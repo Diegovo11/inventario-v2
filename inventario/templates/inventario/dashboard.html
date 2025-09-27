@@ -285,28 +285,43 @@
 
 {% block extra_js %}
 <script>
-// Gráfico de movimientos
-const ctx = document.getElementById('movimientosChart').getContext('2d');
-const movimientosChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: {{ fechas_movimientos|safe }},
-        datasets: [{
-            label: 'Entradas',
-            data: {{ entradas_data|safe }},
-            borderColor: 'rgb(32, 201, 151)',
-            backgroundColor: 'rgba(32, 201, 151, 0.1)',
-            fill: true,
-            tension: 0.4
-        }, {
-            label: 'Salidas',
-            data: {{ salidas_data|safe }},
-            borderColor: 'rgb(220, 53, 69)',
-            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-            fill: true,
-            tension: 0.4
-        }]
-    },
+document.addEventListener('DOMContentLoaded', function() {
+    // Gráfico de movimientos
+    const ctx = document.getElementById('movimientosChart');
+    if (!ctx) return; // Salir si no existe el elemento
+    
+    const chartContext = ctx.getContext('2d');
+    
+    // Datos del servidor con valores por defecto
+    const fechasData = {{ fechas_movimientos|safe }};
+    const entradasData = {{ entradas_data|safe }};
+    const salidasData = {{ salidas_data|safe }};
+    
+    // Datos por defecto si no hay datos del servidor
+    const fechasMovimientos = fechasData || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const entradas = entradasData || [0, 0, 0, 0, 0, 0, 0];
+    const salidas = salidasData || [0, 0, 0, 0, 0, 0, 0];
+    
+    const movimientosChart = new Chart(chartContext, {
+        type: 'line',
+        data: {
+            labels: fechasMovimientos,
+            datasets: [{
+                label: 'Entradas',
+                data: entradas,
+                borderColor: 'rgb(32, 201, 151)',
+                backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Salidas',
+                data: salidas,
+                borderColor: 'rgb(220, 53, 69)',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
     options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -325,19 +340,20 @@ const movimientosChart = new Chart(ctx, {
                     color: 'rgba(0,0,0,0.1)'
                 }
             },
-            x: {
-                grid: {
-                    color: 'rgba(0,0,0,0.1)'
+                x: {
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
                 }
             }
         }
-    }
+    });
+    
+    // Actualización en tiempo real (cada 30 segundos)
+    setInterval(() => {
+        // Aquí puedes agregar código para actualizar las métricas automáticamente
+        console.log('Actualizando datos...');
+    }, 30000);
 });
-
-// Actualización en tiempo real (cada 30 segundos)
-setInterval(() => {
-    // Aquí puedes agregar código para actualizar las métricas automáticamente
-    console.log('Actualizando datos...');
-}, 30000);
 </script>
 {% endblock %}
