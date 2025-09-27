@@ -284,6 +284,11 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Datos para JavaScript -->
+{{ fechas_movimientos|json_script:"fechas-data" }}
+{{ entradas_data|json_script:"entradas-data" }}
+{{ salidas_data|json_script:"salidas-data" }}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Gráfico de movimientos
@@ -292,15 +297,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const chartContext = ctx.getContext('2d');
     
-    // Datos del servidor con valores por defecto
-    const fechasData = {{ fechas_movimientos|safe }};
-    const entradasData = {{ entradas_data|safe }};
-    const salidasData = {{ salidas_data|safe }};
+    // Obtener datos de forma segura
+    const fechasElement = document.getElementById('fechas-data');
+    const entradasElement = document.getElementById('entradas-data');
+    const salidasElement = document.getElementById('salidas-data');
     
-    // Datos por defecto si no hay datos del servidor
-    const fechasMovimientos = fechasData || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    const entradas = entradasData || [0, 0, 0, 0, 0, 0, 0];
-    const salidas = salidasData || [0, 0, 0, 0, 0, 0, 0];
+    // Parsear datos o usar valores por defecto
+    let fechasMovimientos = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    let entradas = [0, 0, 0, 0, 0, 0, 0];
+    let salidas = [0, 0, 0, 0, 0, 0, 0];
+    
+    try {
+        if (fechasElement && fechasElement.textContent) {
+            const parsedFechas = JSON.parse(fechasElement.textContent);
+            if (parsedFechas && parsedFechas.length > 0) {
+                fechasMovimientos = parsedFechas;
+            }
+        }
+        
+        if (entradasElement && entradasElement.textContent) {
+            const parsedEntradas = JSON.parse(entradasElement.textContent);
+            if (parsedEntradas && Array.isArray(parsedEntradas)) {
+                entradas = parsedEntradas;
+            }
+        }
+        
+        if (salidasElement && salidasElement.textContent) {
+            const parsedSalidas = JSON.parse(salidasElement.textContent);
+            if (parsedSalidas && Array.isArray(parsedSalidas)) {
+                salidas = parsedSalidas;
+            }
+        }
+    } catch (e) {
+        console.log('Using default chart data');
+    }
     
     const movimientosChart = new Chart(chartContext, {
         type: 'line',
@@ -322,24 +352,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 tension: 0.4
             }]
         },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            title: {
-                display: false
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                grid: {
-                    color: 'rgba(0,0,0,0.1)'
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: false
                 }
             },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
                 x: {
                     grid: {
                         color: 'rgba(0,0,0,0.1)'
