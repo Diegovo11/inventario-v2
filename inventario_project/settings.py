@@ -30,6 +30,16 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 # Railway automáticamente configura esta variable en producción
 ALLOWED_HOSTS = ['*'] if config('RAILWAY_ENVIRONMENT', default=None) else ['127.0.0.1', 'localhost']
 
+# CSRF Configuration for Railway
+if config('RAILWAY_ENVIRONMENT', default=None):
+    CSRF_TRUSTED_ORIGINS = [
+        'https://web-production-944d97.up.railway.app',
+        'https://*.railway.app',
+    ]
+    # También deshabilitar CSRF para testing (temporal)
+    # CSRF_COOKIE_SECURE = False
+    # CSRF_COOKIE_HTTPONLY = False
+
 
 # Application definition
 
