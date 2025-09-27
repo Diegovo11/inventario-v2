@@ -106,15 +106,13 @@
                                     <span class="small">{{ material.cantidad_disponible }} {{ material.unidad_base }}</span>
                                 </div>
                                 <div class="progress" style="height: 8px;">
-                                    {% with porcentaje=material.cantidad_disponible|floatformat:0 %}
-                                        <div class="progress-bar 
-                                            {% if material.cantidad_disponible <= 10 %}bg-danger progress-critical
-                                            {% elif material.cantidad_disponible <= 25 %}bg-warning progress-low
-                                            {% else %}bg-warning progress-warning{% endif %}" 
-                                            role="progressbar" 
-                                            style="width: {% widthratio material.cantidad_disponible stock_minimo 100 %}%">
-                                        </div>
-                                    {% endwith %}
+                                    <div class="progress-bar 
+                                        {% if material.cantidad_disponible <= 10 %}bg-danger progress-critical
+                                        {% elif material.cantidad_disponible <= 25 %}bg-warning progress-low
+                                        {% else %}bg-warning progress-warning{% endif %}" 
+                                        role="progressbar" 
+                                        data-width="{% widthratio material.cantidad_disponible stock_minimo 100 %}">
+                                    </div>
                                 </div>
                                 <div class="d-flex justify-content-between mt-1">
                                     <small class="text-muted">0</small>
@@ -239,6 +237,12 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Configurar barras de progreso
+    document.querySelectorAll('.progress-bar[data-width]').forEach(function(bar) {
+        const width = bar.dataset.width;
+        bar.style.width = Math.min(100, Math.max(0, width)) + '%';
+    });
+    
     // Auto-refresh cada 30 segundos
     setInterval(function() {
         const refreshBtn = document.querySelector('.btn-outline-primary');

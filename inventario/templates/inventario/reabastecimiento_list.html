@@ -242,7 +242,7 @@
                                             <div class="progress" style="height: 20px;">
                                                 <div class="progress-bar {% if reab.porcentaje_completado == 100 %}bg-success{% else %}bg-info{% endif %}" 
                                                      role="progressbar" 
-                                                     style="width: {{ reab.porcentaje_completado }}%">
+                                                     data-width="{{ reab.porcentaje_completado }}">
                                                     {{ reab.porcentaje_completado }}%
                                                 </div>
                                             </div>
@@ -282,4 +282,24 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar barras de progreso
+    document.querySelectorAll('.progress-bar[data-width]').forEach(function(bar) {
+        const width = bar.dataset.width;
+        bar.style.width = Math.min(100, Math.max(0, width)) + '%';
+    });
+    
+    // Auto-refresh cada 60 segundos para actualizar estados
+    setInterval(function() {
+        if (!document.hidden) {
+            console.log('Auto-checking for updates...');
+            // En una implementación real, aquí haríamos AJAX para actualizar la tabla
+        }
+    }, 60000);
+});
+</script>
 {% endblock %}
