@@ -31,14 +31,18 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = ['*'] if config('RAILWAY_ENVIRONMENT', default=None) else ['127.0.0.1', 'localhost']
 
 # CSRF Configuration for Railway
+CSRF_TRUSTED_ORIGINS = [
+    'https://web-production-944d97.up.railway.app',
+    'https://*.up.railway.app',
+    'https://*.railway.app',
+]
+
+# Si estamos en Railway, configurar CSRF correctamente
 if config('RAILWAY_ENVIRONMENT', default=None):
-    CSRF_TRUSTED_ORIGINS = [
-        'https://web-production-944d97.up.railway.app',
-        'https://*.railway.app',
-    ]
-    # También deshabilitar CSRF para testing (temporal)
-    # CSRF_COOKIE_SECURE = False
-    # CSRF_COOKIE_HTTPONLY = False
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
 
 
 # Application definition
