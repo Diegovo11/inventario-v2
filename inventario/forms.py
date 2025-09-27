@@ -1,6 +1,6 @@
 from django import forms
 from django.utils import timezone
-from .models import Reabastecimiento, Material, TipoMono, RecetaProduccion, SimulacionProduccion
+from .models import Reabastecimiento, Material, TipoMono, RecetaProduccion, SimulacionProduccion, Insumo, Movimiento
 
 class ReabastecimientoForm(forms.ModelForm):
     class Meta:
@@ -240,3 +240,134 @@ class RecetaProduccionForm(forms.ModelForm):
             'es_opcional': 'Es Opcional',
             'notas': 'Notas',
         }
+
+class MaterialForm(forms.ModelForm):
+    class Meta:
+        model = Material
+        fields = ['codigo', 'nombre', 'descripcion', 'tipo_material', 'unidad_base', 
+                 'factor_conversion', 'cantidad_disponible', 'precio_compra', 'categoria']
+        widgets = {
+            'codigo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: M001'
+            }),
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Listón rojo'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': '3',
+                'placeholder': 'Descripción detallada del material...'
+            }),
+            'tipo_material': forms.Select(attrs={'class': 'form-select'}),
+            'unidad_base': forms.Select(attrs={'class': 'form-select'}),
+            'factor_conversion': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': '100'
+            }),
+            'cantidad_disponible': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'placeholder': '0'
+            }),
+            'precio_compra': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.01',
+                'placeholder': '0.00'
+            }),
+            'categoria': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: listón, piedra, adorno'
+            }),
+        }
+        labels = {
+            'codigo': 'Código',
+            'nombre': 'Nombre del Material',
+            'descripcion': 'Descripción',
+            'tipo_material': 'Tipo de Material',
+            'unidad_base': 'Unidad Base',
+            'factor_conversion': 'Factor de Conversión',
+            'cantidad_disponible': 'Cantidad Disponible',
+            'precio_compra': 'Precio de Compra',
+            'categoria': 'Categoría',
+        }
+
+class InsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumo
+        fields = ['nombre', 'descripcion', 'cantidad_por_unidad', 'unidad_consumo', 'material']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Moño básico'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': '3',
+                'placeholder': 'Descripción del insumo...'
+            }),
+            'cantidad_por_unidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': '10'
+            }),
+            'unidad_consumo': forms.Select(attrs={'class': 'form-select'}),
+            'material': forms.Select(attrs={'class': 'form-select'}),
+        }
+        labels = {
+            'nombre': 'Nombre del Insumo',
+            'descripcion': 'Descripción',
+            'cantidad_por_unidad': 'Cantidad por Unidad',
+            'unidad_consumo': 'Unidad de Consumo',
+            'material': 'Material Asociado',
+        }
+
+class MovimientoForm(forms.ModelForm):
+    class Meta:
+        model = Movimiento
+        fields = ['material', 'tipo_movimiento', 'cantidad', 'detalle']
+        widgets = {
+            'material': forms.Select(attrs={'class': 'form-select'}),
+            'tipo_movimiento': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0'
+            }),
+            'detalle': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': '3',
+                'placeholder': 'Motivo del movimiento...'
+            }),
+        }
+        labels = {
+            'material': 'Material',
+            'tipo_movimiento': 'Tipo de Movimiento',
+            'cantidad': 'Cantidad',
+            'detalle': 'Detalle/Motivo',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Personalizar help text para cantidad según tipo de movimiento
+        self.fields['cantidad'].help_text = "Para salidas, usar número positivo (se convertirá automáticamente)"
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        # Convertir salidas a negativo automáticamente
+        if instance.tipo_movimiento == 'salida' and instance.cantidad > 0:
+            instance.cantidad = -instance.cantidad
+        
+        if commit:
+            instance.save()
+            
+            # Actualizar el stock del material
+            if instance.tipo_movimiento in ['entrada', 'salida']:
+                material = instance.material
+                material.cantidad_disponible += instance.cantidad
+                material.save()
+                
+        return instance

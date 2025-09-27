@@ -1,24 +1,391 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block title %}Movimientos - Inventario{% endblock %}
 
+{% block extra_css %}
+    <style>
+        .card-header { 
+            background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%); 
+        }
+        .table-container { 
+            border-radius: 15px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        }
+        .table thead th { 
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%); 
+            color: white; 
+            font-weight: 600; 
+            border: none;
+            padding: 15px 12px;
+        }
+        .table tbody td { 
+            padding: 12px; 
+            border-color: #e9ecef; 
+            vertical-align: middle;
+        }
+        .table tbody tr:hover { 
+            background-color: #f8f9fa; 
+            transform: scale(1.005);
+            transition: all 0.2s ease;
+        }
+        .btn-floating {
+            border-radius: 50px;
+            padding: 12px 25px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(32, 201, 151, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-floating:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(32, 201, 151, 0.4);
+        }
+        .movement-entrada { border-left: 4px solid #28a745; }
+        .movement-salida { border-left: 4px solid #dc3545; }
+        .movement-ajuste { border-left: 4px solid #ffc107; }
+        .filter-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">
-            <i class="bi bi-arrow-left-right me-2 text-primary"></i>
-            Historial de Movimientos
-        </h1>
-        <button class="btn btn-primary">
-            <i class="bi bi-plus-lg me-1"></i>
-            Nuevo Movimiento
-        </button>
-    </div>
-
-    <div class="card">
-        <div class="card-body">
-            <p class="text-center text-muted">Página de movimientos en desarrollo...</p>
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-1">
+                        <i class="bi bi-arrow-left-right me-2 text-primary"></i>
+                        Historial de Movimientos
+                    </h1>
+                    <p class="text-muted mb-0">Registro completo de movimientos de inventario</p>
+                </div>
+                <a href="{% url 'movimiento_create' %}" class="btn btn-success btn-floating">
+                    <i class="bi bi-plus-lg me-2"></i>
+                    Nuevo Movimiento
+                </a>
+            </div>
         </div>
     </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3>{{ total_entradas }}</h3>
+                            <p class="mb-0">Entradas</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-box-arrow-in-down" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3>{{ total_salidas }}</h3>
+                            <p class="mb-0">Salidas</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-box-arrow-up" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3>{{ total_ajustes }}</h3>
+                            <p class="mb-0">Ajustes</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-gear" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3>${{ valor_total_movimientos|floatformat:0 }}</h3>
+                            <p class="mb-0">Valor Total</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-currency-dollar" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-section">
+                <h5 class="mb-3">
+                    <i class="bi bi-funnel me-2"></i>
+                    Filtros
+                </h5>
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <select name="tipo_movimiento" class="form-select" id="tipoMovimiento">
+                                <option value="">Todos los tipos</option>
+                                <option value="entrada" {% if request.GET.tipo_movimiento == 'entrada' %}selected{% endif %}>Entrada</option>
+                                <option value="salida" {% if request.GET.tipo_movimiento == 'salida' %}selected{% endif %}>Salida</option>
+                                <option value="ajuste" {% if request.GET.tipo_movimiento == 'ajuste' %}selected{% endif %}>Ajuste</option>
+                            </select>
+                            <label for="tipoMovimiento">Tipo de Movimiento</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-floating">
+                            <select name="material" class="form-select" id="materialFilter">
+                                <option value="">Todos los materiales</option>
+                                {% for material in materiales %}
+                                    <option value="{{ material.id }}" {% if request.GET.material == material.id|stringformat:"s" %}selected{% endif %}>
+                                        {{ material.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <label for="materialFilter">Material</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-floating">
+                            <input type="date" name="fecha_desde" class="form-control" id="fechaDesde" value="{{ request.GET.fecha_desde }}">
+                            <label for="fechaDesde">Fecha Desde</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-floating">
+                            <input type="date" name="fecha_hasta" class="form-control" id="fechaHasta" value="{{ request.GET.fecha_hasta }}">
+                            <label for="fechaHasta">Fecha Hasta</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-1"></i>
+                                Filtrar
+                            </button>
+                            <a href="{% url 'movimientos_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>
+                                Limpiar
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movimientos Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card table-container">
+                <div class="card-header text-white py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table me-2"></i>
+                        Movimientos de Inventario
+                        {% if movimientos.count %}
+                            <span class="badge bg-light text-dark ms-2">{{ movimientos.count }} registros</span>
+                        {% endif %}
+                    </h5>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Material</th>
+                                    <th>Cantidad</th>
+                                    <th>Costo Unit.</th>
+                                    <th>Costo Total</th>
+                                    <th>Responsable</th>
+                                    <th>Observaciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movimiento in movimientos %}
+                                    <tr class="movement-{{ movimiento.tipo_movimiento }}">
+                                        <td>
+                                            <strong>{{ movimiento.fecha|date:"d/m/Y" }}</strong>
+                                            <br><small class="text-muted">{{ movimiento.fecha|date:"H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            {% if movimiento.tipo_movimiento == 'entrada' %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-box-arrow-in-down me-1"></i>
+                                                    Entrada
+                                                </span>
+                                            {% elif movimiento.tipo_movimiento == 'salida' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-box-arrow-up me-1"></i>
+                                                    Salida
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    <i class="bi bi-gear me-1"></i>
+                                                    Ajuste
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ movimiento.material.nombre }}</strong>
+                                            <br><small class="text-muted">{{ movimiento.material.codigo }}</small>
+                                        </td>
+                                        <td>
+                                            {% if movimiento.tipo_movimiento == 'entrada' %}
+                                                <span class="text-success fw-bold">+{{ movimiento.cantidad }}</span>
+                                            {% elif movimiento.tipo_movimiento == 'salida' %}
+                                                <span class="text-danger fw-bold">-{{ movimiento.cantidad }}</span>
+                                            {% else %}
+                                                <span class="text-warning fw-bold">
+                                                    {% if movimiento.cantidad >= 0 %}+{% endif %}{{ movimiento.cantidad }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>${{ movimiento.costo_unitario|floatformat:4 }}</td>
+                                        <td>
+                                            <strong class="text-primary">${{ movimiento.costo_total|floatformat:2 }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if movimiento.responsable %}
+                                                {{ movimiento.responsable }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if movimiento.observaciones %}
+                                                <span title="{{ movimiento.observaciones }}">
+                                                    {{ movimiento.observaciones|truncatechars:30 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5">
+                                            <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                            <p class="mt-2 text-muted mb-3">No hay movimientos registrados</p>
+                                            {% if not request.GET %}
+                                                <a href="{% url 'movimiento_create' %}" class="btn btn-success">
+                                                    <i class="bi bi-plus-lg me-1"></i>
+                                                    Registrar primer movimiento
+                                                </a>
+                                            {% else %}
+                                                <p class="text-muted">Prueba con filtros diferentes</p>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginación si fuera necesaria -->
+                    {% if is_paginated %}
+                        <div class="card-footer">
+                            <nav aria-label="Paginación de movimientos">
+                                <ul class="pagination justify-content-center mb-0">
+                                    {% if page_obj.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if request.GET.tipo_movimiento %}&tipo_movimiento={{ request.GET.tipo_movimiento }}{% endif %}{% if request.GET.material %}&material={{ request.GET.material }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}">Primera</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.tipo_movimiento %}&tipo_movimiento={{ request.GET.tipo_movimiento }}{% endif %}{% if request.GET.material %}&material={{ request.GET.material }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}">Anterior</a>
+                                        </li>
+                                    {% endif %}
+                                    
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                        </span>
+                                    </li>
+                                    
+                                    {% if page_obj.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.tipo_movimiento %}&tipo_movimiento={{ request.GET.tipo_movimiento }}{% endif %}{% if request.GET.material %}&material={{ request.GET.material }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}">Siguiente</a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.tipo_movimiento %}&tipo_movimiento={{ request.GET.tipo_movimiento }}{% endif %}{% if request.GET.material %}&material={{ request.GET.material }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}">Última</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen rápido -->
+    {% if movimientos.count > 0 %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info" role="alert">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Resumen de la Vista Actual
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Total de registros:</strong> {{ movimientos.count }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Valor total:</strong> ${{ valor_total_movimientos|floatformat:2 }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Período:</strong> 
+                            {% if request.GET.fecha_desde or request.GET.fecha_hasta %}
+                                {% if request.GET.fecha_desde %}{{ request.GET.fecha_desde }}{% else %}Inicio{% endif %} - 
+                                {% if request.GET.fecha_hasta %}{{ request.GET.fecha_hasta }}{% else %}Hoy{% endif %}
+                            {% else %}
+                                Todos los tiempos
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Filtros activos:</strong> 
+                            {% if request.GET.tipo_movimiento or request.GET.material %}
+                                <span class="badge bg-secondary">Sí</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">Ninguno</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

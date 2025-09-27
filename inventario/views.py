@@ -6,7 +6,8 @@ from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Material, Insumo, Movimiento, Reabastecimiento, TipoMono, RecetaProduccion, SimulacionProduccion
-from .forms import ReabastecimientoForm, ReabastecimientoUpdateForm, StockBajoForm, SimuladorForm, TipoMonoForm
+from .forms import (ReabastecimientoForm, ReabastecimientoUpdateForm, StockBajoForm, 
+                    SimuladorForm, TipoMonoForm, MaterialForm, InsumoForm, MovimientoForm)
 import json
 
 @login_required
@@ -324,21 +325,132 @@ def reportes(request):
     """Página de reportes"""
     return render(request, 'inventario/reportes.html')
 
-# Views para crear nuevos elementos (placeholder)
+# Views para gestión completa de elementos
 @login_required
 def material_create(request):
-    messages.info(request, 'Funcionalidad de crear material próximamente')
-    return redirect('dashboard')
+    """Crear nuevo material"""
+    if request.method == 'POST':
+        form = MaterialForm(request.POST)
+        if form.is_valid():
+            material = form.save()
+            messages.success(request, f'Material "{material.nombre}" creado correctamente')
+            return redirect('materiales_list')
+    else:
+        form = MaterialForm()
+    
+    return render(request, 'inventario/material_form.html', {
+        'form': form,
+        'title': 'Crear Material'
+    })
+
+@login_required
+def material_edit(request, pk):
+    """Editar material existente"""
+    material = get_object_or_404(Material, pk=pk)
+    
+    if request.method == 'POST':
+        form = MaterialForm(request.POST, instance=material)
+        if form.is_valid():
+            material = form.save()
+            messages.success(request, f'Material "{material.nombre}" actualizado correctamente')
+            return redirect('materiales_list')
+    else:
+        form = MaterialForm(instance=material)
+    
+    return render(request, 'inventario/material_form.html', {
+        'form': form,
+        'material': material,
+        'title': 'Editar Material'
+    })
+
+@login_required
+def material_delete(request, pk):
+    """Eliminar material"""
+    material = get_object_or_404(Material, pk=pk)
+    
+    if request.method == 'POST':
+        nombre = material.nombre
+        material.delete()
+        messages.success(request, f'Material "{nombre}" eliminado correctamente')
+        return redirect('materiales_list')
+    
+    return render(request, 'inventario/confirm_delete.html', {
+        'objeto': material,
+        'tipo': 'Material',
+        'url_cancelar': 'materiales_list'
+    })
 
 @login_required
 def insumo_create(request):
-    messages.info(request, 'Funcionalidad de crear insumo próximamente')
-    return redirect('dashboard')
+    """Crear nuevo insumo"""
+    if request.method == 'POST':
+        form = InsumoForm(request.POST)
+        if form.is_valid():
+            insumo = form.save()
+            messages.success(request, f'Insumo "{insumo.nombre}" creado correctamente')
+            return redirect('insumos_list')
+    else:
+        form = InsumoForm()
+    
+    return render(request, 'inventario/insumo_form.html', {
+        'form': form,
+        'title': 'Crear Insumo'
+    })
+
+@login_required
+def insumo_edit(request, pk):
+    """Editar insumo existente"""
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        form = InsumoForm(request.POST, instance=insumo)
+        if form.is_valid():
+            insumo = form.save()
+            messages.success(request, f'Insumo "{insumo.nombre}" actualizado correctamente')
+            return redirect('insumos_list')
+    else:
+        form = InsumoForm(instance=insumo)
+    
+    return render(request, 'inventario/insumo_form.html', {
+        'form': form,
+        'insumo': insumo,
+        'title': 'Editar Insumo'
+    })
+
+@login_required
+def insumo_delete(request, pk):
+    """Eliminar insumo"""
+    insumo = get_object_or_404(Insumo, pk=pk)
+    
+    if request.method == 'POST':
+        nombre = insumo.nombre
+        insumo.delete()
+        messages.success(request, f'Insumo "{nombre}" eliminado correctamente')
+        return redirect('insumos_list')
+    
+    return render(request, 'inventario/confirm_delete.html', {
+        'objeto': insumo,
+        'tipo': 'Insumo',
+        'url_cancelar': 'insumos_list'
+    })
 
 @login_required
 def movimiento_create(request):
-    messages.info(request, 'Funcionalidad de crear movimiento próximamente')
-    return redirect('dashboard')
+    """Crear nuevo movimiento"""
+    if request.method == 'POST':
+        form = MovimientoForm(request.POST)
+        if form.is_valid():
+            movimiento = form.save()
+            tipo_texto = movimiento.get_tipo_movimiento_display()
+            messages.success(request, f'{tipo_texto} de {abs(movimiento.cantidad)} {movimiento.material.unidad_base} registrado')
+            return redirect('movimientos_list')
+    else:
+        form = MovimientoForm()
+    
+    return render(request, 'inventario/movimiento_form.html', {
+        'form': form,
+        'title': 'Registrar Movimiento'
+    })
 
 # Alias para compatibilidad con enlaces existentes
 @login_required  

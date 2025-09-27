@@ -25,8 +25,16 @@ urlpatterns = [
     # Otras funcionalidades
     path('reportes/', views.reportes, name='reportes'),
     
-    # Crear elementos
+    # Gestión de Materiales
     path('material/nuevo/', views.material_create, name='material_create'),
+    path('material/<int:pk>/editar/', views.material_edit, name='material_edit'),
+    path('material/<int:pk>/eliminar/', views.material_delete, name='material_delete'),
+    
+    # Gestión de Insumos  
     path('insumo/nuevo/', views.insumo_create, name='insumo_create'),
+    path('insumo/<int:pk>/editar/', views.insumo_edit, name='insumo_edit'),
+    path('insumo/<int:pk>/eliminar/', views.insumo_delete, name='insumo_delete'),
+    
+    # Gestión de Movimientos
     path('movimiento/nuevo/', views.movimiento_create, name='movimiento_create'),
 ]

@@ -1,0 +1,264 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Inventario{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        border: none;
+    }
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        padding: 2rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .info-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card form-card">
+                <div class="form-header text-center">
+                    <h2 class="mb-2">
+                        <i class="fas fa-box me-3"></i>{{ title }}
+                    </h2>
+                    <p class="mb-0 opacity-75">
+                        {% if material %}
+                            Modificar información del material {{ material.codigo }}
+                        {% else %}
+                            Agregar un nuevo material al inventario
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div class="card-body p-4">
+                    {% if material %}
+                        <div class="info-card">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Código actual:</strong> {{ material.codigo }}</p>
+                                    <p class="mb-2"><strong>Stock actual:</strong> {{ material.cantidad_disponible }} {{ material.unidad_base }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Costo unitario:</strong> ${{ material.costo_unitario|floatformat:4 }}</p>
+                                    <p class="mb-2"><strong>Creado:</strong> {{ material.created_at|date:"d/m/Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <!-- Código -->
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.codigo.id_for_label }}" class="form-label">
+                                    {{ form.codigo.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.codigo }}
+                                <div class="form-text">Identificador único, ej: M001, M002</div>
+                                {% if form.codigo.errors %}
+                                    <div class="text-danger small mt-1">{{ form.codigo.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Nombre -->
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                    {{ form.nombre.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.nombre }}
+                                {% if form.nombre.errors %}
+                                    <div class="text-danger small mt-1">{{ form.nombre.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Descripción -->
+                            <div class="col-12 mb-3">
+                                <label for="{{ form.descripcion.id_for_label }}" class="form-label">
+                                    {{ form.descripcion.label }}
+                                </label>
+                                {{ form.descripcion }}
+                                {% if form.descripcion.errors %}
+                                    <div class="text-danger small mt-1">{{ form.descripcion.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Tipo y Unidad -->
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.tipo_material.id_for_label }}" class="form-label">
+                                    {{ form.tipo_material.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.tipo_material }}
+                                {% if form.tipo_material.errors %}
+                                    <div class="text-danger small mt-1">{{ form.tipo_material.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.unidad_base.id_for_label }}" class="form-label">
+                                    {{ form.unidad_base.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.unidad_base }}
+                                {% if form.unidad_base.errors %}
+                                    <div class="text-danger small mt-1">{{ form.unidad_base.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.factor_conversion.id_for_label }}" class="form-label">
+                                    {{ form.factor_conversion.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.factor_conversion }}
+                                <div class="form-text">Unidades por paquete/rollo</div>
+                                {% if form.factor_conversion.errors %}
+                                    <div class="text-danger small mt-1">{{ form.factor_conversion.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Stock y Precios -->
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.cantidad_disponible.id_for_label }}" class="form-label">
+                                    {{ form.cantidad_disponible.label }}
+                                </label>
+                                {{ form.cantidad_disponible }}
+                                <div class="form-text">Stock inicial</div>
+                                {% if form.cantidad_disponible.errors %}
+                                    <div class="text-danger small mt-1">{{ form.cantidad_disponible.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.precio_compra.id_for_label }}" class="form-label">
+                                    {{ form.precio_compra.label }}
+                                </label>
+                                {{ form.precio_compra }}
+                                <div class="form-text">Precio total de compra</div>
+                                {% if form.precio_compra.errors %}
+                                    <div class="text-danger small mt-1">{{ form.precio_compra.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.categoria.id_for_label }}" class="form-label">
+                                    {{ form.categoria.label }}
+                                </label>
+                                {{ form.categoria }}
+                                <div class="form-text">Para organizar materiales</div>
+                                {% if form.categoria.errors %}
+                                    <div class="text-danger small mt-1">{{ form.categoria.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Información calculada -->
+                        {% if material %}
+                            <div class="info-card">
+                                <h6 class="mb-3"><i class="fas fa-calculator me-2"></i>Valores Calculados</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>Costo unitario actual:</strong></p>
+                                        <span class="badge bg-info">${{ material.costo_unitario|floatformat:4 }} por {{ material.unidad_base }}</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-1"><strong>Valor total en stock:</strong></p>
+                                        <span class="badge bg-success">${{ material.cantidad_disponible|floatformat:2 }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Botones de acción -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'materiales_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-1"></i>
+                                {% if material %}Actualizar{% else %}Crear{% endif %} Material
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular costo unitario en tiempo real
+    const precioInput = document.querySelector('input[name="precio_compra"]');
+    const factorInput = document.querySelector('input[name="factor_conversion"]');
+    
+    function calcularCostoUnitario() {
+        if (precioInput && factorInput && precioInput.value && factorInput.value) {
+            const precio = parseFloat(precioInput.value);
+            const factor = parseFloat(factorInput.value);
+            
+            if (precio > 0 && factor > 0) {
+                const costoUnitario = precio / factor;
+                
+                // Mostrar el cálculo visual
+                let infoDiv = document.getElementById('costo-calculado');
+                if (!infoDiv) {
+                    infoDiv = document.createElement('div');
+                    infoDiv.id = 'costo-calculado';
+                    infoDiv.className = 'alert alert-info mt-3';
+                    factorInput.closest('.row').after(infoDiv);
+                }
+                
+                infoDiv.innerHTML = `
+                    <i class="fas fa-calculator me-2"></i>
+                    <strong>Costo unitario calculado:</strong> $${costoUnitario.toFixed(4)} por unidad
+                `;
+            }
+        }
+    }
+    
+    if (precioInput) precioInput.addEventListener('input', calcularCostoUnitario);
+    if (factorInput) factorInput.addEventListener('input', calcularCostoUnitario);
+    
+    // Validaciones en tiempo real
+    const codigoInput = document.querySelector('input[name="codigo"]');
+    if (codigoInput) {
+        codigoInput.addEventListener('input', function() {
+            // Convertir a mayúsculas
+            this.value = this.value.toUpperCase();
+            
+            // Validar formato
+            if (this.value && !/^[A-Z]\d{3}$/.test(this.value)) {
+                this.setCustomValidity('Formato sugerido: M001, L001, etc.');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
