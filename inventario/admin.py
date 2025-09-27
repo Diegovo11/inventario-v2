@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Material, Insumo, Movimiento
+from .models import Material, Insumo, Movimiento, Reabastecimiento
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
@@ -38,3 +38,37 @@ class MovimientoAdmin(admin.ModelAdmin):
     search_fields = ['material__nombre', 'material__codigo', 'detalle']
     readonly_fields = ['created_at']
     date_hierarchy = 'fecha'
+
+@admin.register(Reabastecimiento)
+class ReabastecimientoAdmin(admin.ModelAdmin):
+    list_display = ['material', 'cantidad_solicitada', 'cantidad_recibida', 'estado', 'prioridad', 'proveedor', 'fecha_solicitud']
+    list_filter = ['estado', 'prioridad', 'automatico', 'fecha_solicitud', 'material__categoria']
+    search_fields = ['material__nombre', 'material__codigo', 'proveedor', 'notas']
+    readonly_fields = ['fecha_solicitud', 'created_at', 'updated_at', 'dias_desde_solicitud', 'esta_retrasado', 'porcentaje_completado']
+    date_hierarchy = 'fecha_solicitud'
+    
+    fieldsets = (
+        ('Información del Pedido', {
+            'fields': ('material', 'cantidad_solicitada', 'cantidad_recibida', 'proveedor')
+        }),
+        ('Estado y Prioridad', {
+            'fields': ('estado', 'prioridad', 'automatico')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_solicitud', 'fecha_estimada_llegada', 'fecha_recepcion')
+        }),
+        ('Costos', {
+            'fields': ('precio_estimado', 'precio_real')
+        }),
+        ('Configuración', {
+            'fields': ('stock_minimo_sugerido', 'notas')
+        }),
+        ('Métricas', {
+            'fields': ('dias_desde_solicitud', 'esta_retrasado', 'porcentaje_completado'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

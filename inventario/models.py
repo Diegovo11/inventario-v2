@@ -107,3 +107,136 @@ class Movimiento(models.Model):
     
     def __str__(self):
         return f"{self.get_tipo_movimiento_display()} - {self.material.codigo} - {self.cantidad}"
+
+
+class Reabastecimiento(models.Model):
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('solicitado', 'Solicitado'),
+        ('en_transito', 'En Tránsito'),
+        ('recibido', 'Recibido'),
+        ('cancelado', 'Cancelado'),
+    ]
+    
+    PRIORIDAD_CHOICES = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica'),
+    ]
+    
+    material = models.ForeignKey(
+        Material, 
+        on_delete=models.CASCADE,
+        help_text="Material a reabastecer"
+    )
+    cantidad_solicitada = models.PositiveIntegerField(
+        help_text="Cantidad a solicitar en unidad base"
+    )
+    cantidad_recibida = models.PositiveIntegerField(
+        default=0,
+        help_text="Cantidad realmente recibida"
+    )
+    proveedor = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Nombre del proveedor o lugar de compra"
+    )
+    precio_estimado = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio estimado total de la compra"
+    )
+    precio_real = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio real pagado"
+    )
+    estado = models.CharField(
+        max_length=15, 
+        choices=ESTADO_CHOICES, 
+        default='pendiente'
+    )
+    prioridad = models.CharField(
+        max_length=10, 
+        choices=PRIORIDAD_CHOICES, 
+        default='media'
+    )
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_estimada_llegada = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Fecha estimada de llegada del pedido"
+    )
+    fecha_recepcion = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Fecha real cuando se recibió el pedido"
+    )
+    notas = models.TextField(
+        blank=True,
+        help_text="Observaciones adicionales del reabastecimiento"
+    )
+    stock_minimo_sugerido = models.PositiveIntegerField(
+        null=True, 
+        blank=True,
+        help_text="Nivel mínimo de stock sugerido para este material"
+    )
+    automatico = models.BooleanField(
+        default=False,
+        help_text="Si fue generado automáticamente por stock bajo"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Reabastecimiento"
+        verbose_name_plural = "Reabastecimientos"
+        ordering = ['-fecha_solicitud']
+    
+    def __str__(self):
+        return f"{self.material.codigo} - {self.get_estado_display()} - {self.cantidad_solicitada}"
+    
+    def save(self, *args, **kwargs):
+        # Si se marca como recibido y no tiene fecha de recepción, asignarla
+        if self.estado == 'recibido' and not self.fecha_recepcion:
+            from django.utils import timezone
+            self.fecha_recepcion = timezone.now()
+            
+            # Crear movimiento de entrada automáticamente
+            if self.cantidad_recibida > 0:
+                Movimiento.objects.create(
+                    material=self.material,
+                    tipo_movimiento='entrada',
+                    cantidad=self.cantidad_recibida,
+                    detalle=f'Reabastecimiento recibido - {self.proveedor or "Proveedor no especificado"}'
+                )
+                
+                # Actualizar stock del material
+                self.material.cantidad_disponible += self.cantidad_recibida
+                self.material.save()
+                
+        super().save(*args, **kwargs)
+    
+    def dias_desde_solicitud(self):
+        """Retorna los días transcurridos desde la solicitud"""
+        from django.utils import timezone
+        return (timezone.now() - self.fecha_solicitud).days
+    
+    def esta_retrasado(self):
+        """Verifica si el pedido está retrasado"""
+        if self.fecha_estimada_llegada and self.estado not in ['recibido', 'cancelado']:
+            from django.utils import timezone
+            return timezone.now() > self.fecha_estimada_llegada
+        return False
+    
+    def porcentaje_completado(self):
+        """Calcula el porcentaje de completado del pedido"""
+        if self.cantidad_solicitada == 0:
+            return 0
+        return min(100, (self.cantidad_recibida * 100) // self.cantidad_solicitada)

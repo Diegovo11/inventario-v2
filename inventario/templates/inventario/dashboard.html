@@ -94,6 +94,51 @@
         </div>
     </div>
 
+    <!-- Métricas de Reabastecimiento -->
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card metric-card text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-1">Pedidos Pendientes</h6>
+                            <h2 class="mb-0">{{ reabastecimientos_pendientes }}</h2>
+                            <small class="opacity-75">En proceso</small>
+                        </div>
+                        <div class="metric-icon">
+                            <i class="bi bi-cart-plus"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-3">
+            <div class="card metric-card text-white" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-1">Pedidos Retrasados</h6>
+                            <h2 class="mb-0">{{ reabastecimientos_retrasados }}</h2>
+                            <small class="opacity-75">
+                                {% if reabastecimientos_retrasados > 0 %}
+                                    <a href="{% url 'reabastecimiento_list' %}?estado=en_transito" class="text-white text-decoration-none">
+                                        Ver detalles <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                {% else %}
+                                    Todo al día
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="metric-icon">
+                            <i class="bi bi-exclamation-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Gráficos y tablas -->
     <div class="row">
         <!-- Gráfico de movimientos -->
@@ -144,10 +189,14 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        <div class="d-grid mt-3">
-                            <a href="{% url 'reabastecimiento' %}" class="btn btn-warning">
+                        <div class="d-grid gap-2 mt-3">
+                            <a href="{% url 'stock_bajo_check' %}" class="btn btn-warning">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Ver Stock Bajo
+                            </a>
+                            <a href="{% url 'reabastecimiento_list' %}" class="btn btn-outline-primary">
                                 <i class="bi bi-cart-plus me-1"></i>
-                                Reabastecer Ahora
+                                Gestionar Reabastecimiento
                             </a>
                         </div>
                     {% else %}

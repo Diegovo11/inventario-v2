@@ -10,8 +10,13 @@ urlpatterns = [
     path('insumos/', views.insumos_list, name='insumos_list'),
     path('movimientos/', views.movimientos_list, name='movimientos_list'),
     
-    # Funcionalidades avanzadas
-    path('reabastecimiento/', views.reabastecimiento, name='reabastecimiento'),
+    # Sistema de reabastecimiento
+    path('reabastecimiento/', views.reabastecimiento_list, name='reabastecimiento_list'),
+    path('reabastecimiento/nuevo/', views.reabastecimiento_create, name='reabastecimiento_create'),
+    path('reabastecimiento/<int:pk>/editar/', views.reabastecimiento_update, name='reabastecimiento_update'),
+    path('stock-bajo/', views.stock_bajo_check, name='stock_bajo_check'),
+    
+    # Otras funcionalidades
     path('simulador/', views.simulador, name='simulador'),
     path('reportes/', views.reportes, name='reportes'),
     

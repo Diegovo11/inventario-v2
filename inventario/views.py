@@ -5,7 +5,8 @@ from django.db.models import Sum, F, Q
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Material, Insumo, Movimiento
+from .models import Material, Insumo, Movimiento, Reabastecimiento
+from .forms import ReabastecimientoForm, ReabastecimientoUpdateForm, StockBajoForm
 import json
 
 @login_required
@@ -24,6 +25,15 @@ def dashboard(request):
     # Movimientos de hoy
     hoy = timezone.now().date()
     movimientos_hoy = Movimiento.objects.filter(fecha__date=hoy).count()
+    
+    # Métricas de reabastecimiento
+    reabastecimientos_pendientes = Reabastecimiento.objects.filter(
+        estado__in=['pendiente', 'solicitado', 'en_transito']
+    ).count()
+    reabastecimientos_retrasados = len([
+        r for r in Reabastecimiento.objects.filter(estado__in=['pendiente', 'solicitado', 'en_transito'])
+        if r.esta_retrasado()
+    ])
     
     # Materiales con stock bajo (menos de 100 unidades)
     materiales_stock_bajo = Material.objects.filter(
@@ -63,6 +73,8 @@ def dashboard(request):
         'stock_bajo': stock_bajo,
         'valor_total': valor_total,
         'movimientos_hoy': movimientos_hoy,
+        'reabastecimientos_pendientes': reabastecimientos_pendientes,
+        'reabastecimientos_retrasados': reabastecimientos_retrasados,
         'materiales_stock_bajo': materiales_stock_bajo,
         'materiales_mas_usados': materiales_mas_usados,
         'movimientos_recientes': movimientos_recientes,
@@ -98,11 +110,129 @@ def movimientos_list(request):
     })
 
 @login_required
-def reabastecimiento(request):
-    """Sistema de reabastecimiento"""
-    materiales = Material.objects.all().order_by('nombre')
-    return render(request, 'inventario/reabastecimiento.html', {
-        'materiales': materiales
+def reabastecimiento_list(request):
+    """Lista de reabastecimientos"""
+    reabastecimientos = Reabastecimiento.objects.select_related('material').order_by('-fecha_solicitud')
+    
+    # Filtros
+    estado_filter = request.GET.get('estado')
+    prioridad_filter = request.GET.get('prioridad')
+    
+    if estado_filter:
+        reabastecimientos = reabastecimientos.filter(estado=estado_filter)
+    if prioridad_filter:
+        reabastecimientos = reabastecimientos.filter(prioridad=prioridad_filter)
+    
+    # Estadísticas rápidas
+    stats = {
+        'pendientes': reabastecimientos.filter(estado='pendiente').count(),
+        'en_transito': reabastecimientos.filter(estado='en_transito').count(),
+        'recibidos': reabastecimientos.filter(estado='recibido').count(),
+        'retrasados': len([r for r in reabastecimientos if r.esta_retrasado()]),
+    }
+    
+    context = {
+        'reabastecimientos': reabastecimientos,
+        'stats': stats,
+        'estado_filter': estado_filter,
+        'prioridad_filter': prioridad_filter,
+        'estados': Reabastecimiento.ESTADO_CHOICES,
+        'prioridades': Reabastecimiento.PRIORIDAD_CHOICES,
+    }
+    
+    return render(request, 'inventario/reabastecimiento_list.html', context)
+
+@login_required
+def reabastecimiento_create(request):
+    """Crear nuevo reabastecimiento"""
+    if request.method == 'POST':
+        form = ReabastecimientoForm(request.POST)
+        if form.is_valid():
+            reabastecimiento = form.save()
+            messages.success(request, f'Reabastecimiento creado para {reabastecimiento.material.nombre}')
+            return redirect('reabastecimiento_list')
+    else:
+        form = ReabastecimientoForm()
+        
+        # Pre-llenar con material si viene en URL
+        material_id = request.GET.get('material')
+        if material_id:
+            try:
+                material = Material.objects.get(id=material_id)
+                form.initial['material'] = material
+            except Material.DoesNotExist:
+                pass
+    
+    return render(request, 'inventario/reabastecimiento_form.html', {
+        'form': form,
+        'title': 'Crear Reabastecimiento'
+    })
+
+@login_required
+def reabastecimiento_update(request, pk):
+    """Actualizar reabastecimiento existente"""
+    reabastecimiento = get_object_or_404(Reabastecimiento, pk=pk)
+    
+    if request.method == 'POST':
+        form = ReabastecimientoUpdateForm(request.POST, instance=reabastecimiento)
+        if form.is_valid():
+            reabastecimiento = form.save()
+            messages.success(request, f'Reabastecimiento actualizado para {reabastecimiento.material.nombre}')
+            return redirect('reabastecimiento_list')
+    else:
+        form = ReabastecimientoUpdateForm(instance=reabastecimiento)
+    
+    return render(request, 'inventario/reabastecimiento_form.html', {
+        'form': form,
+        'reabastecimiento': reabastecimiento,
+        'title': 'Actualizar Reabastecimiento'
+    })
+
+@login_required
+def stock_bajo_check(request):
+    """Ver materiales con stock bajo y generar reabastecimientos automáticos"""
+    stock_minimo = int(request.GET.get('minimo', 50))
+    
+    materiales_bajo_stock = Material.objects.filter(
+        cantidad_disponible__lt=stock_minimo
+    ).order_by('cantidad_disponible')
+    
+    if request.method == 'POST':
+        form = StockBajoForm(request.POST)
+        if form.is_valid():
+            cantidad_solicitar = form.cleaned_data['cantidad_a_solicitar']
+            proveedor_default = form.cleaned_data['proveedor_default']
+            
+            # Crear reabastecimientos automáticos
+            creados = 0
+            for material in materiales_bajo_stock:
+                # Verificar que no existe ya un reabastecimiento pendiente
+                existe = Reabastecimiento.objects.filter(
+                    material=material,
+                    estado__in=['pendiente', 'solicitado', 'en_transito']
+                ).exists()
+                
+                if not existe:
+                    Reabastecimiento.objects.create(
+                        material=material,
+                        cantidad_solicitada=cantidad_solicitar,
+                        proveedor=proveedor_default,
+                        prioridad='alta' if material.cantidad_disponible < (stock_minimo / 2) else 'media',
+                        stock_minimo_sugerido=stock_minimo,
+                        automatico=True,
+                        notas=f'Generado automáticamente por stock bajo ({material.cantidad_disponible} < {stock_minimo})'
+                    )
+                    creados += 1
+            
+            messages.success(request, f'Se crearon {creados} reabastecimientos automáticos')
+            return redirect('reabastecimiento_list')
+    else:
+        form = StockBajoForm()
+    
+    return render(request, 'inventario/stock_bajo.html', {
+        'materiales': materiales_bajo_stock,
+        'form': form,
+        'stock_minimo': stock_minimo,
     })
 
 @login_required
@@ -133,3 +263,9 @@ def insumo_create(request):
 def movimiento_create(request):
     messages.info(request, 'Funcionalidad de crear movimiento próximamente')
     return redirect('dashboard')
+
+# Alias para compatibilidad con enlaces existentes
+@login_required  
+def reabastecimiento(request):
+    """Redireccionar a la nueva vista de reabastecimiento"""
+    return redirect('reabastecimiento_list')

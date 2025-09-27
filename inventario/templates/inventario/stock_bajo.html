@@ -1,0 +1,258 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block title %}Stock Bajo - Inventario{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stock-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: none;
+        border-radius: 10px;
+    }
+    .stock-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .stock-level-critical {
+        border-left: 4px solid #dc3545;
+    }
+    .stock-level-low {
+        border-left: 4px solid #fd7e14;
+    }
+    .stock-level-warning {
+        border-left: 4px solid #ffc107;
+    }
+    .progress-critical {
+        background-color: #f8d7da;
+    }
+    .progress-low {
+        background-color: #ffeaa7;
+    }
+    .progress-warning {
+        background-color: #fff3cd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Header -->
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-danger mb-1">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Stock Bajo
+                    </h2>
+                    <p class="text-muted mb-0">Materiales que requieren reabastecimiento urgente</p>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'reabastecimiento_list' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-1"></i>Volver
+                    </a>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#stockModal">
+                        <i class="fas fa-cog me-1"></i>Configurar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerta de Estado -->
+    {% if materiales %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                    <i class="fas fa-exclamation-triangle me-3 fa-2x"></i>
+                    <div>
+                        <h5 class="alert-heading mb-1">¡Atención requerida!</h5>
+                        Se encontraron <strong>{{ materiales|length }}</strong> material{{ materiales|length|pluralize:"es" }} 
+                        con stock por debajo del mínimo de <strong>{{ stock_minimo }}</strong> unidades.
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Materiales con Stock Bajo -->
+    <div class="row">
+        {% if materiales %}
+            {% for material in materiales %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card stock-card h-100 
+                        {% if material.cantidad_disponible <= 10 %}stock-level-critical
+                        {% elif material.cantidad_disponible <= 25 %}stock-level-low  
+                        {% else %}stock-level-warning{% endif %}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="card-title mb-1">{{ material.codigo }}</h5>
+                                    <p class="card-text text-muted small">{{ material.nombre }}</p>
+                                </div>
+                                {% if material.cantidad_disponible <= 10 %}
+                                    <span class="badge bg-danger">Crítico</span>
+                                {% elif material.cantidad_disponible <= 25 %}
+                                    <span class="badge bg-warning">Bajo</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Alerta</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Stock Visual -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small fw-bold">Stock Actual</span>
+                                    <span class="small">{{ material.cantidad_disponible }} {{ material.unidad_base }}</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    {% with porcentaje=material.cantidad_disponible|floatformat:0 %}
+                                        <div class="progress-bar 
+                                            {% if material.cantidad_disponible <= 10 %}bg-danger progress-critical
+                                            {% elif material.cantidad_disponible <= 25 %}bg-warning progress-low
+                                            {% else %}bg-warning progress-warning{% endif %}" 
+                                            role="progressbar" 
+                                            style="width: {% widthratio material.cantidad_disponible stock_minimo 100 %}%">
+                                        </div>
+                                    {% endwith %}
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small class="text-muted">0</small>
+                                    <small class="text-muted">{{ stock_minimo }} (mínimo)</small>
+                                </div>
+                            </div>
+
+                            <!-- Información adicional -->
+                            <div class="row small text-muted mb-3">
+                                <div class="col-6">
+                                    <strong>Categoría:</strong><br>
+                                    {{ material.categoria|capfirst }}
+                                </div>
+                                <div class="col-6">
+                                    <strong>Tipo:</strong><br>
+                                    {{ material.get_tipo_material_display }}
+                                </div>
+                            </div>
+
+                            <!-- Acciones -->
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'reabastecimiento_create' %}?material={{ material.id }}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Crear Reabastecimiento
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="fas fa-check-circle fa-4x text-success"></i>
+                    </div>
+                    <h4 class="text-success">¡Excelente!</h4>
+                    <p class="text-muted">Todos los materiales tienen stock suficiente</p>
+                    <p class="text-muted">
+                        No hay materiales por debajo del stock mínimo de 
+                        <strong>{{ stock_minimo }}</strong> unidades.
+                    </p>
+                    <a href="{% url 'reabastecimiento_list' %}" class="btn btn-primary">
+                        <i class="fas fa-truck me-1"></i>Ver Reabastecimientos
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Acción Masiva -->
+    {% if materiales %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-magic me-2"></i>Generar Reabastecimientos Automáticos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Crea reabastecimientos automáticamente para todos los materiales con stock bajo.</p>
+                        <form method="post" class="row g-3">
+                            {% csrf_token %}
+                            {% for field in form %}
+                                <div class="col-md-4">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}
+                                        <div class="form-text">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="col-md-12">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-bolt me-1"></i>Generar {{ materiales|length }} Reabastecimientos
+                                </button>
+                                <small class="text-muted ms-2">
+                                    Solo se crearán reabastecimientos para materiales que no tengan pedidos pendientes.
+                                </small>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Configuración -->
+<div class="modal fade" id="stockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-cog me-2"></i>Configurar Stock Mínimo
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="get">
+                    <div class="mb-3">
+                        <label for="minimo" class="form-label">Stock Mínimo</label>
+                        <input type="number" class="form-control" id="minimo" name="minimo" 
+                               value="{{ stock_minimo }}" min="1" max="1000">
+                        <div class="form-text">
+                            Materiales con stock por debajo de este valor aparecerán en esta lista.
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>Actualizar Lista
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh cada 30 segundos
+    setInterval(function() {
+        const refreshBtn = document.querySelector('.btn-outline-primary');
+        if (refreshBtn && !document.hidden) {
+            console.log('Auto-refreshing stock data...');
+            // En una implementación real, aquí haríamos AJAX para actualizar solo los datos
+        }
+    }, 30000);
+    
+    // Tooltip para mostrar información adicional
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}
