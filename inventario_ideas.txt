@@ -1,0 +1,981 @@
+INVENTARIOINVENTARIO
+
+
+
+MATERIALESMATERIALES
+
+    - codigo: Identificador único (ej. M001)    - codigo: Identificador único (ej. M001)
+
+    - nombre: Nombre del material (ej. Listón rojo)    - nombre: Nombre del material (ej. Listón rojo)
+
+    - descripcion: Detalle del material    - descripcion: Detalle del material
+
+    - tipo_material: paquete | rollo    - tipo_material: paquete | rollo
+
+    - unidad_base: unidades | cm    - unidad_base: unidades | cm
+
+    - factor_conversion: cantidad que representa 1 paquete o 1 rollo en unidad base    - factor_conversion: cantidad que representa 1 paquete o 1 rollo en unidad base
+
+                         ej. 1 paquete = 50 unidades, 1 rollo = 1000 cm        ej. 1 paquete = 50 unidades, 1 rollo = 1000 cm
+
+    - cantidad_disponible: stock actual en unidad base    - cantidad_disponible: stock actual en unidad base
+
+    - precio_compra: precio total de la compra (reabastecer)    - precio_compra: precio total de la compra (reabastecer)
+
+    - costo_unitario: precio por unidad base (precio_compra / factor_conversion)    - costo_unitario: precio por unidad base (precio_compra / factor_conversion)
+
+    - categoria: clasificación (ej. listón, piedra, adorno)    - categoria: clasificación (ej. listón, piedra, adorno)
+
+
+
+INSUMOSINSUMOS
+
+    - id_insumo: Identificador único    - id_insumo: Identificador único
+
+    - nombre: Nombre del insumo (ej. Moño básico)    - nombre: Nombre del insumo (ej. Moño básico)
+
+    - descripcion: detalle del insumo    - descripcion: detalle del insumo
+
+    - cantidad_por_unidad: cantidad de material que se usa por cada moño    - cantidad_por_unidad: cantidad de material que se usa por cada moño
+
+    - unidad_consumo: unidad en la que se descuenta (unidades | cm)    - unidad_consumo: unidad en la que se descuenta (unidades | cm)
+
+    - tipo_asociado: material al que está vinculado (ej. listón, paquete)    - tipo_asociado: material al que está vinculado (ej. listón, paquete)
+
+
+
+MOVIMIENTOSMOVIMIENTOS
+
+    - id_movimiento: Identificador único    - id_movimiento: Identificador único
+
+    - codigo_material: referencia al código del material    - codigo_material: referencia al código del material
+
+    - tipo_movimiento: entrada | salida | ajuste    - tipo_movimiento: entrada | salida | ajuste
+
+    - cantidad: cantidad afectada en unidad base    - cantidad: cantidad afectada en unidad base
+
+    - fecha: fecha del movimiento    - fecha: fecha del movimiento
+
+    - detalle: motivo (ej. "Compra proveedor X", "Producción de 50 moños")    - detalle: motivo (ej. "Compra proveedor X", "Producción de 50 moños")
+
+
+
+
+
+FLUJO DEL BOTÓN "REABASTECIMIENTO"FLUJO DEL BOTÓN "REABASTECIMIENTO"
+
+
+
+1. SELECCIÓN DEL ARTÍCULO1. SELECCIÓN DEL ARTÍCULO
+
+    - Usuario selecciona un artículo ya registrado en el inventario.    - Usuario selecciona un artículo ya registrado en el inventario.
+
+    - El sistema carga todas sus características:    - El sistema carga todas sus características:
+
+        * codigo        * codigo
+
+        * nombre        * nombre
+
+        * tipo_material (paquete | rollo)        * tipo_material (paquete | rollo)
+
+        * unidad_base (unidades | cm)        * unidad_base (unidades | cm)
+
+        * factor_conversion        * factor_conversion
+
+        * cantidad_disponible        * cantidad_disponible
+
+        * precio_compra        * precio_compra
+
+
+
+2. INGRESO DE CANTIDAD A REABASTECER2. INGRESO DE CANTIDAD A REABASTECER
+
+    - Usuario ingresa la cantidad comprada en su presentación original:    - Usuario ingresa la cantidad comprada en su presentación original:
+
+        * Paquetes: número de paquetes        * Paquetes: número de paquetes
+
+        * Rollos: número de rollos        * Rollos: número de rollos
+
+
+
+3. CONVERSIÓN A UNIDAD BASE3. CONVERSIÓN A UNIDAD BASE
+
+    - Sistema calcula automáticamente:    - Sistema calcula automáticamente:
+
+        cantidad_en_unidad_base = cantidad_comprada * factor_conversion        cantidad_en_unidad_base = cantidad_comprada * factor_conversion
+
+        Ejemplo: 5 rollos de 10 m cada uno        Ejemplo: 5 rollos de 10 m cada uno
+
+                 factor_conversion = 1000 cm/rollo                 factor_conversion = 1000 cm/rollo
+
+                 cantidad_en_unidad_base = 5 * 10 * 100 = 5000 cm                 cantidad_en_unidad_base = 5 * 10 * 100 = 5000 cm
+
+
+
+4. CÁLCULO DEL COSTO4. CÁLCULO DEL COSTO
+
+    - Sistema calcula:    - Sistema calcula:
+
+        costo_unitario = precio_compra_total / (cantidad_comprada * factor_conversion)        costo_unitario = precio_compra_total / (cantidad_comprada * factor_conversion)
+
+        costo_total = cantidad_en_unidad_base * costo_unitario        costo_total = cantidad_en_unidad_base * costo_unitario
+
+
+
+5. RESUMEN DEL REABASTECIMIENTO5. RESUMEN DEL REABASTECIMIENTO
+
+    - Antes de confirmar, se muestra:    - Antes de confirmar, se muestra:
+
+        * Artículo: Listón rojo        * Artículo: Listón rojo
+
+        * Cantidad ingresada: 5 rollos        * Cantidad ingresada: 5 rollos
+
+        * Equivalente en unidad base: 5000 cm        * Equivalente en unidad base: 5000 cm
+
+        * Costo total de la compra: $250        * Costo total de la compra: $250
+
+        * Costo por unidad base: $0.05/cm        * Costo por unidad base: $0.05/cm
+
+        * Nuevo stock disponible: cantidad_disponible + cantidad_en_unidad_base        * Nuevo stock disponible: cantidad_disponible + cantidad_en_unidad_base
+
+        
+
+6. CONFIRMACIÓN6. CONFIRMACIÓN
+
+    - Usuario confirma la entrada    - Usuario confirma la entrada
+
+    - Sistema realiza:    - Sistema realiza:
+
+        * Actualización del inventario:        * Actualización del inventario:
+
+            cantidad_disponible += cantidad_en_unidad_base            cantidad_disponible += cantidad_en_unidad_base
+
+        * Registro del movimiento en el historial:        * Registro del movimiento en el historial:
+
+            tipo_movimiento = "entrada"            tipo_movimiento = "entrada"
+
+            fecha = fecha_actual            fecha = fecha_actual
+
+            detalle = "Reabastecimiento de 5 rollos"            detalle = "Reabastecimiento de 5 rollos"
+
+
+
+7. FIN DEL PROCESO7. FIN DEL PROCESO
+
+    - Inventario actualizado    - Inventario actualizado
+
+    - Historial de movimientos actualizado    - Historial de movimientos actualizado
+
+    - Resumen de la entrada mostrado al usuario    - Resumen de la entrada mostrado al usuario
+
+
+
+SISTEMA DE SIMULACIÓN COMPLETO: CREACIÓN DE MOÑOS CON GANANCIAS Y NECESIDADES DE MATERIALSISTEMA DE SIMULACIÓN COMPLETO: CREACIÓN DE MOÑOS CON GANANCIAS Y NECESIDADES DE MATERIAL
+
+
+
+1. INICIO DE LA SIMULACIÓN1. INICIO DE LA SIMULACIÓN
+
+    - Usuario accede al sistema.    - Usuario accede al sistema.
+
+    - Menú:    - Menú:
+
+        1. Buscar artículos/materiales        1. Buscar artículos/materiales
+
+        2. Definir cantidad de moños a crear        2. Definir cantidad de moños a crear
+
+        3. Seleccionar tipo de venta: Individual o Par        3. Seleccionar tipo de venta: Individual o Par
+
+        4. Definir precio de venta        4. Definir precio de venta
+
+        5. Generar resumen de costos, ganancias y necesidades de compra        5. Generar resumen de costos, ganancias y necesidades de compra
+
+
+
+2. BÚSQUEDA DE ARTÍCULOS2. BÚSQUEDA DE ARTÍCULOS
+
+    - Usuario ingresa nombre o código del artículo.    - Usuario ingresa nombre o código del artículo.
+
+    - Sistema muestra datos del artículo:    - Sistema muestra datos del artículo:
+
+        * codigo, nombre, tipo_material, unidad_base, factor_conversion, cantidad_disponible, precio_unitario_material        * codigo, nombre, tipo_material, unidad_base, factor_conversion, cantidad_disponible, precio_unitario_material
+
+
+
+3. DEFINICIÓN DE CANTIDAD DE MOÑOS3. DEFINICIÓN DE CANTIDAD DE MOÑOS
+
+    - Usuario define cantidad de moños a crear    - Usuario define cantidad de moños a crear
+
+    - Tipo de venta:    - Tipo de venta:
+
+        * Individual → cantidad de moños = X        * Individual → cantidad de moños = X
+
+        * Pares → cantidad de moños = X * 2        * Pares → cantidad de moños = X * 2
+
+    - Sistema calcula automáticamente la cantidad de material necesario:    - Sistema calcula automáticamente la cantidad de material necesario:
+
+        * cantidad_por_moño * cantidad_total_moños = cantidad_total_requerida (unidades o cm)        * cantidad_por_moño * cantidad_total_moños = cantidad_total_requerida (unidades o cm)
+
+
+
+4. DEFINICIÓN DE PRECIO DE VENTA4. DEFINICIÓN DE PRECIO DE VENTA
+
+    - Usuario ingresa precio de venta según clasificación:    - Usuario ingresa precio de venta según clasificación:
+
+        * Individual → precio por moño        * Individual → precio por moño
+
+        * Pares → precio por par        * Pares → precio por par
+
+    - Sistema ajusta precio según cantidad de moños a producir    - Sistema ajusta precio según cantidad de moños a producir
+
+
+
+5. VERIFICACIÓN DE INVENTARIO Y NECESIDADES DE COMPRA5. VERIFICACIÓN DE INVENTARIO Y NECESIDADES DE COMPRA
+
+    - Para cada material:    - Para cada material:
+
+        * Comparar cantidad_total_requerida con cantidad_disponible        * Comparar cantidad_total_requerida con cantidad_disponible
+
+            - Si cantidad_disponible >= cantidad_total_requerida → suficiente            - Si cantidad_disponible >= cantidad_total_requerida → suficiente
+
+            - Si cantidad_disponible < cantidad_total_requerida → insuficiente            - Si cantidad_disponible < cantidad_total_requerida → insuficiente
+
+                - cantidad_a_comprar = cantidad_total_requerida - cantidad_disponible                - cantidad_a_comprar = cantidad_total_requerida - cantidad_disponible
+
+                - Ajuste a unidad completa:                - Ajuste a unidad completa:
+
+                    - Paquetes → pedir paquetes completos                    - Paquetes → pedir paquetes completos
+
+                    - Rollos → pedir rollos completos (redondear al alza)                    - Rollos → pedir rollos completos (redondear al alza)
+
+                - cantidad_a_comprar_en_unidad_real = ceil(cantidad_a_comprar / factor_conversion)                - cantidad_a_comprar_en_unidad_real = ceil(cantidad_a_comprar / factor_conversion)
+
+                - costo_total_material_faltante = cantidad_a_comprar_en_unidad_real * precio_unitario_material                - costo_total_material_faltante = cantidad_a_comprar_en_unidad_real * precio_unitario_material
+
+
+
+6. CÁLCULO DE COSTOS Y GANANCIAS6. CÁLCULO DE COSTOS Y GANANCIAS
+
+    - Para cada material usado en la simulación:    - Para cada material usado en la simulación:
+
+        * Costo_material_usado = cantidad_total_requerida_en_unidad_base * costo_unitario_material        * Costo_material_usado = cantidad_total_requerida_en_unidad_base * costo_unitario_material
+
+    - Costo total del moño = suma de todos los costos de materiales    - Costo total del moño = suma de todos los costos de materiales
+
+    - Costo individual = Costo total / cantidad_total_moños    - Costo individual = Costo total / cantidad_total_moños
+
+    - Costo total de producción = Costo individual * cantidad_total_moños    - Costo total de producción = Costo individual * cantidad_total_moños
+
+    - Ganancia estimada = (Precio de venta * cantidad_total_moños / pares si aplica) - Costo total de producción    - Ganancia estimada = (Precio de venta * cantidad_total_moños / pares si aplica) - Costo total de producción
+
+
+
+7. RESUMEN DE SIMULACIÓN7. RESUMEN DE SIMULACIÓN
+
+    - Para cada material:    - Para cada material:
+
+        * Nombre del material        * Nombre del material
+
+        * Cantidad necesaria (unidades o cm)        * Cantidad necesaria (unidades o cm)
+
+        * Cantidad disponible en inventario        * Cantidad disponible en inventario
+
+        * Cantidad a comprar (si insuficiente) → siempre unidad completa (paquete/rollo)        * Cantidad a comprar (si insuficiente) → siempre unidad completa (paquete/rollo)
+
+        * Costo estimado de compra (si aplica)        * Costo estimado de compra (si aplica)
+
+        * Estado: "Suficiente" o "Se necesita comprar"        * Estado: "Suficiente" o "Se necesita comprar"
+
+    - Para el moño:    - Para el moño:
+
+        * Cantidad de moños a producir        * Cantidad de moños a producir
+
+        * Tipo de venta: Individual / Par        * Tipo de venta: Individual / Par
+
+        * Precio de venta        * Precio de venta
+
+        * Costo total del moño        * Costo total del moño
+
+        * Costo individual        * Costo individual
+
+        * Costo total de producción        * Costo total de producción
+
+        * Ganancia estimada        * Ganancia estimada
+
+
+
+8. OPCIONAL: GENERAR PEDIDO DE COMPRA8. OPCIONAL: GENERAR PEDIDO DE COMPRA
+
+    - El sistema puede exportar un listado de materiales faltantes con cantidades y costos para realizar la compra.    - El sistema puede exportar un listado de materiales faltantes con cantidades y costos para realizar la compra.
+
+
+
+9. FINALIZAR SIMULACIÓN9. FINALIZAR SIMULACIÓN
+
+    - Usuario revisa resumen    - Usuario revisa resumen
+
+    - Inventario real no se actualiza; la simulación sirve para planificación de producción, costos y compras.    - Inventario real no se actualiza; la simulación sirve para planificación de producción, costos y compras.
+
+
+
+SISTEMA DE SALIDA DE INVENTARIO
+
+SISTEMA DE SALIDA DE INVENTARIO
+
+1. TIPOS DE SALIDA
+
+    - El sistema permite dos formas de registrar la salida de material/artículos:1. TIPOS DE SALIDA
+
+    - El sistema permite dos formas de registrar la salida de material/artículos:
+
+    A) SALIDA NORMAL
+
+        - Se utiliza para descontar artículos directamente del inventario.    A) SALIDA NORMAL
+
+        - Proceso:        - Se utiliza para descontar artículos directamente del inventario.
+
+            1. Usuario selecciona uno o varios artículos del inventario.        - Proceso:
+
+            2. Ingresa la cantidad a retirar (en unidades o cm según corresponda).            1. Usuario selecciona uno o varios artículos del inventario.
+
+            3. Sistema verifica existencia:            2. Ingresa la cantidad a retirar (en unidades o cm según corresponda).
+
+                * Si suficiente → resta la cantidad ingresada de cantidad_disponible            3. Sistema verifica existencia:
+
+                * Si insuficiente → muestra alerta y no permite salida                * Si suficiente → resta la cantidad ingresada de cantidad_disponible
+
+            4. Actualización del inventario:                * Si insuficiente → muestra alerta y no permite salida
+
+                cantidad_disponible -= cantidad_retirada            4. Actualización del inventario:
+
+            5. Registro del movimiento en historial:                cantidad_disponible -= cantidad_retirada
+
+                * tipo_movimiento = "salida"            5. Registro del movimiento en historial:
+
+                * fecha = fecha_actual                * tipo_movimiento = "salida"
+
+                * detalle = "Salida normal de X unidades"                * fecha = fecha_actual
+
+            6. Cálculo de reducción de valor monetario:                * detalle = "Salida normal de X unidades"
+
+                * dinero_total -= cantidad_retirada * costo_unitario_material            6. Cálculo de reducción de valor monetario:
+
+            7. Resumen mostrado al usuario:                * dinero_total -= cantidad_retirada * costo_unitario_material
+
+                * Artículos retirados, cantidades y dinero descontado            7. Resumen mostrado al usuario:
+
+                * Artículos retirados, cantidades y dinero descontado
+
+    B) SALIDA MEDIANTE SIMULACIÓN DE PRODUCCIÓN
+
+        - Se utiliza para simular la fabricación de moños y registrar la salida de materiales usados.    B) SALIDA MEDIANTE SIMULACIÓN DE PRODUCCIÓN
+
+        - Proceso:        - Se utiliza para simular la fabricación de moños y registrar la salida de materiales usados.
+
+            1. Usuario define cantidad de moños a producir y tipo de venta (individual o par)        - Proceso:
+
+            2. Sistema calcula cantidad total de moños y materiales necesarios:            1. Usuario define cantidad de moños a producir y tipo de venta (individual o par)
+
+                * cantidad_necesaria_por_moño * cantidad_total_moños            2. Sistema calcula cantidad total de moños y materiales necesarios:
+
+            3. Verificación de inventario:                * cantidad_necesaria_por_moño * cantidad_total_moños
+
+                * Si cantidad_disponible >= cantidad_total_requerida → suficiente            3. Verificación de inventario:
+
+                * Si insuficiente → indica material faltante y costos de compra necesarios                * Si cantidad_disponible >= cantidad_total_requerida → suficiente
+
+            4. Cálculo de costos de producción:                * Si insuficiente → indica material faltante y costos de compra necesarios
+
+                * Costo_material_total = suma de costos de materiales usados            4. Cálculo de costos de producción:
+
+                * Costo total de producción = cantidad_total_moños * costo_individual                * Costo_material_total = suma de costos de materiales usados
+
+            5. Registro de salida:                * Costo total de producción = cantidad_total_moños * costo_individual
+
+                * cantidad_disponible -= cantidad_material_usado            5. Registro de salida:
+
+                * tipo_movimiento = "producción"                * cantidad_disponible -= cantidad_material_usado
+
+                * detalle = "Producción de X moños"                * tipo_movimiento = "producción"
+
+            6. Cálculo de ganancia estimada:                * detalle = "Producción de X moños"
+
+                * Ganancia = (Precio_venta * cantidad_total_moños / pares si aplica) - Costo_total_producción            6. Cálculo de ganancia estimada:
+
+            7. Resumen mostrado al usuario:                * Ganancia = (Precio_venta * cantidad_total_moños / pares si aplica) - Costo_total_producción
+
+                * Cantidad de moños producidos            7. Resumen mostrado al usuario:
+
+                * Material utilizado por artículo                * Cantidad de moños producidos
+
+                * Costo total de producción                * Material utilizado por artículo
+
+                * Ganancia estimada                * Costo total de producción
+
+                * Material faltante y costo de compra (si aplica)                * Ganancia estimada
+
+            8. Opcional:                * Material faltante y costo de compra (si aplica)
+
+                * Generar reporte de materiales faltantes para compra            8. Opcional:
+
+                * Mostrar ajustes de inventario después de producción                * Generar reporte de materiales faltantes para compra
+
+                * Mostrar ajustes de inventario después de producción
+
+2. FINALIZAR SALIDA
+
+    - El usuario confirma la salida2. FINALIZAR SALIDA
+
+    - Inventario se actualiza según el tipo de salida    - El usuario confirma la salida
+
+    - Historial de movimientos actualizado para seguimiento contable y de stock    - Inventario se actualiza según el tipo de salida
+
+    - Historial de movimientos actualizado para seguimiento contable y de stock
+
+3. BENEFICIOS
+
+    - Control completo de inventario en tiempo real3. BENEFICIOS
+
+    - Permite simular la producción antes de retirar materiales    - Control completo de inventario en tiempo real
+
+    - Calcula costos y ganancias asociadas a la producción    - Permite simular la producción antes de retirar materiales
+
+    - Optimiza compras y planificación de materiales    - Calcula costos y ganancias asociadas a la producción
+
+    - Optimiza compras y planificación de materiales
+
+PANEL CENTRAL COMPLETO DEL SISTEMA DE INVENTARIO, PRODUCCIÓN Y VENTAS DE MOÑOS
+
+PANEL CENTRAL COMPLETO DEL SISTEMA DE INVENTARIO, PRODUCCIÓN Y VENTAS DE MOÑOS
+
+1. SECCIONES PRINCIPALES DEL PANEL
+
+1. SECCIONES PRINCIPALES DEL PANEL
+
+    A) PRODUCTOS / MATERIALES
+
+        - Vista general de todos los artículos/materiales en inventario    A) PRODUCTOS / MATERIALES
+
+        - Funcionalidades:        - Vista general de todos los artículos/materiales en inventario
+
+            1. Filtros y búsquedas: por código, nombre, tipo_material, unidad_base        - Funcionalidades:
+
+            2. Tabla de inventario: Código, nombre, tipo, unidad base, cantidad disponible, precio unitario            1. Filtros y búsquedas: por código, nombre, tipo_material, unidad_base
+
+            3. Botones por artículo:            2. Tabla de inventario: Código, nombre, tipo, unidad base, cantidad disponible, precio unitario
+
+                * Ver detalles            3. Botones por artículo:
+
+                * Editar                * Ver detalles
+
+                * Eliminar                * Editar
+
+            4. Botones globales:                * Eliminar
+
+                * Agregar artículo            4. Botones globales:
+
+                * Entrada → registrar entrada/reabastecimiento                * Agregar artículo
+
+                * Salida → registrar salida normal                * Entrada → registrar entrada/reabastecimiento
+
+                * Salida → registrar salida normal
+
+    B) MOÑOS
+
+        - Vista general de todos los moños creados    B) MOÑOS
+
+        - Funcionalidades:        - Vista general de todos los moños creados
+
+            1. Tabla de moños: Código, nombre, tipo de venta, materiales usados, costo de producción        - Funcionalidades:
+
+            2. Botones por moño:            1. Tabla de moños: Código, nombre, tipo de venta, materiales usados, costo de producción
+
+                * Ver detalles            2. Botones por moño:
+
+                * Editar                * Ver detalles
+
+                * Eliminar                * Editar
+
+            3. Botones globales:                * Eliminar
+
+                * Agregar moño → crear nuevo moño con definición de materiales y cantidades            3. Botones globales:
+
+                * Agregar moño → crear nuevo moño con definición de materiales y cantidades
+
+    C) SIMULACIÓN
+
+        - Simulaciones de producción con base en la base de datos    C) SIMULACIÓN
+
+        - Funcionalidades:        - Simulaciones de producción con base en la base de datos
+
+            1. Selector de moño → elegir moño a simular        - Funcionalidades:
+
+            2. Cantidad a producir            1. Selector de moño → elegir moño a simular
+
+            3. Tipo de venta → individual o par            2. Cantidad a producir
+
+            4. Precio de venta            3. Tipo de venta → individual o par
+
+            5. Botones:            4. Precio de venta
+
+                * Ejecutar simulación → calcula:            5. Botones:
+
+                    - Material necesario                * Ejecutar simulación → calcula:
+
+                    - Inventario disponible                    - Material necesario
+
+                    - Cantidad a comprar si hace falta                    - Inventario disponible
+
+                    - Costos de producción                    - Cantidad a comprar si hace falta
+
+                    - Ganancia estimada                    - Costos de producción
+
+                * Reabastecer → llenar inventario según necesidades calculadas                    - Ganancia estimada
+
+                * Generar pedido de compra → exporta listado de materiales faltantes y costos                * Reabastecer → llenar inventario según necesidades calculadas
+
+                * Registrar salida → descontar materiales usados                * Generar pedido de compra → exporta listado de materiales faltantes y costos
+
+            6. Resumen de simulación:                * Registrar salida → descontar materiales usados
+
+                - Cantidad de moños a producir            6. Resumen de simulación:
+
+                - Material usado por artículo                - Cantidad de moños a producir
+
+                - Cantidad disponible y faltante                - Material usado por artículo
+
+                - Costo total de producción                - Cantidad disponible y faltante
+
+                - Ganancia estimada                - Costo total de producción
+
+                - Ganancia estimada
+
+    D) HISTORIAL
+
+        - Registro completo de todos los movimientos de inventario y producción    D) HISTORIAL
+
+        - Funcionalidades:        - Registro completo de todos los movimientos de inventario y producción
+
+            1. Filtros y búsquedas: por fecha, tipo de movimiento, usuario, artículo/moño        - Funcionalidades:
+
+            2. Tabla de historial:            1. Filtros y búsquedas: por fecha, tipo de movimiento, usuario, artículo/moño
+
+                * Fecha            2. Tabla de historial:
+
+                * Tipo de movimiento (entrada, salida, producción, reabastecimiento)                * Fecha
+
+                * Artículo/Moño                * Tipo de movimiento (entrada, salida, producción, reabastecimiento)
+
+                * Cantidad                * Artículo/Moño
+
+                * Usuario responsable                * Cantidad
+
+                * Observaciones/Detalle                * Usuario responsable
+
+            3. Exportar historial a Excel                * Observaciones/Detalle
+
+            3. Exportar historial a Excel
+
+    E) USUARIOS
+
+        - Gestión de usuarios del sistema    E) USUARIOS
+
+        - Funcionalidades:        - Gestión de usuarios del sistema
+
+            1. Lista de usuarios: nombre, rol, estado        - Funcionalidades:
+
+            2. Botones por usuario:            1. Lista de usuarios: nombre, rol, estado
+
+                * Ver detalles            2. Botones por usuario:
+
+                * Editar                * Ver detalles
+
+                * Dar de baja                * Editar
+
+            3. Botones globales:                * Dar de baja
+
+                * Agregar usuario            3. Botones globales:
+
+                * Asignar roles → usuario normal / administrador / superusuario                * Agregar usuario
+
+            4. Control de permisos:                * Asignar roles → usuario normal / administrador / superusuario
+
+                * Superusuario → acceso completo a todo el sistema            4. Control de permisos:
+
+                * Administrador → acceso a inventario, moños, simulación, historial                * Superusuario → acceso completo a todo el sistema
+
+                * Usuario normal → acceso limitado según permisos asignados                * Administrador → acceso a inventario, moños, simulación, historial
+
+                * Usuario normal → acceso limitado según permisos asignados
+
+    F) ANÁLISIS DE VENTAS Y ESTADÍSTICAS
+
+        - Funcionalidades:    F) ANÁLISIS DE VENTAS Y ESTADÍSTICAS
+
+            1. Tabla de ventas por moño:        - Funcionalidades:
+
+                * Nombre del moño            1. Tabla de ventas por moño:
+
+                * Cantidad vendida                * Nombre del moño
+
+                * Fecha de venta                * Cantidad vendida
+
+                * Tipo de venta (individual/par)                * Fecha de venta
+
+                * Precio de venta                * Tipo de venta (individual/par)
+
+                * Ganancia obtenida                * Precio de venta
+
+            2. Filtros:                * Ganancia obtenida
+
+                * Por fechas / temporadas            2. Filtros:
+
+                * Por moño                * Por fechas / temporadas
+
+                * Por tipo de venta                * Por moño
+
+            3. Reportes visuales:                * Por tipo de venta
+
+                * Gráficos de moños más vendidos            3. Reportes visuales:
+
+                * Temporadas con mayor venta                * Gráficos de moños más vendidos
+
+            4. Exportar reportes y datos a Excel para almacenamiento y análisis externo                * Temporadas con mayor venta
+
+            4. Exportar reportes y datos a Excel para almacenamiento y análisis externo
+
+2. PANEL DE CONTROL GLOBAL
+
+    - Buscador rápido de artículos, moños, usuarios y ventas2. PANEL DE CONTROL GLOBAL
+
+    - Accesos directos:    - Buscador rápido de artículos, moños, usuarios y ventas
+
+        * Productos    - Accesos directos:
+
+        * Moños        * Productos
+
+        * Simulación        * Moños
+
+        * Historial        * Simulación
+
+        * Usuarios        * Historial
+
+        * Ventas/Estadísticas        * Usuarios
+
+    - Indicadores de inventario crítico y alertas de reabastecimiento        * Ventas/Estadísticas
+
+    - Accesos rápidos a botones de Entrada, Salida y Reabastecimiento    - Indicadores de inventario crítico y alertas de reabastecimiento
+
+    - Accesos rápidos a botones de Entrada, Salida y Reabastecimiento
+
+3. FUNCIONALIDAD GENERAL
+
+    - Todo cambio de inventario se registra en historial3. FUNCIONALIDAD GENERAL
+
+    - Simulación puede ejecutarse sin afectar inventario real hasta que se confirme salida o reabastecimiento    - Todo cambio de inventario se registra en historial
+
+    - Permite planificación de producción, análisis de costos, ganancias y control de compras    - Simulación puede ejecutarse sin afectar inventario real hasta que se confirme salida o reabastecimiento
+
+    - Gestión de usuarios garantiza seguridad y control de permisos    - Permite planificación de producción, análisis de costos, ganancias y control de compras
+
+    - Datos de ventas y simulaciones pueden exportarse a Excel para análisis histórico y toma de decisiones    - Gestión de usuarios garantiza seguridad y control de permisos
+
+    - Datos de ventas y simulaciones pueden exportarse a Excel para análisis histórico y toma de decisiones
+
+SECCIÓN DE CONTADURÍA / FINANZAS
+
+
+
+1. REGISTRO DE MOVIMIENTOS DE EFECTIVOSECCIÓN DE CONTADURÍA / FINANZAS
+
+    - Movimientos automáticos:
+
+        * Salida de inventario → resta del efectivo según costo de materiales1. REGISTRO DE MOVIMIENTOS DE EFECTIVO
+
+        * Entrada de ventas (moños vendidos) → suma al efectivo    - Movimientos automáticos:
+
+        * Salida por simulación confirmada → resta según costo de producción        * Salida de inventario → resta del efectivo según costo de materiales
+
+    - Movimientos manuales:        * Entrada de ventas (moños vendidos) → suma al efectivo
+
+        * Sueldos        * Salida por simulación confirmada → resta según costo de producción
+
+        * Renta    - Movimientos manuales:
+
+        * Otros gastos        * Sueldos
+
+        * Ingresos adicionales        * Renta
+
+        * Otros gastos
+
+2. TABLA DE FLUJO DE EFECTIVO        * Ingresos adicionales
+
+    - Fecha
+
+    - Concepto / Detalle2. TABLA DE FLUJO DE EFECTIVO
+
+    - Tipo (Ingreso / Egreso)    - Fecha
+
+    - Monto    - Concepto / Detalle
+
+    - Saldo acumulado    - Tipo (Ingreso / Egreso)
+
+    - Monto
+
+3. REPORTES    - Saldo acumulado
+
+    - Estado de resultados (ingresos - egresos = ganancia/pérdida)
+
+    - Flujo de efectivo por mes3. REPORTES
+
+    - Exportar datos a Excel para contabilidad externa    - Estado de resultados (ingresos - egresos = ganancia/pérdida)
+
+    - Flujo de efectivo por mes
+
+4. BOTONES    - Exportar datos a Excel para contabilidad externa
+
+    - Registrar nuevo movimiento
+
+    - Generar reporte financiero4. BOTONES
+
+    - Exportar a Excel    - Registrar nuevo movimiento
+
+    - Generar reporte financiero
+
+FLUJO DE LA APLICACIÓN WEB DE INVENTARIO Y PRODUCCIÓN DE MOÑOS    - Exportar a Excel
+
+
+
+1. LOGIN / AUTENTICACIÓN
+
+   - Usuario accede con nombre de usuario y contraseña
+
+   - Validación según rol:FLUJO DE LA APLICACIÓN WEB DE INVENTARIO Y PRODUCCIÓN DE MOÑOS
+
+       * Superusuario → acceso completo
+
+       * Administrador → acceso a inventario, moños, simulación, contaduría, historial, ventas1. LOGIN / AUTENTICACIÓN
+
+       * Usuario normal → acceso limitado según permisos   - Usuario accede con nombre de usuario y contraseña
+
+   - Validación según rol:
+
+2. PANEL CENTRAL       * Superusuario → acceso completo
+
+   - Barra de navegación principal:       * Administrador → acceso a inventario, moños, simulación, contaduría, historial, ventas
+
+       * Productos / Materiales       * Usuario normal → acceso limitado según permisos
+
+       * Moños
+
+       * Simulación2. PANEL CENTRAL
+
+       * Historial   - Barra de navegación principal:
+
+       * Contaduría / Finanzas       * Productos / Materiales
+
+       * Ventas / Estadísticas       * Moños
+
+       * Simulación
+
+3. PRODUCTOS / MATERIALES       * Historial
+
+   - Vista: tabla de inventario con filtros y búsquedas       * Contaduría / Finanzas
+
+   - Botones por artículo:       * Ventas / Estadísticas
+
+       * Ver detalles → muestra características y movimientos
+
+       * Editar → modifica datos del artículo3. PRODUCTOS / MATERIALES
+
+       * Eliminar → elimina artículo   - Vista: tabla de inventario con filtros y búsquedas
+
+   - Botones globales:   - Botones por artículo:
+
+       * Agregar artículo       * Ver detalles → muestra características y movimientos
+
+       * Entrada → registrar reabastecimiento       * Editar → modifica datos del artículo
+
+       * Salida → registrar salida normal       * Eliminar → elimina artículo
+
+   - Flujo de datos:   - Botones globales:
+
+       Inventario ↔ Base de datos ↔ Historial ↔ Contaduría (opcional: registra movimientos de dinero)       * Agregar artículo
+
+       * Entrada → registrar reabastecimiento
+
+4. MOÑOS       * Salida → registrar salida normal
+
+   - Vista: tabla de moños creados   - Flujo de datos:
+
+   - Botones por moño:       Inventario ↔ Base de datos ↔ Historial ↔ Contaduría (opcional: registra movimientos de dinero)
+
+       * Ver detalles → muestra materiales usados, costos y ventas
+
+       * Editar → modifica moño4. MOÑOS
+
+       * Eliminar → elimina moño   - Vista: tabla de moños creados
+
+   - Botones globales:   - Botones por moño:
+
+       * Agregar moño → crear nuevo moño con definición de materiales y cantidades       * Ver detalles → muestra materiales usados, costos y ventas
+
+   - Flujo de datos:       * Editar → modifica moño
+
+       Moños ↔ Base de datos ↔ Simulación ↔ Contaduría       * Eliminar → elimina moño
+
+   - Botones globales:
+
+5. SIMULACIÓN       * Agregar moño → crear nuevo moño con definición de materiales y cantidades
+
+   - Selección de moño   - Flujo de datos:
+
+   - Definición de cantidad a producir y tipo de venta (individual/par)       Moños ↔ Base de datos ↔ Simulación ↔ Contaduría
+
+   - Botones:
+
+       * Ejecutar simulación → calcula materiales necesarios, costos, ganancia5. SIMULACIÓN
+
+       * Reabastecer → actualiza inventario según necesidades calculadas   - Selección de moño
+
+       * Registrar salida → descuenta materiales usados   - Definición de cantidad a producir y tipo de venta (individual/par)
+
+       * Generar pedido de compra → exporta listado de materiales faltantes   - Botones:
+
+   - Flujo de datos:       * Ejecutar simulación → calcula materiales necesarios, costos, ganancia
+
+       Simulación ↔ Inventario ↔ Contaduría ↔ Historial       * Reabastecer → actualiza inventario según necesidades calculadas
+
+       * Registrar salida → descuenta materiales usados
+
+6. HISTORIAL       * Generar pedido de compra → exporta listado de materiales faltantes
+
+   - Vista: tabla de movimientos de inventario, simulaciones y ventas   - Flujo de datos:
+
+   - Filtros por fecha, tipo, usuario, artículo/moño       Simulación ↔ Inventario ↔ Contaduría ↔ Historial
+
+   - Exportar datos a Excel
+
+   - Flujo de datos:6. HISTORIAL
+
+       Historial ↔ Base de datos ↔ Contaduría ↔ Panel central   - Vista: tabla de movimientos de inventario, simulaciones y ventas
+
+   - Filtros por fecha, tipo, usuario, artículo/moño
+
+7. CONTADURÍA / FINANZAS   - Exportar datos a Excel
+
+   - Registro automático de movimientos:   - Flujo de datos:
+
+       * Salida de inventario → resta de efectivo       Historial ↔ Base de datos ↔ Contaduría ↔ Panel central
+
+       * Simulación confirmada → resta de costos
+
+       * Ventas → ingreso de efectivo7. CONTADURÍA / FINANZAS
+
+   - Registro manual de gastos e ingresos:   - Registro automático de movimientos:
+
+       * Sueldos, renta, compras, otros       * Salida de inventario → resta de efectivo
+
+   - Vista: flujo de efectivo, saldo acumulado       * Simulación confirmada → resta de costos
+
+   - Exportar reportes a Excel       * Ventas → ingreso de efectivo
+
+   - Flujo de datos:   - Registro manual de gastos e ingresos:
+
+       Contaduría ↔ Base de datos ↔ Simulación ↔ Historial       * Sueldos, renta, compras, otros
+
+   - Vista: flujo de efectivo, saldo acumulado
+
+8. VENTAS / ESTADÍSTICAS   - Exportar reportes a Excel
+
+   - Tabla de ventas por moño:   - Flujo de datos:
+
+       * Nombre del moño, cantidad vendida, tipo de venta, fecha, ganancia       Contaduría ↔ Base de datos ↔ Simulación ↔ Historial
+
+   - Filtros: por moño, fechas, temporada
+
+   - Gráficos de moños más vendidos y temporadas8. VENTAS / ESTADÍSTICAS
+
+   - Exportar datos a Excel   - Tabla de ventas por moño:
+
+   - Flujo de datos:       * Nombre del moño, cantidad vendida, tipo de venta, fecha, ganancia
+
+       Ventas ↔ Base de datos ↔ Contaduría ↔ Historial   - Filtros: por moño, fechas, temporada
+
+   - Gráficos de moños más vendidos y temporadas
+
+9. PANEL DE CONTROL GLOBAL   - Exportar datos a Excel
+
+   - Buscador rápido: artículos, moños, usuarios, ventas   - Flujo de datos:
+
+   - Indicadores:       Ventas ↔ Base de datos ↔ Contaduría ↔ Historial
+
+       * Inventario crítico
+
+       * Movimientos recientes9. PANEL DE CONTROL GLOBAL
+
+       * Ganancia estimada   - Buscador rápido: artículos, moños, usuarios, ventas
+
+   - Accesos directos: Entrada, Salida, Reabastecimiento, Simulación   - Indicadores:
+
+       * Inventario crítico
+
+10. FLUJO GENERAL DE DATOS       * Movimientos recientes
+
+   Usuario → Panel web → Sección seleccionada → Base de datos ↔ Historial ↔ Contaduría ↔ Estadísticas       * Ganancia estimada
+
+   - Accesos directos: Entrada, Salida, Reabastecimiento, Simulación
+
+NOTAS DE IMPLEMENTACIÓN:
+
+- Sistema de simulación: Requiere lógica cuidadosa pero es totalmente factible10. FLUJO GENERAL DE DATOS
+
+- Cálculos financieros: Matemáticas straightforward   Usuario → Panel web → Sección seleccionada → Base de datos ↔ Historial ↔ Contaduría ↔ Estadísticas
+
+- Manejo de conversiones: Lógica clara ya definida
+
+- Reportes dinámicos: Usando pandas + Django
+
+
+
+FASES DE IMPLEMENTACIÓN:Como llevar el proceso unicamente para el usuarioCaracterísticas más complejas:
+
+Fase 1: MVP (Mínimo Viable Product)Sistema de simulación - Requiere lógica cuidadosa pero es totalmente factible
+
+- Gestión básica de materialesCálculos financieros - Matemáticas straightforward
+
+- Sistema de entrada/salidaManejo de conversiones - Lógica clara ya definida en tu documento
+
+- Autenticación simpleReportes dinámicos - Usando pandas + Django
+
+- Admin panel funcionalMi propuesta de implementación:
+
+Fase 1: MVP (Mínimo Viable Product)
+
+Fase 2: Funcionalidad avanzada
+
+- Sistema de simulación completoGestión básica de materiales
+
+- Módulo financieroSistema de entrada/salida
+
+- Reportes y estadísticasAutenticación simple
+
+- Frontend mejoradoAdmin panel funcional
+
+Fase 2: Funcionalidad avanzada
+
+Fase 3: Pulimiento
+
+- Dashboard visualSistema de simulación completo
+
+- ExportacionesMódulo financiero
+
+- OptimizacionesReportes y estadísticas
+
+- TestingFrontend mejorado
+Fase 3: Pulimiento
+
+Dashboard visual
+Exportaciones
+Optimizaciones
+Testing

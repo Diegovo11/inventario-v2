@@ -1,0 +1,11 @@
+# Requirements optimizados para Railway.app
+Django==5.1.4
+psycopg2-binary==2.9.10
+python-decouple==3.8
+whitenoise==6.6.0
+gunicorn==21.2.0
+openpyxl==3.1.2
+dj-database-url==2.1.0
+
+# Para desarrollo local (opcional)
+django-extensions==3.2.3

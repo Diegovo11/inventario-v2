@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi"
+healthcheckPath = "/admin/"
+
+[env]
+NIXPACKS_PYTHON_VERSION = "3.12"
