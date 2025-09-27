@@ -1,6 +1,6 @@
 from django import forms
 from django.utils import timezone
-from .models import Reabastecimiento, Material
+from .models import Reabastecimiento, Material, TipoMono, RecetaProduccion, SimulacionProduccion
 
 class ReabastecimientoForm(forms.ModelForm):
     class Meta:
@@ -131,3 +131,112 @@ class StockBajoForm(forms.Form):
         }),
         label='Proveedor por Defecto'
     )
+
+class TipoMonoForm(forms.ModelForm):
+    class Meta:
+        model = TipoMono
+        fields = ['nombre', 'descripcion', 'precio_venta_sugerido', 'tiempo_produccion_minutos']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Moño Básico'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': '3',
+                'placeholder': 'Descripción del tipo de moño...'
+            }),
+            'precio_venta_sugerido': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.01',
+                'placeholder': '0.00'
+            }),
+            'tiempo_produccion_minutos': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': '30'
+            }),
+        }
+        labels = {
+            'nombre': 'Nombre del Tipo de Moño',
+            'descripcion': 'Descripción',
+            'precio_venta_sugerido': 'Precio de Venta Sugerido',
+            'tiempo_produccion_minutos': 'Tiempo de Producción (minutos)',
+        }
+
+class SimuladorForm(forms.Form):
+    tipo_mono = forms.ModelChoiceField(
+        queryset=TipoMono.objects.filter(activo=True),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tipo de Moño'
+    )
+    cantidad_a_producir = forms.IntegerField(
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '1',
+            'placeholder': '1'
+        }),
+        label='Cantidad a Producir'
+    )
+    precio_venta_unitario = forms.DecimalField(
+        min_value=0.01,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0.01',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        label='Precio de Venta por Unidad'
+    )
+    guardar_simulacion = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label='Guardar esta simulación'
+    )
+    nombre_simulacion = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nombre para la simulación (opcional)'
+        }),
+        label='Nombre de la Simulación'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pre-llenar precio con el sugerido si se selecciona un tipo
+        if self.initial.get('tipo_mono'):
+            try:
+                tipo = TipoMono.objects.get(id=self.initial['tipo_mono'])
+                self.initial['precio_venta_unitario'] = tipo.precio_venta_sugerido
+            except TipoMono.DoesNotExist:
+                pass
+
+class RecetaProduccionForm(forms.ModelForm):
+    class Meta:
+        model = RecetaProduccion
+        fields = ['insumo', 'cantidad_necesaria', 'es_opcional', 'notas']
+        widgets = {
+            'insumo': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad_necesaria': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0.01',
+                'step': '0.01'
+            }),
+            'es_opcional': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': '2'
+            }),
+        }
+        labels = {
+            'insumo': 'Material/Insumo',
+            'cantidad_necesaria': 'Cantidad Necesaria',
+            'es_opcional': 'Es Opcional',
+            'notas': 'Notas',
+        }

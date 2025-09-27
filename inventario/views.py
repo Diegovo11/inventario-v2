@@ -5,8 +5,8 @@ from django.db.models import Sum, F, Q
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Material, Insumo, Movimiento, Reabastecimiento
-from .forms import ReabastecimientoForm, ReabastecimientoUpdateForm, StockBajoForm
+from .models import Material, Insumo, Movimiento, Reabastecimiento, TipoMono, RecetaProduccion, SimulacionProduccion
+from .forms import ReabastecimientoForm, ReabastecimientoUpdateForm, StockBajoForm, SimuladorForm, TipoMonoForm
 import json
 
 @login_required
@@ -238,9 +238,85 @@ def stock_bajo_check(request):
 @login_required
 def simulador(request):
     """Simulador de producción y ganancias"""
-    insumos = Insumo.objects.select_related('material').all()
+    resultado = None
+    mensaje_error = None
+    
+    if request.method == 'POST':
+        form = SimuladorForm(request.POST)
+        if form.is_valid():
+            tipo_mono = form.cleaned_data['tipo_mono']
+            cantidad = form.cleaned_data['cantidad_a_producir']
+            precio_venta = form.cleaned_data['precio_venta_unitario']
+            
+            # Verificar stock disponible
+            puede_producir, mensaje_stock = tipo_mono.puede_producir(cantidad)
+            
+            # Calcular métricas
+            costo_unitario = tipo_mono.calcular_costo_materiales()
+            costo_total = costo_unitario * cantidad
+            ingreso_total = precio_venta * cantidad
+            ganancia_neta = ingreso_total - costo_total
+            
+            if ingreso_total > 0:
+                margen_porcentaje = (ganancia_neta / ingreso_total) * 100
+            else:
+                margen_porcentaje = 0
+            
+            # Obtener recetas para mostrar desglose
+            recetas = RecetaProduccion.objects.filter(tipo_mono=tipo_mono).select_related('insumo__material')
+            
+            # Calcular tiempo de producción
+            tiempo_total_minutos = tipo_mono.tiempo_produccion_minutos * cantidad
+            tiempo_horas = tiempo_total_minutos / 60
+            
+            # Calcular rentabilidad por hora
+            if tiempo_horas > 0:
+                ganancia_por_hora = ganancia_neta / tiempo_horas
+            else:
+                ganancia_por_hora = 0
+            
+            resultado = {
+                'tipo_mono': tipo_mono,
+                'cantidad': cantidad,
+                'precio_venta_unitario': precio_venta,
+                'costo_unitario': costo_unitario,
+                'costo_total': costo_total,
+                'ingreso_total': ingreso_total,
+                'ganancia_neta': ganancia_neta,
+                'margen_porcentaje': margen_porcentaje,
+                'puede_producir': puede_producir,
+                'mensaje_stock': mensaje_stock,
+                'recetas': recetas,
+                'tiempo_total_minutos': tiempo_total_minutos,
+                'tiempo_horas': tiempo_horas,
+                'ganancia_por_hora': ganancia_por_hora,
+            }
+            
+            # Guardar simulación si se solicitó
+            if form.cleaned_data['guardar_simulacion'] and form.cleaned_data['nombre_simulacion']:
+                SimulacionProduccion.objects.create(
+                    nombre_simulacion=form.cleaned_data['nombre_simulacion'],
+                    tipo_mono=tipo_mono,
+                    cantidad_a_producir=cantidad,
+                    precio_venta_unitario=precio_venta
+                )
+                messages.success(request, 'Simulación guardada correctamente')
+            
+        else:
+            mensaje_error = 'Por favor corrige los errores en el formulario'
+    else:
+        form = SimuladorForm()
+    
+    # Obtener tipos de moño disponibles y simulaciones recientes
+    tipos_mono = TipoMono.objects.filter(activo=True)
+    simulaciones_recientes = SimulacionProduccion.objects.select_related('tipo_mono').order_by('-fecha_simulacion')[:5]
+    
     return render(request, 'inventario/simulador.html', {
-        'insumos': insumos
+        'form': form,
+        'resultado': resultado,
+        'mensaje_error': mensaje_error,
+        'tipos_mono': tipos_mono,
+        'simulaciones_recientes': simulaciones_recientes
     })
 
 @login_required
@@ -269,3 +345,43 @@ def movimiento_create(request):
 def reabastecimiento(request):
     """Redireccionar a la nueva vista de reabastecimiento"""
     return redirect('reabastecimiento_list')
+
+@login_required
+def tipos_mono_list(request):
+    """Lista de tipos de moño"""
+    tipos = TipoMono.objects.all().order_by('nombre')
+    
+    # Calcular métricas para cada tipo
+    for tipo in tipos:
+        tipo.costo_calculado = tipo.calcular_costo_materiales()
+        tipo.margen_calculado = tipo.margen_ganancia()
+        
+    return render(request, 'inventario/tipos_mono_list.html', {
+        'tipos': tipos
+    })
+
+@login_required
+def tipo_mono_create(request):
+    """Crear nuevo tipo de moño"""
+    if request.method == 'POST':
+        form = TipoMonoForm(request.POST)
+        if form.is_valid():
+            tipo = form.save()
+            messages.success(request, f'Tipo de moño "{tipo.nombre}" creado correctamente')
+            return redirect('tipos_mono_list')
+    else:
+        form = TipoMonoForm()
+    
+    return render(request, 'inventario/tipo_mono_form.html', {
+        'form': form,
+        'title': 'Crear Tipo de Moño'
+    })
+
+@login_required
+def simulaciones_list(request):
+    """Lista de simulaciones guardadas"""
+    simulaciones = SimulacionProduccion.objects.select_related('tipo_mono').order_by('-fecha_simulacion')
+    
+    return render(request, 'inventario/simulaciones_list.html', {
+        'simulaciones': simulaciones
+    })

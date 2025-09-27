@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Material, Insumo, Movimiento, Reabastecimiento
+from .models import Material, Insumo, Movimiento, Reabastecimiento, TipoMono, RecetaProduccion, SimulacionProduccion
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
@@ -72,3 +72,27 @@ class ReabastecimientoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+@admin.register(TipoMono)
+class TipoMonoAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'precio_venta_sugerido', 'tiempo_produccion_minutos', 'activo']
+    list_filter = ['activo', 'created_at']
+    search_fields = ['nombre', 'descripcion']
+    readonly_fields = ['created_at', 'updated_at']
+
+class RecetaProduccionInline(admin.TabularInline):
+    model = RecetaProduccion
+    extra = 1
+
+TipoMonoAdmin.inlines = [RecetaProduccionInline]
+
+@admin.register(RecetaProduccion)
+class RecetaProduccionAdmin(admin.ModelAdmin):
+    list_display = ['tipo_mono', 'insumo', 'cantidad_necesaria', 'es_opcional']
+    list_filter = ['tipo_mono', 'es_opcional']
+
+@admin.register(SimulacionProduccion)  
+class SimulacionProduccionAdmin(admin.ModelAdmin):
+    list_display = ['nombre_simulacion', 'tipo_mono', 'cantidad_a_producir', 'ganancia_neta', 'stock_suficiente']
+    list_filter = ['stock_suficiente', 'tipo_mono']
+    readonly_fields = ['costo_total_materiales', 'ingreso_total', 'ganancia_neta', 'margen_porcentaje', 'stock_suficiente', 'fecha_simulacion']

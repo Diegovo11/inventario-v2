@@ -1,18 +1,351 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block title %}Simulador - Inventario{% endblock %}
 
+{% block extra_css %}
+<style>
+    .simulator-card {
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        border: none;
+    }
+    .simulator-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        padding: 2rem;
+    }
+    .result-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        border-radius: 15px;
+    }
+    .metric-item {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .profit-positive {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    .profit-negative {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .breakdown-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #667eea;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <h1 class="h2 mb-4">
-        <i class="bi bi-calculator me-2 text-primary"></i>
-        Simulador de Producción
-    </h1>
-
-    <div class="card">
-        <div class="card-body">
-            <p class="text-center text-muted">Simulador de producción en desarrollo...</p>
+    <div class="row">
+        <!-- Header -->
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-primary mb-1">
+                        <i class="fas fa-calculator me-2"></i>Simulador de Producción
+                    </h2>
+                    <p class="text-muted mb-0">Calcula costos, ganancias y planifica tu producción</p>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'tipos_mono_list' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>Tipos de Moños
+                    </a>
+                    <a href="{% url 'simulaciones_list' %}" class="btn btn-info">
+                        <i class="fas fa-history me-1"></i>Simulaciones
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="row">
+        <!-- Formulario del Simulador -->
+        <div class="col-lg-6 mb-4">
+            <div class="card simulator-card">
+                <div class="simulator-header text-center">
+                    <h3 class="mb-2">
+                        <i class="fas fa-play-circle me-2"></i>Nuevo Simulacro
+                    </h3>
+                    <p class="mb-0 opacity-75">Configura los parámetros de producción</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    {% if mensaje_error %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>{{ mensaje_error }}
+                        </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Tipo de Moño -->
+                        <div class="mb-3">
+                            <label for="{{ form.tipo_mono.id_for_label }}" class="form-label">
+                                <i class="fas fa-ribbon me-1"></i>{{ form.tipo_mono.label }}
+                            </label>
+                            {{ form.tipo_mono }}
+                            {% if form.tipo_mono.errors %}
+                                <div class="text-danger small mt-1">{{ form.tipo_mono.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Cantidad -->
+                        <div class="mb-3">
+                            <label for="{{ form.cantidad_a_producir.id_for_label }}" class="form-label">
+                                <i class="fas fa-hashtag me-1"></i>{{ form.cantidad_a_producir.label }}
+                            </label>
+                            {{ form.cantidad_a_producir }}
+                            {% if form.cantidad_a_producir.errors %}
+                                <div class="text-danger small mt-1">{{ form.cantidad_a_producir.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Precio de Venta -->
+                        <div class="mb-3">
+                            <label for="{{ form.precio_venta_unitario.id_for_label }}" class="form-label">
+                                <i class="fas fa-dollar-sign me-1"></i>{{ form.precio_venta_unitario.label }}
+                            </label>
+                            {{ form.precio_venta_unitario }}
+                            {% if form.precio_venta_unitario.errors %}
+                                <div class="text-danger small mt-1">{{ form.precio_venta_unitario.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Opciones de Guardado -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.guardar_simulacion }}
+                                <label class="form-check-label" for="{{ form.guardar_simulacion.id_for_label }}">
+                                    {{ form.guardar_simulacion.label }}
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4" id="nombre-simulacion" style="display: none;">
+                            <label for="{{ form.nombre_simulacion.id_for_label }}" class="form-label">
+                                {{ form.nombre_simulacion.label }}
+                            </label>
+                            {{ form.nombre_simulacion }}
+                        </div>
+
+                        <!-- Botón Simular -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play me-1"></i>Ejecutar Simulación
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="col-lg-6 mb-4">
+            {% if resultado %}
+                <div class="card simulator-card">
+                    <div class="card-header result-card text-center p-4">
+                        <h3 class="mb-2">
+                            <i class="fas fa-chart-line me-2"></i>Resultados
+                        </h3>
+                        <p class="mb-0 opacity-75">{{ resultado.cantidad }} {{ resultado.tipo_mono.nombre }}</p>
+                    </div>
+                    
+                    <div class="card-body p-4">
+                        <!-- Métricas Principales -->
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <div class="metric-item text-center {% if resultado.ganancia_neta >= 0 %}profit-positive{% else %}profit-negative{% endif %}">
+                                    <h4 class="mb-1">${{ resultado.ganancia_neta|floatformat:2 }}</h4>
+                                    <small class="opacity-75">Ganancia Total</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-item text-center" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                                    <h4 class="mb-1">{{ resultado.margen_porcentaje|floatformat:1 }}%</h4>
+                                    <small class="opacity-75">Margen</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Desglose Financiero -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="fas fa-coins me-2"></i>Desglose Financiero
+                            </h5>
+                            <div class="breakdown-item">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fas fa-shopping-cart me-2"></i>Ingresos Totales:</span>
+                                    <strong>${{ resultado.ingreso_total|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fas fa-box me-2"></i>Costo Materiales:</span>
+                                    <strong>${{ resultado.costo_total|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fas fa-clock me-2"></i>Tiempo Total:</span>
+                                    <strong>{{ resultado.tiempo_horas|floatformat:1 }} horas</strong>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="d-flex justify-content-between">
+                                    <span><i class="fas fa-tachometer-alt me-2"></i>Ganancia/Hora:</span>
+                                    <strong>${{ resultado.ganancia_por_hora|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Estado del Stock -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <i class="fas fa-warehouse me-2"></i>Estado del Stock
+                            </h5>
+                            {% if resultado.puede_producir %}
+                                <div class="alert alert-success d-flex align-items-center">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <span>Stock suficiente para producir {{ resultado.cantidad }} unidades</span>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning d-flex align-items-center">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <span>{{ resultado.mensaje_stock }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Materiales Necesarios -->
+                        {% if resultado.recetas %}
+                            <div class="mb-4">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-list-ul me-2"></i>Materiales Necesarios
+                                </h5>
+                                {% for receta in resultado.recetas %}
+                                    <div class="breakdown-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ receta.insumo.material.nombre }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ receta.insumo.nombre }}</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="badge bg-primary">
+                                                    {{ receta.cantidad_necesaria|floatformat:1 }} × {{ resultado.cantidad }} = 
+                                                    {% widthratio receta.cantidad_necesaria resultado.cantidad 1 as total_necesario %}
+                                                    {{ total_necesario }} {{ receta.insumo.material.unidad_base }}
+                                                </span>
+                                                <br>
+                                                <small class="text-muted">
+                                                    Stock: {{ receta.insumo.material.cantidad_disponible }} {{ receta.insumo.material.unidad_base }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="card simulator-card">
+                    <div class="card-body text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-calculator fa-4x text-muted"></i>
+                        </div>
+                        <h5 class="text-muted">Ejecuta una simulación</h5>
+                        <p class="text-muted">Completa el formulario y presiona "Ejecutar Simulación" para ver los resultados</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Simulaciones Recientes -->
+    {% if simulaciones_recientes %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history me-2"></i>Simulaciones Recientes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Tipo de Moño</th>
+                                        <th>Cantidad</th>
+                                        <th>Ganancia</th>
+                                        <th>Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sim in simulaciones_recientes %}
+                                    <tr>
+                                        <td>{{ sim.nombre_simulacion }}</td>
+                                        <td>{{ sim.tipo_mono.nombre }}</td>
+                                        <td>{{ sim.cantidad_a_producir }}</td>
+                                        <td>
+                                            <span class="badge {% if sim.ganancia_neta >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                                ${{ sim.ganancia_neta|floatformat:2 }}
+                                            </span>
+                                        </td>
+                                        <td>{{ sim.fecha_simulacion|date:"d/m/Y H:i" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar/ocultar campo de nombre cuando se marca guardar simulación
+    const checkGuardar = document.querySelector('input[name="guardar_simulacion"]');
+    const campoNombre = document.getElementById('nombre-simulacion');
+    
+    if (checkGuardar) {
+        checkGuardar.addEventListener('change', function() {
+            if (this.checked) {
+                campoNombre.style.display = 'block';
+            } else {
+                campoNombre.style.display = 'none';
+            }
+        });
+    }
+    
+    // Auto-llenar precio sugerido cuando se selecciona un tipo de moño
+    const selectTipo = document.querySelector('select[name="tipo_mono"]');
+    const inputPrecio = document.querySelector('input[name="precio_venta_unitario"]');
+    
+    if (selectTipo && inputPrecio) {
+        selectTipo.addEventListener('change', function() {
+            // En una implementación futura, podríamos hacer AJAX para obtener el precio sugerido
+            console.log('Tipo seleccionado:', this.value);
+        });
+    }
+});
+</script>
 {% endblock %}

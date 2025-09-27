@@ -16,8 +16,13 @@ urlpatterns = [
     path('reabastecimiento/<int:pk>/editar/', views.reabastecimiento_update, name='reabastecimiento_update'),
     path('stock-bajo/', views.stock_bajo_check, name='stock_bajo_check'),
     
-    # Otras funcionalidades
+    # Sistema de producción y simulador
     path('simulador/', views.simulador, name='simulador'),
+    path('tipos-mono/', views.tipos_mono_list, name='tipos_mono_list'),
+    path('tipos-mono/nuevo/', views.tipo_mono_create, name='tipo_mono_create'),
+    path('simulaciones/', views.simulaciones_list, name='simulaciones_list'),
+    
+    # Otras funcionalidades
     path('reportes/', views.reportes, name='reportes'),
     
     # Crear elementos

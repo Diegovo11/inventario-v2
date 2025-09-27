@@ -240,3 +240,219 @@ class Reabastecimiento(models.Model):
         if self.cantidad_solicitada == 0:
             return 0
         return min(100, (self.cantidad_recibida * 100) // self.cantidad_solicitada)
+
+
+class TipoMono(models.Model):
+    """Modelo para diferentes tipos de moños que se pueden producir"""
+    
+    nombre = models.CharField(
+        max_length=100, 
+        unique=True,
+        help_text="Nombre del tipo de moño (ej. Moño Básico, Moño Premium)"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción detallada del moño"
+    )
+    precio_venta_sugerido = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio de venta sugerido por unidad"
+    )
+    tiempo_produccion_minutos = models.PositiveIntegerField(
+        default=30,
+        help_text="Tiempo estimado de producción en minutos"
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="Si el tipo de moño está disponible para producción"
+    )
+
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Tipo de Moño"
+        verbose_name_plural = "Tipos de Moños"
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+    
+    def calcular_costo_materiales(self):
+        """Calcula el costo total de materiales necesarios"""
+        recetas = self.recetaproduccion_set.all()
+        costo_total = Decimal('0.00')
+        
+        for receta in recetas:
+            costo_material = receta.insumo.costo_por_unidad()
+            costo_total += costo_material * receta.cantidad_necesaria
+            
+        return costo_total
+    
+    def margen_ganancia(self):
+        """Calcula el margen de ganancia"""
+        costo = self.calcular_costo_materiales()
+        if costo == 0:
+            return Decimal('100.00')
+        
+        ganancia = self.precio_venta_sugerido - costo
+        return (ganancia / self.precio_venta_sugerido) * 100
+    
+    def puede_producir(self, cantidad=1):
+        """Verifica si se puede producir la cantidad especificada"""
+        recetas = self.recetaproduccion_set.all()
+        
+        for receta in recetas:
+            material_necesario = receta.cantidad_necesaria * cantidad
+            if receta.insumo.material.cantidad_disponible < material_necesario:
+                return False, f"Stock insuficiente de {receta.insumo.material.nombre}"
+        
+        return True, "Stock suficiente"
+
+
+class RecetaProduccion(models.Model):
+    """Modelo que define qué materiales e insumos se necesitan para cada tipo de moño"""
+    
+    tipo_mono = models.ForeignKey(
+        TipoMono, 
+        on_delete=models.CASCADE,
+        help_text="Tipo de moño al que pertenece esta receta"
+    )
+    insumo = models.ForeignKey(
+        Insumo, 
+        on_delete=models.CASCADE,
+        help_text="Insumo/material necesario"
+    )
+    cantidad_necesaria = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text="Cantidad del insumo necesaria para producir 1 moño"
+    )
+    es_opcional = models.BooleanField(
+        default=False,
+        help_text="Si este insumo es opcional para la producción"
+    )
+    notas = models.TextField(
+        blank=True,
+        help_text="Notas sobre el uso de este insumo"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Receta de Producción"
+        verbose_name_plural = "Recetas de Producción"
+        unique_together = ['tipo_mono', 'insumo']
+        ordering = ['tipo_mono', 'insumo']
+    
+    def __str__(self):
+        return f"{self.tipo_mono.nombre} - {self.insumo.nombre} ({self.cantidad_necesaria})"
+    
+    def costo_total_insumo(self, cantidad_monos=1):
+        """Calcula el costo total de este insumo para producir X moños"""
+        costo_unitario = self.insumo.costo_por_unidad()
+        cantidad_total = self.cantidad_necesaria * cantidad_monos
+        return costo_unitario * cantidad_total
+
+
+class SimulacionProduccion(models.Model):
+    """Modelo para guardar simulaciones de producción"""
+    
+    nombre_simulacion = models.CharField(
+        max_length=150,
+        help_text="Nombre para identificar esta simulación"
+    )
+    tipo_mono = models.ForeignKey(
+        TipoMono, 
+        on_delete=models.CASCADE,
+        help_text="Tipo de moño a simular"
+    )
+    cantidad_a_producir = models.PositiveIntegerField(
+        help_text="Cantidad de moños a producir en la simulación"
+    )
+    precio_venta_unitario = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text="Precio de venta por unidad para esta simulación"
+    )
+    
+    # Campos calculados
+    costo_total_materiales = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Costo total de todos los materiales"
+    )
+    ingreso_total = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Ingreso total estimado"
+    )
+    ganancia_neta = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Ganancia neta estimada"
+    )
+    margen_porcentaje = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Margen de ganancia en porcentaje"
+    )
+    
+    stock_suficiente = models.BooleanField(
+        default=True,
+        help_text="Si hay stock suficiente para producir esta cantidad"
+    )
+    
+    fecha_simulacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Simulación de Producción"
+        verbose_name_plural = "Simulaciones de Producción"
+        ordering = ['-fecha_simulacion']
+    
+    def __str__(self):
+        return f"{self.nombre_simulacion} - {self.cantidad_a_producir} {self.tipo_mono.nombre}"
+    
+    def save(self, *args, **kwargs):
+        # Calcular todos los valores automáticamente
+        self.calcular_metricas()
+        super().save(*args, **kwargs)
+    
+    def calcular_metricas(self):
+        """Calcula todas las métricas de la simulación"""
+        costo_unitario = self.tipo_mono.calcular_costo_materiales()
+        
+        self.costo_total_materiales = costo_unitario * self.cantidad_a_producir
+        self.ingreso_total = self.precio_venta_unitario * self.cantidad_a_producir
+        self.ganancia_neta = self.ingreso_total - self.costo_total_materiales
+        
+        if self.ingreso_total > 0:
+            self.margen_porcentaje = (self.ganancia_neta / self.ingreso_total) * 100
+        else:
+            self.margen_porcentaje = Decimal('0.00')
+        
+        # Verificar si hay stock suficiente
+        puede_producir, mensaje = self.tipo_mono.puede_producir(self.cantidad_a_producir)
+        self.stock_suficiente = puede_producir
+    
+    def tiempo_total_produccion(self):
+        """Calcula el tiempo total de producción en horas"""
+        minutos_totales = self.tipo_mono.tiempo_produccion_minutos * self.cantidad_a_producir
+        return minutos_totales / 60
+    
+    def rentabilidad_por_hora(self):
+        """Calcula la rentabilidad por hora de trabajo"""
+        tiempo_horas = self.tiempo_total_produccion()
+        if tiempo_horas > 0:
+            return self.ganancia_neta / Decimal(str(tiempo_horas))
+        return Decimal('0.00')
