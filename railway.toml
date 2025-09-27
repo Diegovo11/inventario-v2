@@ -3,7 +3,7 @@ builder = "nixpacks"
 
 [deploy]
 # Ejecuta migraciones automáticamente en cada deploy
-startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi"
+startCommand = "python manage.py migrate && python manage.py create_admin && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi"
 healthcheckPath = "/admin/"
 
 [env]
