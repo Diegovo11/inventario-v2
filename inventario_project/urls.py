@@ -15,8 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.shortcuts import redirect
+
+def redirect_to_dashboard(request):
+    """Redirigir desde la raíz al dashboard"""
+    return redirect('dashboard')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('inventario/', include('inventario.urls')),
+    path('', redirect_to_dashboard),  # Página raíz redirige al dashboard
 ]
