@@ -212,15 +212,47 @@
                 
                 <hr class="text-white-50 mx-3">
                 
-                <a class="nav-link" href="/inventario/materiales/">
-                    <i class="bi bi-box me-2"></i> Materiales
-                </a>
-                <a class="nav-link" href="/inventario/insumos/">
-                    <i class="bi bi-gift me-2"></i> Insumos
-                </a>
-                <a class="nav-link" href="/inventario/movimientos/">
-                    <i class="bi bi-arrow-left-right me-2"></i> Movimientos
-                </a>
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-box me-2"></i> Materiales
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'materiales_list' %}">
+                            <i class="bi bi-list me-2"></i> Lista de Materiales
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'material_create' %}">
+                            <i class="bi bi-plus-circle me-2"></i> Crear Material
+                        </a></li>
+                    </ul>
+                </div>
+                
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-boxes me-2"></i> Insumos
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'insumos_list' %}">
+                            <i class="bi bi-list me-2"></i> Lista de Insumos
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'insumo_create' %}">
+                            <i class="bi bi-plus-circle me-2"></i> Crear Insumo
+                        </a></li>
+                    </ul>
+                </div>
+                
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-arrow-left-right me-2"></i> Movimientos
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="{% url 'movimientos_list' %}">
+                            <i class="bi bi-list me-2"></i> Historial de Movimientos
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'movimiento_create' %}">
+                            <i class="bi bi-plus-circle me-2"></i> Registrar Movimiento
+                        </a></li>
+                    </ul>
+                </div>
                 
                 <hr class="text-white-50 mx-3">
                 
@@ -236,9 +268,27 @@
                 
                 <hr class="text-white-50 mx-3">
                 
-                <a class="nav-link" href="/admin/">
-                    <i class="bi bi-gear me-2"></i> Admin Django
-                </a>
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear me-2"></i> Administración
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><h6 class="dropdown-header">Gestión Rápida</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'material_create' %}">
+                            <i class="bi bi-plus me-2"></i> Nuevo Material
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'insumo_create' %}">
+                            <i class="bi bi-plus me-2"></i> Nuevo Insumo
+                        </a></li>
+                        <li><a class="dropdown-item" href="{% url 'movimiento_create' %}">
+                            <i class="bi bi-plus me-2"></i> Nuevo Movimiento
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/admin/" target="_blank">
+                            <i class="bi bi-tools me-2"></i> Django Admin
+                        </a></li>
+                    </ul>
+                </div>
             </nav>
         </div>
     </div>
