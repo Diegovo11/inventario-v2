@@ -36,8 +36,20 @@
         
         .sidebar {
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            min-height: 100vh;
+            min-height: calc(100vh - 56px); /* Altura completa menos navbar */
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto; /* Permitir scroll si es necesario */
+            position: fixed;
+            top: 56px;
+            left: 0;
+            width: 250px;
+            z-index: 1020;
+        }
+        
+        @media (min-width: 768px) {
+            .sidebar {
+                display: block !important; /* Forzar visibilidad en desktop */
+            }
         }
         
         .sidebar .nav-link {
@@ -115,14 +127,24 @@
         
         .content-area {
             padding: 20px;
+            padding-top: 80px; /* Compensar navbar fijo */
             margin-left: 0;
             transition: all 0.3s ease;
+            min-height: 100vh; /* Asegurar altura mínima completa */
         }
         
         @media (min-width: 768px) {
             .content-area {
                 margin-left: 250px;
+                padding-top: 80px; /* Mantener padding en desktop */
             }
+        }
+        
+        /* Asegurar que el cuerpo tenga altura completa */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
         }
         
         .floating-action {
@@ -176,7 +198,7 @@
     </nav>
 
     <!-- Sidebar -->
-    <div class="offcanvas-md offcanvas-start sidebar" tabindex="-1" id="sidebar" style="width: 250px; margin-top: 56px;">
+    <div class="offcanvas-md offcanvas-start sidebar" tabindex="-1" id="sidebar" style="width: 250px; margin-top: 56px; height: calc(100vh - 56px);">
         <div class="offcanvas-header d-md-none">
             <h5 class="offcanvas-title text-white">Menú</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
@@ -222,7 +244,7 @@
     </div>
 
     <!-- Main content -->
-    <main class="content-area" style="margin-top: 56px;">
+    <main class="content-area">
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
