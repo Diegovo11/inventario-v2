@@ -1,0 +1,168 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-list-alt me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>
+                    Nueva Lista
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>
+                        Todas las Listas
+                    </h5>
+                    <span class="badge bg-primary">{{ listas.count }}</span>
+                </div>
+                <div class="card-body">
+                    {% if listas %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Lista</th>
+                                        <th>Estado</th>
+                                        <th>Moños</th>
+                                        <th>Ganancia Estimada</th>
+                                        <th>Fecha</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for lista in listas %}
+                                        <tr>
+                                            <td>
+                                                <h6 class="mb-1">{{ lista.nombre }}</h6>
+                                                <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{% if lista.estado == 'borrador' %}secondary{% elif lista.estado == 'pendiente_compra' %}warning{% elif lista.estado == 'comprado' %}info{% elif lista.estado == 'reabastecido' %}success{% elif lista.estado == 'en_produccion' %}primary{% else %}dark{% endif %}">
+                                                    {{ lista.get_estado_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong>{{ lista.total_moños_planificados }}</strong>
+                                                <small class="text-muted d-block">{{ lista.detalles_monos.count }} tipo{{ lista.detalles_monos.count|pluralize }}</small>
+                                            </td>
+                                            <td>
+                                                {% if lista.ganancia_estimada %}
+                                                    <strong class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</strong>
+                                                {% else %}
+                                                    <small class="text-muted">No calculado</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ lista.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
+                                                       class="btn btn-outline-info btn-sm" title="Ver Detalle">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
+                                                       class="btn btn-outline-primary btn-sm" title="Editar Lista">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-list-alt fa-4x text-muted mb-3"></i>
+                            <h5 class="text-muted">No hay listas de producción</h5>
+                            <p class="text-muted mb-4">Comienza creando tu primera lista de producción</p>
+                            <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>
+                                Crear Primera Lista
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    {% if listas %}
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-secondary">
+                            <i class="fas fa-edit me-2"></i>
+                            Borradores
+                        </h5>
+                        <h3 class="text-secondary">{{ listas|length }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">
+                            <i class="fas fa-shopping-cart me-2"></i>
+                            Pend. Compra
+                        </h5>
+                        <h3 class="text-warning">{{ listas|length }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">
+                            <i class="fas fa-check me-2"></i>
+                            Reabastecidas
+                        </h5>
+                        <h3 class="text-success">{{ listas|length }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">
+                            <i class="fas fa-cogs me-2"></i>
+                            En Producción
+                        </h5>
+                        <h3 class="text-primary">{{ listas|length }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

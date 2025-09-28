@@ -30,19 +30,20 @@ urlpatterns = [
     path('simulacion/<int:simulacion_id>/', views.detalle_simulacion, name='detalle_simulacion'),
     
     # Sistema de Listas de Producción (Nuevo)
-    path('listas-produccion/', views.historial_simulaciones, name='listas_produccion'),  # Temporal redirect
+    path('listas-produccion/', views.listado_listas_produccion, name='listas_produccion'),
     path('lista-produccion/crear/', views.crear_lista_produccion, name='crear_lista_produccion'),
+    path('lista-produccion/<int:lista_id>/editar/', views.editar_lista_produccion, name='editar_lista_produccion'),
     path('lista-compras/', views.lista_de_compras, name='lista_de_compras'),
     path('compra-productos/', views.compra_productos, name='compra_productos'),
+    path('reabastecimiento/', views.reabastecimiento, name='reabastecimiento'),
     path('lista-produccion/<int:lista_id>/', views.detalle_lista_produccion, name='detalle_lista_produccion'),
     # path('lista-produccion/<int:lista_id>/compras/', views.lista_compras, name='lista_compras'),
-    # path('lista-produccion/<int:lista_id>/reabastecer/', views.reabastecimiento, name='reabastecimiento'),
     # path('lista-produccion/<int:lista_id>/produccion/', views.posible_venta, name='posible_venta'),
     # path('lista-produccion/<int:lista_id>/finalizar/', views.venta_final, name='venta_final'),
     
     # Sistema de Entrada y Salida
     path('entrada-material/', views.entrada_material, name='entrada_material'),
-    path('reabastecimiento/', views.entrada_material, name='reabastecimiento_list'),  # Redirect to entrada_material
+    path('entrada-reabastecimiento/', views.entrada_material, name='reabastecimiento_list'),  # Redirect to entrada_material
     path('salida-material/', views.salida_material, name='salida_material'),
     path('historial-movimientos/', views.historial_movimientos, name='historial_movimientos'),
     

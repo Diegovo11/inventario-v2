@@ -779,6 +779,104 @@ def calcular_costos_estimados(lista_produccion):
 
 
 @login_required
+def editar_lista_produccion(request, lista_id):
+    """Vista para editar una lista de producción existente"""
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if request.method == 'POST':
+        form = ListaProduccionForm(request.POST, instance=lista)
+        formset = DetalleListaMonosFormSet(request.POST, instance=lista)
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                from django.db import transaction
+                
+                with transaction.atomic():
+                    # 1. Actualizar la lista de producción
+                    lista = form.save()
+                    
+                    # 2. Procesar moños del formset
+                    moños_agregados = 0
+                    total_moños_planificados = 0
+                    
+                    # Primero guardar el formset para manejar deletes
+                    formset.save()
+                    
+                    # Recalcular totales
+                    for detalle in lista.detalles_monos.all():
+                        moños_agregados += 1
+                        total_moños_planificados += detalle.cantidad_total_planificada
+                    
+                    if moños_agregados == 0:
+                        raise ValueError("Debe mantener al menos un moño en la lista")
+                    
+                    # 3. Actualizar totales de la lista
+                    lista.total_moños_planificados = total_moños_planificados
+                    
+                    # 4. Recalcular materiales necesarios
+                    calcular_materiales_necesarios(lista)
+                    
+                    # 5. Recalcular costos estimados
+                    calcular_costos_estimados(lista)
+                    
+                    lista.save()
+                    
+                    messages.success(request, f'Lista de producción "{lista.nombre}" actualizada exitosamente.')
+                    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                    
+            except Exception as e:
+                messages.error(request, f'Error al actualizar la lista: {str(e)}')
+                print(f"Error editando lista de producción: {str(e)}")
+        
+        else:
+            # Mostrar errores del formulario
+            if not form.is_valid():
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f'Error en {field}: {error}')
+            
+            # Mostrar errores del formset
+            if not formset.is_valid():
+                for i, form_errors in enumerate(formset.errors):
+                    if form_errors:
+                        for field, errors in form_errors.items():
+                            for error in errors:
+                                messages.error(request, f'Error en moño #{i+1} - {field}: {error}')
+    
+    else:
+        form = ListaProduccionForm(instance=lista)
+        formset = DetalleListaMonosFormSet(instance=lista)
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'lista': lista,
+        'titulo': f'Editar Lista: {lista.nombre}',
+        'moños_disponibles': Monos.objects.filter(activo=True).order_by('nombre'),
+        'editando': True
+    }
+    
+    return render(request, 'inventario/crear_lista_produccion.html', context)
+
+
+@login_required
+def listado_listas_produccion(request):
+    """Vista para mostrar todas las listas de producción"""
+    
+    listas = ListaProduccion.objects.filter(
+        usuario_creador=request.user
+    ).prefetch_related('detalles_monos__monos').order_by('-fecha_creacion')
+    
+    context = {
+        'listas': listas,
+        'titulo': 'Listas de Producción'
+    }
+    
+    return render(request, 'inventario/listado_listas_produccion.html', context)
+
+
+@login_required
 def lista_de_compras(request):
     """Vista para generar lista consolidada de compras"""
     
@@ -813,7 +911,7 @@ def lista_de_compras(request):
                     lista.save()
                 
                 messages.success(request, f'Se han marcado {len(listas_seleccionadas)} listas como compradas.')
-                return redirect('lista_de_compras')
+                return redirect('inventario:lista_de_compras')
     
     context = {
         'listas_disponibles': listas_disponibles,
@@ -972,7 +1070,7 @@ def compra_productos(request):
                 f'Se registraron {materiales_actualizados} compras por un total de ${total_invertido:.2f}. '
                 f'El inventario ha sido actualizado.'
             )
-            return redirect('compra_productos')
+            return redirect('inventario:compra_productos')
         else:
             messages.warning(request, 'No se registró ninguna compra. Verifique los datos ingresados.')
     
@@ -983,6 +1081,165 @@ def compra_productos(request):
     }
     
     return render(request, 'inventario/compra_productos.html', context)
+
+
+@login_required
+def reabastecimiento(request):
+    """Vista para gestionar el proceso de producción/reabastecimiento"""
+    
+    # Obtener listas en estado 'reabastecido' listas para producción
+    listas_reabastecidas = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='reabastecido'
+    ).prefetch_related('detalles_monos__monos__recetas__material', 'resumen_materiales__material')
+    
+    # Procesar inicio o finalización de producción
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+        lista_id = request.POST.get('lista_id')
+        
+        try:
+            lista = ListaProduccion.objects.get(id=lista_id, usuario_creador=request.user)
+            
+            if accion == 'iniciar_produccion':
+                # Cambiar estado a 'en_produccion'
+                lista.estado = 'en_produccion'
+                lista.save()
+                
+                # Descontar materiales del inventario
+                materiales_descontados = descontar_materiales_produccion(lista)
+                
+                messages.success(
+                    request, 
+                    f'Se inició la producción de "{lista.nombre}". '
+                    f'Se descontaron {materiales_descontados} materiales del inventario.'
+                )
+                
+            elif accion == 'finalizar_produccion':
+                # Obtener cantidades producidas del formulario
+                cantidades_actualizadas = 0
+                
+                for detalle in lista.detalles_monos.all():
+                    cantidad_key = f'cantidad_producida_{detalle.id}'
+                    cantidad_producida = request.POST.get(cantidad_key)
+                    
+                    if cantidad_producida:
+                        try:
+                            cantidad = int(cantidad_producida)
+                            if cantidad >= 0:
+                                detalle.cantidad_producida = cantidad
+                                detalle.save()
+                                cantidades_actualizadas += 1
+                        except (ValueError, TypeError):
+                            continue
+                
+                if cantidades_actualizadas > 0:
+                    # Verificar si la producción está completa
+                    produccion_completa = all(
+                        detalle.cantidad_producida >= detalle.cantidad 
+                        for detalle in lista.detalles_monos.all()
+                    )
+                    
+                    if produccion_completa:
+                        lista.estado = 'finalizado'
+                        lista.save()
+                        
+                        # Actualizar total de moños producidos
+                        total_producidos = sum(
+                            detalle.cantidad_total_producida 
+                            for detalle in lista.detalles_monos.all()
+                        )
+                        lista.total_moños_producidos = total_producidos
+                        lista.save()
+                        
+                        messages.success(
+                            request, 
+                            f'¡Producción de "{lista.nombre}" completada! '
+                            f'Se produjeron {total_producidos} moños en total.'
+                        )
+                    else:
+                        messages.info(
+                            request, 
+                            f'Se actualizaron las cantidades de "{lista.nombre}". '
+                            f'Aún faltan algunos moños por completar.'
+                        )
+                else:
+                    messages.warning(request, 'No se actualizó ninguna cantidad.')
+                    
+        except ListaProduccion.DoesNotExist:
+            messages.error(request, 'Lista de producción no encontrada.')
+        except Exception as e:
+            messages.error(request, f'Error al procesar la acción: {str(e)}')
+            
+        return redirect('inventario:reabastecimiento')
+    
+    # Obtener también listas en producción para mostrar progreso
+    listas_en_produccion = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='en_produccion'
+    ).prefetch_related('detalles_monos__monos')
+    
+    context = {
+        'listas_reabastecidas': listas_reabastecidas,
+        'listas_en_produccion': listas_en_produccion,
+        'titulo': 'Reabastecimiento y Producción'
+    }
+    
+    return render(request, 'inventario/reabastecimiento.html', context)
+
+
+def descontar_materiales_produccion(lista_produccion):
+    """Descuenta materiales del inventario según las recetas de los moños"""
+    
+    materiales_descontados = 0
+    
+    for detalle in lista_produccion.detalles_monos.all():
+        monos = detalle.monos
+        cantidad_total_planificada = detalle.cantidad_total_planificada
+        
+        # Obtener recetas del moño
+        for receta in monos.recetas.all():
+            material = receta.material
+            cantidad_por_mono = receta.cantidad_necesaria
+            cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
+            
+            # Descontar del inventario
+            if material.cantidad_disponible >= cantidad_total_necesaria:
+                material.cantidad_disponible -= cantidad_total_necesaria
+                material.save()
+                
+                # Actualizar cantidad utilizada en el resumen
+                try:
+                    resumen = ResumenMateriales.objects.get(
+                        lista_produccion=lista_produccion,
+                        material=material
+                    )
+                    resumen.cantidad_utilizada += cantidad_total_necesaria
+                    resumen.save()
+                except ResumenMateriales.DoesNotExist:
+                    pass
+                
+                materiales_descontados += 1
+            else:
+                # Si no hay suficiente material, usar lo que hay disponible
+                cantidad_usada = material.cantidad_disponible
+                material.cantidad_disponible = 0
+                material.save()
+                
+                # Actualizar cantidad utilizada
+                try:
+                    resumen = ResumenMateriales.objects.get(
+                        lista_produccion=lista_produccion,
+                        material=material
+                    )
+                    resumen.cantidad_utilizada += cantidad_usada
+                    resumen.save()
+                except ResumenMateriales.DoesNotExist:
+                    pass
+                
+                materiales_descontados += 1
+    
+    return materiales_descontados
 
 
 def ejecutar_simulacion(data, usuario):
