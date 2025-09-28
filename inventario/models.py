@@ -543,6 +543,11 @@ class DetalleListaMonos(models.Model):
         else:
             return f"{self.cantidad} individuales"
     
+    @property
+    def total_estimado(self):
+        """Calcula el total estimado en dinero"""
+        return self.monos.precio_venta * self.cantidad_total_planificada
+    
     def __str__(self):
         return f"{self.monos.nombre} - {self.tipo_venta_display}"
 

@@ -59,7 +59,7 @@
                                             </td>
                                             <td>${{ detalle.monos.precio_venta|floatformat:2 }}</td>
                                             <td class="text-success">
-                                                <strong>${{ detalle.monos.precio_venta|mul:detalle.cantidad_total_planificada|floatformat:2 }}</strong>
+                                                <strong>${{ detalle.total_estimado|floatformat:2 }}</strong>
                                             </td>
                                         </tr>
                                     {% endfor %}
