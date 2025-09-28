@@ -328,6 +328,19 @@ def agregar_monos(request):
                         'cantidad': cantidad_decimal
                     })
         
+        # Deduplicar materiales (en caso de que haya duplicados en el formset)
+        materiales_unicos = {}
+        for receta in recetas_validas:
+            material_id = receta['material'].id
+            if material_id in materiales_unicos:
+                # Si ya existe, usar la cantidad más reciente (última encontrada)
+                print(f"⚠️  DUPLICADO detectado en creación: Material {material_id}, reemplazando cantidad {materiales_unicos[material_id]['cantidad']} por {receta['cantidad']}")
+            materiales_unicos[material_id] = receta
+        
+        # Convertir de vuelta a lista sin duplicados
+        recetas_validas = list(materiales_unicos.values())
+        print(f"📋 Recetas después de deduplicar en creación: {[(r['material'].id, r['cantidad']) for r in recetas_validas]}")
+        
         # Mostrar errores de recetas
         for error in recetas_con_errores:
             messages.error(request, error)
@@ -447,6 +460,19 @@ def editar_monos(request, monos_id):
                         'cantidad': cantidad_decimal,
                         'id': receta_id  # Para saber si es nueva o existente
                     })
+        
+        # Deduplicar materiales (en caso de que haya duplicados en el formset)
+        materiales_unicos = {}
+        for receta in recetas_validas:
+            material_id = receta['material'].id
+            if material_id in materiales_unicos:
+                # Si ya existe, usar la cantidad más reciente (última encontrada)
+                print(f"⚠️  DUPLICADO detectado: Material {material_id}, reemplazando cantidad {materiales_unicos[material_id]['cantidad']} por {receta['cantidad']}")
+            materiales_unicos[material_id] = receta
+        
+        # Convertir de vuelta a lista sin duplicados
+        recetas_validas = list(materiales_unicos.values())
+        print(f"📋 Recetas después de deduplicar: {[(r['material'].id, r['cantidad']) for r in recetas_validas]}")
         
         # Mostrar errores de recetas
         for error in recetas_con_errores:
