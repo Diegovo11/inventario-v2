@@ -15,6 +15,9 @@ urlpatterns = [
     path('material/agregar/', views.agregar_material, name='agregar_material'),
     path('material/<int:material_id>/editar/', views.editar_material, name='editar_material'),
     
+    # AJAX
+    path('ajax/material/<int:material_id>/info/', views.obtener_info_material, name='obtener_info_material'),
+    
     # Moños
     path('monos/', views.lista_monos, name='lista_monos'),
     path('monos/<int:monos_id>/', views.detalle_monos, name='detalle_monos'),

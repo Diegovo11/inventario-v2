@@ -191,6 +191,23 @@ def editar_material(request, material_id):
     })
 
 
+# ================ VISTAS AJAX ================
+
+@login_required
+def obtener_info_material(request, material_id):
+    """Vista AJAX para obtener información del material"""
+    try:
+        material = Material.objects.get(id=material_id, activo=True)
+        data = {
+            'unidad_base': material.unidad_base,
+            'precio_unitario': float(material.costo_unitario),
+            'nombre': material.nombre,
+            'disponible': float(material.cantidad_disponible)
+        }
+        return JsonResponse(data)
+    except Material.DoesNotExist:
+        return JsonResponse({'error': 'Material no encontrado'}, status=404)
+
 # ================ VISTAS PARA SISTEMA DE SIMULACIÓN ================
 
 @login_required
@@ -251,7 +268,16 @@ def agregar_monos(request):
         form = MonosForm(request.POST)
         
         # Debug: Imprimir los datos del POST para ver qué estamos recibiendo
-        print("POST data:", dict(request.POST))
+        print("=== DEBUG POST DATA ===")
+        for key, value in request.POST.items():
+            print(f"{key}: {value}")
+        print("=== END DEBUG ===")
+        
+        # Debug específico del formset
+        print("=== FORMSET DEBUG ===")
+        recetas_keys = [key for key in request.POST.keys() if 'recetas-' in key]
+        print(f"Keys relacionadas con formset: {recetas_keys}")
+        print("=== END FORMSET DEBUG ===")
         
         # Para un nuevo objeto, crear el formset con un moño temporal
         temp_monos = Monos()  # Instancia temporal sin guardar

@@ -127,6 +127,20 @@
                 
                 {{ formset.management_form }}
                 
+                <!-- Debug info -->
+                {% if formset.forms %}
+                    <div class="alert alert-info d-none" id="debug-info">
+                        <small>
+                            <strong>Debug:</strong> 
+                            Formset prefix: "{{ formset.prefix }}" |
+                            Total forms: {{ formset.total_form_count }} |
+                            {% if formset.forms.0 %}
+                                Sample field names: {{ formset.forms.0.material.html_name }}, {{ formset.forms.0.cantidad_necesaria.html_name }}
+                            {% endif %}
+                        </small>
+                    </div>
+                {% endif %}
+                
                 <div id="receta-formset">
                     {% for form in formset %}
                         <div class="receta-form card mb-3 {% if form.DELETE %}d-none{% endif %}" data-form-idx="{{ forloop.counter0 }}">
@@ -302,19 +316,33 @@ function updateMaterialInfo() {
     const materialSelect = this;
     const formRow = materialSelect.closest('.receta-form');
     const unitSpan = formRow.querySelector('.material-unit');
+    const cantidadInput = formRow.querySelector('input[name*="-cantidad_necesaria"]');
     
     if (materialSelect.value) {
-        // Obtener la unidad del material seleccionado desde el dropdown
-        const selectedOption = materialSelect.options[materialSelect.selectedIndex];
-        if (selectedOption && selectedOption.value) {
-            // Por ahora usar unidades como predeterminado, se puede mejorar con AJAX
-            unitSpan.textContent = 'unidades';
-            updateMaterialCost.call(formRow.querySelector('input[name*="-cantidad_necesaria"]'));
-        }
+        // Obtener información del material via AJAX
+        fetch(`/inventario/ajax/material/${materialSelect.value}/info/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    unitSpan.textContent = 'unidades';
+                } else {
+                    unitSpan.textContent = data.unidad_base;
+                    // Guardar el precio unitario en el elemento para usarlo después
+                    cantidadInput.setAttribute('data-precio-unitario', data.precio_unitario);
+                    updateMaterialCost.call(cantidadInput);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching material info:', error);
+                unitSpan.textContent = 'unidades';
+                updateMaterialCost.call(cantidadInput);
+            });
     } else {
         unitSpan.textContent = '-';
         const costSpan = formRow.querySelector('.material-cost');
         costSpan.textContent = 'Costo: $0.00';
+        cantidadInput.removeAttribute('data-precio-unitario');
     }
     updateCostoTotal();
 }
@@ -327,8 +355,8 @@ function updateMaterialCost() {
     
     if (materialSelect.value && cantidadInput.value) {
         const cantidad = parseFloat(cantidadInput.value) || 0;
-        // Calcular costo básico (se puede mejorar con AJAX para obtener precio real)
-        const costoEstimado = cantidad * 1.0; // $1 por unidad como ejemplo
+        const precioUnitario = parseFloat(cantidadInput.getAttribute('data-precio-unitario')) || 1.0;
+        const costoEstimado = cantidad * precioUnitario;
         costSpan.textContent = `Costo: $${costoEstimado.toFixed(2)}`;
     } else {
         costSpan.textContent = 'Costo: $0.00';
@@ -349,10 +377,51 @@ function updateCostoTotal() {
     document.getElementById('costo-total').textContent = `$${total.toFixed(2)}`;
 }
 
+// Debug: Función para verificar datos antes de enviar
+function debugFormSubmission() {
+    console.log('=== DEBUG FORM SUBMISSION ===');
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    
+    console.log('Form data:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+    }
+    
+    // Verificar campos específicos del formset
+    const totalForms = document.querySelector('input[name="recetas-TOTAL_FORMS"]');
+    console.log('Total forms field:', totalForms ? totalForms.value : 'NOT FOUND');
+    
+    const recetaForms = document.querySelectorAll('.receta-form:not(.d-none)');
+    console.log(`Visible receta forms: ${recetaForms.length}`);
+    
+    recetaForms.forEach((formDiv, index) => {
+        const materialSelect = formDiv.querySelector('select[name*="-material"]');
+        const cantidadInput = formDiv.querySelector('input[name*="-cantidad_necesaria"]');
+        console.log(`Form ${index}: material=${materialSelect ? materialSelect.value : 'NOT FOUND'}, cantidad=${cantidadInput ? cantidadInput.value : 'NOT FOUND'}`);
+    });
+    console.log('=== END DEBUG ===');
+}
+
 // Inicializar event listeners para forms existentes
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.receta-form').forEach(addFormEventListeners);
     updateCostoTotal();
+    
+    // Agregar debug al botón de submit
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            debugFormSubmission();
+            // No preventDefault, dejamos que el form se envíe
+        });
+    }
+    
+    // Mostrar info de debug si estamos en desarrollo
+    const debugInfo = document.getElementById('debug-info');
+    if (debugInfo && window.location.hostname.includes('localhost')) {
+        debugInfo.classList.remove('d-none');
+    }
 });
 </script>
 {% endblock %}
