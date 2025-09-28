@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.http import JsonResponse
+from django.utils import timezone
 import math
 from .models import (Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, 
                    Simulacion, DetalleSimulacion, MovimientoEfectivo, ListaProduccion,
@@ -885,6 +886,103 @@ def detalle_lista_produccion(request, lista_id):
     }
     
     return render(request, 'inventario/detalle_lista_produccion.html', context)
+
+
+@login_required
+def compra_productos(request):
+    """Vista para registrar compras reales de materiales"""
+    
+    # Obtener listas en estado 'comprado' que necesitan registro de compras
+    listas_comprado = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='comprado'
+    ).prefetch_related('resumen_materiales__material')
+    
+    # Obtener todos los materiales de todas las listas en estado comprado
+    materiales_pendientes = []
+    for lista in listas_comprado:
+        for resumen in lista.resumen_materiales.filter(cantidad_faltante__gt=0):
+            # Solo materiales que aún no han sido comprados
+            if resumen.cantidad_comprada == 0:
+                materiales_pendientes.append({
+                    'resumen': resumen,
+                    'lista': lista,
+                    'material': resumen.material,
+                    'cantidad_faltante': resumen.cantidad_faltante,
+                    'costo_estimado': resumen.cantidad_faltante * (resumen.material.precio_compra / resumen.material.factor_conversion) if resumen.material.precio_compra > 0 else 0
+                })
+    
+    # Procesar formulario de compra
+    if request.method == 'POST':
+        materiales_actualizados = 0
+        total_invertido = 0
+        
+        for material_info in materiales_pendientes:
+            resumen = material_info['resumen']
+            
+            # Obtener datos del formulario para cada material
+            cantidad_key = f'cantidad_{resumen.id}'
+            precio_key = f'precio_{resumen.id}'
+            proveedor_key = f'proveedor_{resumen.id}'
+            
+            cantidad_comprada = request.POST.get(cantidad_key)
+            precio_real = request.POST.get(precio_key)
+            proveedor = request.POST.get(proveedor_key, '')
+            
+            if cantidad_comprada and precio_real:
+                try:
+                    cantidad = float(cantidad_comprada)
+                    precio = float(precio_real)
+                    
+                    if cantidad > 0 and precio > 0:
+                        # Actualizar resumen de material
+                        resumen.cantidad_comprada = cantidad
+                        resumen.precio_compra_real = precio
+                        resumen.proveedor = proveedor
+                        resumen.fecha_compra = timezone.now()
+                        resumen.save()
+                        
+                        # Actualizar inventario del material
+                        material = resumen.material
+                        material.cantidad_disponible += cantidad
+                        material.save()
+                        
+                        materiales_actualizados += 1
+                        total_invertido += cantidad * precio
+                        
+                except (ValueError, TypeError):
+                    continue
+        
+        if materiales_actualizados > 0:
+            # Verificar si todas las compras de todas las listas están completas
+            for lista in listas_comprado:
+                compras_completas = True
+                for resumen in lista.resumen_materiales.filter(cantidad_faltante__gt=0):
+                    if resumen.cantidad_comprada == 0:
+                        compras_completas = False
+                        break
+                
+                # Si todas las compras están completas, cambiar estado
+                if compras_completas:
+                    lista.estado = 'reabastecido'
+                    lista.save()
+            
+            messages.success(
+                request, 
+                f'Se registraron {materiales_actualizados} compras por un total de ${total_invertido:.2f}. '
+                f'El inventario ha sido actualizado.'
+            )
+            return redirect('compra_productos')
+        else:
+            messages.warning(request, 'No se registró ninguna compra. Verifique los datos ingresados.')
+    
+    context = {
+        'listas_comprado': listas_comprado,
+        'materiales_pendientes': materiales_pendientes,
+        'titulo': 'Compra de Productos'
+    }
+    
+    return render(request, 'inventario/compra_productos.html', context)
 
 
 def ejecutar_simulacion(data, usuario):

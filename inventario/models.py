@@ -599,6 +599,16 @@ class ResumenMateriales(models.Model):
         default=0,
         help_text="Precio real pagado por el material"
     )
+    proveedor = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Proveedor donde se compró el material"
+    )
+    fecha_compra = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha cuando se realizó la compra"
+    )
     
     # Uso real
     cantidad_utilizada = models.DecimalField(

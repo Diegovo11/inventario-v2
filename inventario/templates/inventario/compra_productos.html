@@ -1,0 +1,340 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }} - Inventario{% endblock %}
+
+{% block extra_css %}
+<style>
+    .material-compra-card {
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease-in-out;
+        margin-bottom: 1rem;
+    }
+    
+    .material-compra-card:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    }
+    
+    .compra-input {
+        border-radius: 0.25rem;
+        border: 1px solid #ced4da;
+    }
+    
+    .compra-input:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .costo-estimado {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .total-inversion {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #198754;
+    }
+    
+    .sin-materiales {
+        color: #6c757d;
+        font-style: italic;
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+    
+    .lista-badge {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Registra las compras reales de materiales
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if materiales_pendientes %}
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-boxes me-2"></i>
+                                Materiales por Comprar
+                            </h5>
+                            <span class="badge bg-warning">{{ materiales_pendientes|length }} pendientes</span>
+                        </div>
+                        <div class="card-body">
+                            {% for material_info in materiales_pendientes %}
+                                <div class="material-compra-card p-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-lg-4">
+                                            <div class="mb-2">
+                                                <h6 class="mb-1">{{ material_info.material.nombre }}</h6>
+                                                <small class="text-muted">{{ material_info.material.categoria.nombre|default:"Sin categoría" }}</small>
+                                                <br>
+                                                <span class="badge bg-info lista-badge">{{ material_info.lista.nombre }}</span>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>Necesario:</strong> {{ material_info.cantidad_faltante|floatformat:2 }} {{ material_info.material.unidad_medida }}
+                                                <br>
+                                                <small class="costo-estimado">Estimado: ${{ material_info.costo_estimado|floatformat:2 }}</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-lg-8">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">
+                                                        <strong>Cantidad Comprada</strong>
+                                                    </label>
+                                                    <input type="number" 
+                                                           name="cantidad_{{ material_info.resumen.id }}" 
+                                                           class="form-control compra-input cantidad-input" 
+                                                           step="0.01" 
+                                                           min="0" 
+                                                           max="{{ material_info.cantidad_faltante }}"
+                                                           placeholder="0.00"
+                                                           data-material-id="{{ material_info.resumen.id }}">
+                                                    <small class="text-muted">Máx: {{ material_info.cantidad_faltante|floatformat:2 }}</small>
+                                                </div>
+                                                
+                                                <div class="col-md-3">
+                                                    <label class="form-label">
+                                                        <strong>Precio Real</strong>
+                                                    </label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">$</span>
+                                                        <input type="number" 
+                                                               name="precio_{{ material_info.resumen.id }}" 
+                                                               class="form-control compra-input precio-input" 
+                                                               step="0.01" 
+                                                               min="0"
+                                                               placeholder="0.00"
+                                                               data-material-id="{{ material_info.resumen.id }}">
+                                                    </div>
+                                                    <small class="text-muted">Por {{ material_info.material.unidad_medida }}</small>
+                                                </div>
+                                                
+                                                <div class="col-md-4">
+                                                    <label class="form-label">
+                                                        <strong>Proveedor</strong>
+                                                    </label>
+                                                    <input type="text" 
+                                                           name="proveedor_{{ material_info.resumen.id }}" 
+                                                           class="form-control compra-input" 
+                                                           placeholder="Nombre del proveedor"
+                                                           maxlength="200">
+                                                </div>
+                                                
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <div class="text-center">
+                                                        <small class="text-muted d-block">Total:</small>
+                                                        <strong class="text-success total-material" data-material-id="{{ material_info.resumen.id }}">$0.00</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-calculator me-2"></i>
+                                Resumen de Inversión
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Total Materiales:</small>
+                                <h4 id="total-materiales">0</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Inversión Total:</small>
+                                <h3 class="total-inversion" id="total-inversion">$0.00</h3>
+                            </div>
+                            
+                            <hr>
+                            
+                            <div class="mb-3">
+                                <h6 class="text-muted">Listas Afectadas:</h6>
+                                {% for lista in listas_comprado %}
+                                    <div class="mb-2">
+                                        <span class="badge bg-warning">{{ lista.nombre }}</span>
+                                        <br><small class="text-muted">{{ lista.detalles_monos.count }} tipos de moños</small>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success" id="btn-registrar-compras" disabled>
+                                    <i class="fas fa-check me-2"></i>
+                                    Registrar Compras
+                                </button>
+                            </div>
+                            <small class="text-muted mt-2 d-block text-center">
+                                Completa al menos una compra para habilitar
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    {% else %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="sin-materiales">
+                            <i class="fas fa-check-circle fa-4x mb-3 d-block text-success"></i>
+                            <h4>¡Todas las compras están completas!</h4>
+                            <p class="mb-3">No hay materiales pendientes de compra en este momento.</p>
+                            
+                            <div class="row justify-content-center">
+                                <div class="col-auto">
+                                    <a href="{% url 'inventario:lista_de_compras' %}" class="btn btn-primary me-2">
+                                        <i class="fas fa-shopping-list me-1"></i>
+                                        Ver Lista de Compras
+                                    </a>
+                                    <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-outline-primary">
+                                        <i class="fas fa-plus me-1"></i>
+                                        Nueva Lista de Producción
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cantidadInputs = document.querySelectorAll('.cantidad-input');
+    const precioInputs = document.querySelectorAll('.precio-input');
+    const btnRegistrar = document.getElementById('btn-registrar-compras');
+    
+    // Función para calcular el total de un material
+    function calcularTotalMaterial(materialId) {
+        const cantidadInput = document.querySelector(`[name="cantidad_${materialId}"]`);
+        const precioInput = document.querySelector(`[name="precio_${materialId}"]`);
+        const totalElement = document.querySelector(`[data-material-id="${materialId}"].total-material`);
+        
+        if (cantidadInput && precioInput && totalElement) {
+            const cantidad = parseFloat(cantidadInput.value) || 0;
+            const precio = parseFloat(precioInput.value) || 0;
+            const total = cantidad * precio;
+            
+            totalElement.textContent = '$' + total.toFixed(2);
+        }
+    }
+    
+    // Función para calcular el resumen total
+    function calcularResumenTotal() {
+        let materialesConCompra = 0;
+        let inversionTotal = 0;
+        
+        cantidadInputs.forEach(function(cantidadInput) {
+            const materialId = cantidadInput.getAttribute('data-material-id');
+            const precioInput = document.querySelector(`[name="precio_${materialId}"]`);
+            
+            if (cantidadInput && precioInput) {
+                const cantidad = parseFloat(cantidadInput.value) || 0;
+                const precio = parseFloat(precioInput.value) || 0;
+                
+                if (cantidad > 0 && precio > 0) {
+                    materialesConCompra++;
+                    inversionTotal += cantidad * precio;
+                }
+            }
+        });
+        
+        // Actualizar display
+        const totalMaterialesEl = document.getElementById('total-materiales');
+        const totalInversionEl = document.getElementById('total-inversion');
+        
+        if (totalMaterialesEl) {
+            totalMaterialesEl.textContent = materialesConCompra;
+        }
+        
+        if (totalInversionEl) {
+            totalInversionEl.textContent = '$' + inversionTotal.toFixed(2);
+        }
+        
+        // Habilitar/deshabilitar botón
+        if (btnRegistrar) {
+            btnRegistrar.disabled = materialesConCompra === 0;
+        }
+    }
+    
+    // Event listeners para inputs de cantidad y precio
+    [...cantidadInputs, ...precioInputs].forEach(function(input) {
+        input.addEventListener('input', function() {
+            const materialId = this.getAttribute('data-material-id');
+            calcularTotalMaterial(materialId);
+            calcularResumenTotal();
+        });
+    });
+    
+    // Validación de cantidad máxima
+    cantidadInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            const maxValue = parseFloat(this.getAttribute('max'));
+            const currentValue = parseFloat(this.value);
+            
+            if (currentValue > maxValue) {
+                this.value = maxValue;
+                calcularTotalMaterial(this.getAttribute('data-material-id'));
+                calcularResumenTotal();
+            }
+        });
+    });
+    
+    // Inicializar cálculos
+    calcularResumenTotal();
+});
+</script>
+{% endblock %}
