@@ -18,6 +18,10 @@ from .views_contaduria import contaduria_home, flujo_efectivo, registrar_movimie
 
 def home(request):
     """Vista principal del sistema"""
+    # Verificar si hay materiales, si no, crear algunos básicos
+    if not Material.objects.exists():
+        _crear_materiales_basicos()
+    
     # Estadísticas básicas
     total_materiales = Material.objects.filter(activo=True).count()
     materiales_bajo_stock = Material.objects.filter(
@@ -43,6 +47,48 @@ def home(request):
     }
     
     return render(request, 'inventario/home.html', context)
+
+
+def _crear_materiales_basicos():
+    """Crea algunos materiales básicos si la base de datos está vacía"""
+    materiales_basicos = [
+        {
+            'codigo': 'M001',
+            'nombre': 'Listón Rojo',
+            'descripcion': 'Listón de tela roja de 1 cm de ancho',
+            'tipo_material': 'liston',
+            'unidad_base': 'metros',
+            'factor_conversion': 10,
+            'cantidad_disponible': Decimal('50.00'),
+            'precio_compra': Decimal('15.00'),
+            'categoria': 'listón'
+        },
+        {
+            'codigo': 'M002',
+            'nombre': 'Perla Blanca',
+            'descripcion': 'Perlas blancas para decoración',
+            'tipo_material': 'piedra',
+            'unidad_base': 'unidades',
+            'factor_conversion': 100,
+            'cantidad_disponible': Decimal('200.00'),
+            'precio_compra': Decimal('25.00'),
+            'categoria': 'piedra'
+        },
+        {
+            'codigo': 'M003',
+            'nombre': 'Flor Rosa',
+            'descripcion': 'Flores artificiales pequeñas',
+            'tipo_material': 'adorno',
+            'unidad_base': 'unidades',
+            'factor_conversion': 20,
+            'cantidad_disponible': Decimal('40.00'),
+            'precio_compra': Decimal('12.00'),
+            'categoria': 'adorno'
+        }
+    ]
+    
+    for material_data in materiales_basicos:
+        Material.objects.create(**material_data)
 
 
 @login_required
@@ -93,7 +139,12 @@ def lista_materiales(request):
 @login_required
 def detalle_material(request, material_id):
     """Vista para ver detalles de un material"""
-    material = get_object_or_404(Material, id=material_id, activo=True)
+    try:
+        material = get_object_or_404(Material, id=material_id, activo=True)
+    except:
+        messages.error(request, f'No se encontró un material con ID {material_id}. Puede que haya sido eliminado o no exista.')
+        return redirect('inventario:lista_materiales')
+    
     movimientos = material.movimientos.all()[:20]
     
     context = {
