@@ -647,19 +647,17 @@ def crear_lista_produccion(request):
                     for form_detalle in formset:
                         if form_detalle.cleaned_data and not form_detalle.cleaned_data.get('DELETE', False):
                             monos = form_detalle.cleaned_data['monos']
-                            cantidad_pares = form_detalle.cleaned_data.get('cantidad_pares', 0)
-                            cantidad_individuales = form_detalle.cleaned_data.get('cantidad_individuales', 0)
+                            cantidad = form_detalle.cleaned_data.get('cantidad', 0)
                             
-                            if cantidad_pares > 0 or cantidad_individuales > 0:
+                            if cantidad > 0:
                                 # Crear detalle de moños
-                                DetalleListaMonos.objects.create(
+                                detalle = DetalleListaMonos.objects.create(
                                     lista_produccion=lista,
                                     monos=monos,
-                                    cantidad_pares=cantidad_pares,
-                                    cantidad_individuales=cantidad_individuales
+                                    cantidad=cantidad
                                 )
                                 moños_agregados += 1
-                                total_moños_planificados += cantidad_pares + cantidad_individuales
+                                total_moños_planificados += detalle.cantidad_total_planificada
                     
                     if moños_agregados == 0:
                         raise ValueError("Debe agregar al menos un moño a la lista")

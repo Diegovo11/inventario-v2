@@ -33,9 +33,9 @@
                                 <thead>
                                     <tr>
                                         <th>Moño</th>
-                                        <th>Pares</th>
-                                        <th>Individuales</th>
-                                        <th>Total</th>
+                                        <th>Tipo Venta</th>
+                                        <th>Cantidad</th>
+                                        <th>Total Moños</th>
                                         <th>Precio Unit.</th>
                                         <th>Total Estimado</th>
                                     </tr>
@@ -47,9 +47,16 @@
                                                 <strong>{{ detalle.monos.nombre }}</strong>
                                                 <br><small class="text-muted">{{ detalle.monos.codigo }}</small>
                                             </td>
-                                            <td>{{ detalle.cantidad_pares }}</td>
-                                            <td>{{ detalle.cantidad_individuales }}</td>
-                                            <td><strong>{{ detalle.cantidad_total_planificada }}</strong></td>
+                                            <td>
+                                                <span class="badge bg-{% if detalle.monos.tipo_venta == 'par' %}primary{% else %}info{% endif %}">
+                                                    {{ detalle.monos.get_tipo_venta_display }}
+                                                </span>
+                                            </td>
+                                            <td><strong>{{ detalle.cantidad }}</strong></td>
+                                            <td>
+                                                <strong>{{ detalle.cantidad_total_planificada }}</strong>
+                                                <br><small class="text-muted">{{ detalle.tipo_venta_display }}</small>
+                                            </td>
                                             <td>${{ detalle.monos.precio_venta|floatformat:2 }}</td>
                                             <td class="text-success">
                                                 <strong>${{ detalle.monos.precio_venta|mul:detalle.cantidad_total_planificada|floatformat:2 }}</strong>

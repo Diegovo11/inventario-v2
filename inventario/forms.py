@@ -607,36 +607,15 @@ class DetalleListaMonosForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control moños-select'}),
         empty_label="Seleccionar moño"
     )
-    cantidad_pares = forms.IntegerField(
-        min_value=0,
-        initial=0,
+    cantidad = forms.IntegerField(
+        min_value=1,
+        initial=1,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'placeholder': '0'
+            'placeholder': '1'
         }),
-        help_text="Cantidad de pares a producir"
+        help_text="Cantidad a producir (pares o individuales según el tipo del moño)"
     )
-    cantidad_individuales = forms.IntegerField(
-        min_value=0,
-        initial=0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': '0'
-        }),
-        help_text="Cantidad de moños individuales a producir"
-    )
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        cantidad_pares = cleaned_data.get('cantidad_pares', 0)
-        cantidad_individuales = cleaned_data.get('cantidad_individuales', 0)
-        
-        if cantidad_pares == 0 and cantidad_individuales == 0:
-            raise forms.ValidationError(
-                'Debe especificar al menos una cantidad (pares o individuales).'
-            )
-        
-        return cleaned_data
 
 
 # Crear formset para múltiples moños

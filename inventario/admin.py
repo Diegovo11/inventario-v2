@@ -363,8 +363,8 @@ class MovimientoEfectivoAdmin(admin.ModelAdmin):
 class DetalleListaMonosInline(admin.TabularInline):
     model = DetalleListaMonos
     extra = 1
-    fields = ['monos', 'cantidad_pares', 'cantidad_individuales', 'pares_producidos', 'individuales_producidos']
-    readonly_fields = ['pares_producidos', 'individuales_producidos']
+    fields = ['monos', 'cantidad', 'cantidad_producida', 'tipo_venta_display']
+    readonly_fields = ['cantidad_producida', 'tipo_venta_display']
 
 
 class ResumenMaterialesInline(admin.TabularInline):
@@ -414,14 +414,13 @@ class DetalleListaMonosAdmin(admin.ModelAdmin):
     list_display = [
         'lista_produccion',
         'monos', 
-        'cantidad_pares',
-        'cantidad_individuales',
+        'cantidad',
+        'tipo_venta_display',
         'cantidad_total_planificada',
-        'pares_producidos',
-        'individuales_producidos',
+        'cantidad_producida',
         'cantidad_total_producida'
     ]
-    list_filter = ['lista_produccion__estado', 'monos']
+    list_filter = ['lista_produccion__estado', 'monos', 'monos__tipo_venta']
     search_fields = ['lista_produccion__nombre', 'monos__nombre']
 
 

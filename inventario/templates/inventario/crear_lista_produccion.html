@@ -112,19 +112,13 @@
                                                 </label>
                                                 {{ form.monos }}
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <label class="form-label">
-                                                    <strong>Cantidad Pares</strong>
+                                                    <strong>Cantidad</strong>
                                                 </label>
-                                                {{ form.cantidad_pares }}
-                                                <div class="form-text">{{ form.cantidad_pares.help_text }}</div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">
-                                                    <strong>Cantidad Individuales</strong>
-                                                </label>
-                                                {{ form.cantidad_individuales }}
-                                                <div class="form-text">{{ form.cantidad_individuales.help_text }}</div>
+                                                {{ form.cantidad }}
+                                                <div class="form-text">{{ form.cantidad.help_text }}</div>
+                                                <small class="text-muted tipo-venta-info">Se define automáticamente según el tipo del moño</small>
                                             </div>
                                             <div class="col-md-2 text-end">
                                                 {% if formset.can_delete %}
@@ -210,19 +204,13 @@
                 </label>
                 <!-- Aquí se insertará el select dinámicamente -->
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label">
-                    <strong>Cantidad Pares</strong>
+                    <strong>Cantidad</strong>
                 </label>
-                <input type="number" name="form-__prefix__-cantidad_pares" class="form-control cantidad-input" min="0" value="0" placeholder="0">
-                <div class="form-text">Cantidad de pares a producir</div>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">
-                    <strong>Cantidad Individuales</strong>
-                </label>
-                <input type="number" name="form-__prefix__-cantidad_individuales" class="form-control cantidad-input" min="0" value="0" placeholder="0">
-                <div class="form-text">Cantidad de moños individuales a producir</div>
+                <input type="number" name="form-__prefix__-cantidad" class="form-control cantidad-input" min="1" value="1" placeholder="1">
+                <div class="form-text">Cantidad a producir (pares o individuales según el tipo del moño)</div>
+                <small class="text-muted tipo-venta-info">Se define automáticamente según el tipo del moño</small>
             </div>
             <div class="col-md-2 text-end">
                 <button type="button" class="btn btn-remove-mono delete-form">
@@ -233,10 +221,13 @@
         
         <div class="mono-info d-none" id="info-__prefix__">
             <div class="row">
-                <div class="col-md-6">
-                    <strong>Precio por moño:</strong> $<span class="precio-mono">0.00</span>
+                <div class="col-md-4">
+                    <strong>Tipo de venta:</strong> <span class="tipo-venta">-</span>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <strong>Precio por unidad:</strong> $<span class="precio-mono">0.00</span>
+                </div>
+                <div class="col-md-4">
                     <strong>Total estimado:</strong> $<span class="total-estimado">0.00</span>
                 </div>
             </div>
@@ -259,7 +250,8 @@
             "id": {{ mono.id }},
             "nombre": "{{ mono.nombre|escapejs }}",
             "codigo": "{{ mono.codigo|escapejs }}",
-            "precio": {{ mono.precio_venta|floatformat:2|default:"0.00" }}
+            "precio": {{ mono.precio_venta|floatformat:2|default:"0.00" }},
+            "tipo_venta": "{{ mono.tipo_venta|default:'individual' }}"
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ]
@@ -350,18 +342,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function configurarEventosFormulario(formDiv, formIndex) {
         const monosSelect = formDiv.querySelector('[name$="-monos"]');
-        const paresInput = formDiv.querySelector('[name$="-cantidad_pares"]');
-        const individualesInput = formDiv.querySelector('[name$="-cantidad_individuales"]');
+        const cantidadInput = formDiv.querySelector('[name$="-cantidad"]');
         const infoDiv = formDiv.querySelector('.mono-info');
         
         // Evento cambio de moño
         if (monosSelect) {
             monosSelect.addEventListener('change', function() {
                 if (this.value) {
-                    const precio = this.selectedOptions[0]?.getAttribute('data-precio') || 0;
-                    infoDiv.querySelector('.precio-mono').textContent = parseFloat(precio).toFixed(2);
-                    infoDiv.classList.remove('d-none');
-                    calcularTotalFormulario(formDiv);
+                    const monoSeleccionado = moñosDisponibles.find(mono => mono.id == this.value);
+                    if (monoSeleccionado) {
+                        const precio = monoSeleccionado.precio;
+                        const tipoVenta = monoSeleccionado.tipo_venta || 'individual';
+                        
+                        infoDiv.querySelector('.precio-mono').textContent = precio.toFixed(2);
+                        infoDiv.querySelector('.tipo-venta').textContent = tipoVenta === 'par' ? 'Par' : 'Individual';
+                        infoDiv.classList.remove('d-none');
+                        calcularTotalFormulario(formDiv);
+                    }
                 } else {
                     infoDiv.classList.add('d-none');
                 }
@@ -369,23 +366,35 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Eventos cambio de cantidad
-        [paresInput, individualesInput].forEach(input => {
-            if (input) {
-                input.addEventListener('input', function() {
-                    calcularTotalFormulario(formDiv);
-                    actualizarResumen();
-                });
-            }
-        });
+        // Evento cambio de cantidad
+        if (cantidadInput) {
+            cantidadInput.addEventListener('input', function() {
+                calcularTotalFormulario(formDiv);
+                actualizarResumen();
+            });
+        }
     }
     
     function calcularTotalFormulario(formDiv) {
-        const precio = parseFloat(formDiv.querySelector('.precio-mono')?.textContent || 0);
-        const pares = parseInt(formDiv.querySelector('[name$="-cantidad_pares"]')?.value || 0);
-        const individuales = parseInt(formDiv.querySelector('[name$="-cantidad_individuales"]')?.value || 0);
+        const monosSelect = formDiv.querySelector('[name$="-monos"]');
+        const cantidadInput = formDiv.querySelector('[name$="-cantidad"]');
         
-        const total = precio * (pares + individuales);
+        if (!monosSelect || !monosSelect.value || !cantidadInput) return;
+        
+        const monoSeleccionado = moñosDisponibles.find(mono => mono.id == monosSelect.value);
+        if (!monoSeleccionado) return;
+        
+        const precio = monoSeleccionado.precio;
+        const cantidad = parseInt(cantidadInput.value || 0);
+        const tipoVenta = monoSeleccionado.tipo_venta || 'individual';
+        
+        // Calcular total de moños según el tipo
+        let totalMonos = cantidad;
+        if (tipoVenta === 'par') {
+            totalMonos = cantidad * 2; // Si es par, cada cantidad son 2 moños
+        }
+        
+        const total = precio * totalMonos;
         const totalSpan = formDiv.querySelector('.total-estimado');
         if (totalSpan) {
             totalSpan.textContent = total.toFixed(2);
@@ -402,16 +411,27 @@ document.addEventListener('DOMContentLoaded', function() {
             if (deleteInput && deleteInput.checked) return;
             
             const monosSelect = formDiv.querySelector('[name$="-monos"]');
-            if (monosSelect && monosSelect.value) {
-                const pares = parseInt(formDiv.querySelector('[name$="-cantidad_pares"]')?.value || 0);
-                const individuales = parseInt(formDiv.querySelector('[name$="-cantidad_individuales"]')?.value || 0);
+            const cantidadInput = formDiv.querySelector('[name$="-cantidad"]');
+            
+            if (monosSelect && monosSelect.value && cantidadInput) {
+                const cantidad = parseInt(cantidadInput.value || 0);
                 
-                if (pares > 0 || individuales > 0) {
+                if (cantidad > 0) {
                     tiposMonos++;
-                    totalMonos += pares + individuales;
                     
-                    const totalFormulario = parseFloat(formDiv.querySelector('.total-estimado')?.textContent || 0);
-                    gananciaTotal += totalFormulario;
+                    // Calcular total de moños según el tipo
+                    const monoSeleccionado = moñosDisponibles.find(mono => mono.id == monosSelect.value);
+                    if (monoSeleccionado) {
+                        const tipoVenta = monoSeleccionado.tipo_venta || 'individual';
+                        let monosReales = cantidad;
+                        if (tipoVenta === 'par') {
+                            monosReales = cantidad * 2;
+                        }
+                        totalMonos += monosReales;
+                        
+                        const totalFormulario = parseFloat(formDiv.querySelector('.total-estimado')?.textContent || 0);
+                        gananciaTotal += totalFormulario;
+                    }
                 }
             }
         });
@@ -434,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listeners para campos de cantidad
     document.addEventListener('input', function(e) {
-        if (e.target.matches('[name$="-cantidad_pares"], [name$="-cantidad_individuales"]')) {
+        if (e.target.matches('[name$="-cantidad"]')) {
             const formDiv = e.target.closest('.formset-row');
             if (formDiv) {
                 calcularTotalFormulario(formDiv);

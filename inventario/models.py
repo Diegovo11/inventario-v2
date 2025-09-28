@@ -506,18 +506,13 @@ class DetalleListaMonos(models.Model):
         on_delete=models.CASCADE,
         related_name='detalles_lista'
     )
-    cantidad_pares = models.PositiveIntegerField(
+    cantidad = models.PositiveIntegerField(
         default=0,
-        help_text="Cantidad de pares a producir"
-    )
-    cantidad_individuales = models.PositiveIntegerField(
-        default=0,
-        help_text="Cantidad de moños individuales a producir"
+        help_text="Cantidad a producir (pares o individuales según el tipo del moño)"
     )
     
-    # Cantidades producidas realmente (se actualiza en "Posible Venta")
-    pares_producidos = models.PositiveIntegerField(default=0)
-    individuales_producidos = models.PositiveIntegerField(default=0)
+    # Cantidad producida realmente (se actualiza en "Posible Venta")
+    cantidad_producida = models.PositiveIntegerField(default=0)
     
     class Meta:
         verbose_name = "Detalle de Moños en Lista"
@@ -526,16 +521,30 @@ class DetalleListaMonos(models.Model):
     
     @property
     def cantidad_total_planificada(self):
-        """Total de moños planificados (pares + individuales)"""
-        return self.cantidad_pares + self.cantidad_individuales
+        """Total de moños planificados según el tipo de venta"""
+        if self.monos.tipo_venta == 'par':
+            return self.cantidad * 2  # Si es par, cada cantidad son 2 moños
+        else:
+            return self.cantidad  # Si es individual, la cantidad es directa
     
     @property
     def cantidad_total_producida(self):
-        """Total de moños producidos realmente"""
-        return self.pares_producidos + self.individuales_producidos
+        """Total de moños producidos realmente según el tipo de venta"""
+        if self.monos.tipo_venta == 'par':
+            return self.cantidad_producida * 2
+        else:
+            return self.cantidad_producida
+    
+    @property
+    def tipo_venta_display(self):
+        """Muestra el tipo de venta con explicación"""
+        if self.monos.tipo_venta == 'par':
+            return f"{self.cantidad} pares (= {self.cantidad_total_planificada} moños)"
+        else:
+            return f"{self.cantidad} individuales"
     
     def __str__(self):
-        return f"{self.monos.nombre} - {self.cantidad_total_planificada} moños"
+        return f"{self.monos.nombre} - {self.tipo_venta_display}"
 
 
 class ResumenMateriales(models.Model):
