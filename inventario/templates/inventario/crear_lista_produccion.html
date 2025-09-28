@@ -246,16 +246,35 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Variables de Django para JavaScript -->
+<script id="django-data" type="application/json">
+{
+    "formset": {
+        "totalForms": {{ formset.total_form_count|default:"0" }},
+        "maxForms": {{ formset.max_num|default:"1000" }}
+    },
+    "monos": [
+        {% for mono in moños_disponibles %}
+        {
+            "id": {{ mono.id }},
+            "nombre": "{{ mono.nombre|escapejs }}",
+            "codigo": "{{ mono.codigo|escapejs }}",
+            "precio": {{ mono.precio_venta|floatformat:2|default:"0.00" }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Obtener valores de Django con validación
-    const formsetData = {
-        totalForms: parseInt('{{ formset.total_form_count|default:"0" }}') || 0,
-        maxForms: parseInt('{{ formset.max_num|default:"1000" }}') || 1000
-    };
+    // Cargar datos de Django desde el script JSON
+    const djangoData = JSON.parse(document.getElementById('django-data').textContent);
     
-    let formCount = formsetData.totalForms;
-    const maxForms = formsetData.maxForms;
+    let formCount = djangoData.formset.totalForms || 0;
+    const maxForms = djangoData.formset.maxForms || 1000;
+    const moñosDisponibles = djangoData.monos || [];
+    
     const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
     
     // Validar que el input existe
@@ -264,34 +283,20 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Datos de moños para el select dinámico
-    const moñosDisponibles = [
-        {% for mono in moños_disponibles %}
-        {
-            id: {{ mono.id }},
-            nombre: "{{ mono.nombre|escapejs }}",
-            codigo: "{{ mono.codigo|escapejs }}",
-            precio: parseFloat("{{ mono.precio_venta|floatformat:2|default:'0.00' }}")
-        }{% if not forloop.last %},{% endif %}
-        {% endfor %}
-    ];
-    
-    // Agregar nuevo formulario con validación
-    const addButton = document.getElementById('add-mono');
-    if (addButton) {
-        addButton.addEventListener('click', function() {
-            if (formCount < maxForms) {
-                const template = document.getElementById('empty-form-template');
-                const container = document.getElementById('formset-forms');
-                
-                if (!template || !container) {
-                    console.error('No se encontraron los elementos necesarios para agregar formulario');
-                    return;
-                }
-                
-                const newForm = template.innerHTML.replace(/__prefix__/g, formCount);
-                container.insertAdjacentHTML('beforeend', newForm);
+    // Función para agregar nuevo formulario
+    function addForm() {
+        if (formCount < maxForms) {
+            const template = document.getElementById('empty-form-template');
+            const container = document.getElementById('formset-forms');
             
+            if (!template || !container) {
+                console.error('No se encontraron los elementos necesarios para agregar formulario');
+                return;
+            }
+            
+            const newForm = template.innerHTML.replace(/__prefix__/g, formCount);
+            container.insertAdjacentHTML('beforeend', newForm);
+        
             // Crear y configurar el select de moños
             const newFormDiv = container.lastElementChild;
             const selectContainer = newFormDiv.querySelector('.col-md-4 label').nextElementSibling;
@@ -319,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             actualizarResumen();
         }
-    });
+    }
     
     // Configurar eventos para formularios existentes
     document.querySelectorAll('.formset-row').forEach((formDiv, index) => {
@@ -420,6 +425,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tiposMonosEl) tiposMonosEl.textContent = tiposMonos;
         if (gananciaEl) gananciaEl.textContent = '$' + gananciaTotal.toFixed(2);
     }
+    
+    // Event listeners para el botón de agregar
+    const addButton = document.getElementById('add-form');
+    if (addButton) {
+        addButton.addEventListener('click', addForm);
+    }
+    
+    // Event listeners para campos de cantidad
+    document.addEventListener('input', function(e) {
+        if (e.target.matches('[name$="-cantidad_pares"], [name$="-cantidad_individuales"]')) {
+            const formDiv = e.target.closest('.formset-row');
+            if (formDiv) {
+                calcularTotalFormulario(formDiv);
+                actualizarResumen();
+            }
+        }
+    });
     
     // Inicializar resumen después de que el DOM esté listo
     setTimeout(function() {
