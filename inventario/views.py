@@ -322,12 +322,22 @@ def agregar_monos(request):
         
         if form.is_valid() and formset.is_valid() and valid_forms_count > 0:
             try:
+                # 1. Primero guardar el moño
                 monos = form.save()
-                formset.instance = monos
-                formset.save()
                 
-                messages.success(request, f'Moño {monos.codigo} agregado exitosamente.')
-                return redirect('inventario:detalle_monos', monos_id=monos.id)
+                # 2. Crear nuevo formset con la instancia real del moño
+                formset_real = RecetaMonosFormSet(request.POST, instance=monos)
+                
+                # 3. Validar y guardar el formset con la instancia correcta
+                if formset_real.is_valid():
+                    formset_real.save()
+                    messages.success(request, f'Moño {monos.codigo} agregado exitosamente.')
+                    return redirect('inventario:detalle_monos', monos_id=monos.id)
+                else:
+                    # Si hay error, eliminar el moño para mantener consistencia
+                    monos.delete()
+                    messages.error(request, 'Error al guardar las recetas. Intente nuevamente.')
+                    
             except Exception as e:
                 messages.error(request, f'Error al guardar: {str(e)}')
                 print("Exception:", str(e))
