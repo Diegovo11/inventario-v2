@@ -325,20 +325,37 @@ def agregar_monos(request):
                 # 1. Primero guardar el moño
                 monos = form.save()
                 
-                # 2. Crear nuevo formset con la instancia real del moño
-                formset_real = RecetaMonosFormSet(request.POST, instance=monos)
+                # 2. Guardar recetas manualmente usando los datos validados del formset
+                recetas_guardadas = 0
+                for form_receta in formset:
+                    if form_receta.cleaned_data and not form_receta.cleaned_data.get('DELETE', False):
+                        material = form_receta.cleaned_data.get('material')
+                        cantidad = form_receta.cleaned_data.get('cantidad_necesaria')
+                        
+                        if material and cantidad:
+                            # Crear y guardar la receta manualmente
+                            RecetaMonos.objects.create(
+                                monos=monos,
+                                material=material,
+                                cantidad_necesaria=cantidad
+                            )
+                            recetas_guardadas += 1
                 
-                # 3. Validar y guardar el formset con la instancia correcta
-                if formset_real.is_valid():
-                    formset_real.save()
-                    messages.success(request, f'Moño {monos.codigo} agregado exitosamente.')
+                if recetas_guardadas > 0:
+                    messages.success(request, f'Moño {monos.codigo} agregado exitosamente con {recetas_guardadas} material(es).')
                     return redirect('inventario:detalle_monos', monos_id=monos.id)
                 else:
-                    # Si hay error, eliminar el moño para mantener consistencia
+                    # Si no se guardó ninguna receta, eliminar el moño
                     monos.delete()
-                    messages.error(request, 'Error al guardar las recetas. Intente nuevamente.')
+                    messages.error(request, 'No se pudo guardar ninguna receta. Intente nuevamente.')
                     
             except Exception as e:
+                # Si hay error, intentar eliminar el moño si fue creado
+                try:
+                    if 'monos' in locals():
+                        monos.delete()
+                except:
+                    pass
                 messages.error(request, f'Error al guardar: {str(e)}')
                 print("Exception:", str(e))
         elif valid_forms_count == 0 and formset.is_valid():
