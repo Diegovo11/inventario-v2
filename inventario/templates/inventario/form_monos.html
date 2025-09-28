@@ -9,17 +9,17 @@
     </h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <a href="{% url 'inventario:lista_monos' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i>Volver a Lista
+            <i class="fas fa-arrow-left me-1"></i><span class="d-none d-sm-inline">Volver a </span>Lista
         </a>
     </div>
 </div>
 
-<form method="post" class="row">
+<form method="post" class="row g-3">
     {% csrf_token %}
     
     <!-- Información Básica del Moño -->
-    <div class="col-md-6">
-        <div class="card shadow">
+    <div class="col-12 col-lg-6 mb-3">
+        <div class="card shadow h-100">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="fas fa-info-circle me-2"></i>Información Básica
@@ -63,8 +63,8 @@
     </div>
     
     <!-- Configuración de Venta -->
-    <div class="col-md-6">
-        <div class="card shadow">
+    <div class="col-12 col-lg-6 mb-3">
+        <div class="card shadow h-100">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="fas fa-dollar-sign me-2"></i>Configuración de Venta
@@ -129,41 +129,46 @@
                 
                 <div id="receta-formset">
                     {% for form in formset %}
-                        <div class="receta-form row align-items-end mb-3 {% if form.DELETE %}d-none{% endif %}" data-form-idx="{{ forloop.counter0 }}">
+                        <div class="receta-form card mb-3 {% if form.DELETE %}d-none{% endif %}" data-form-idx="{{ forloop.counter0 }}">
                             {% for hidden in form.hidden_fields %}
                                 {{ hidden }}
                             {% endfor %}
                             
-                            <div class="col-md-5">
-                                <label class="form-label">Material</label>
-                                {{ form.material }}
-                                {% if form.material.errors %}
-                                    <div class="text-danger small">{{ form.material.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <label class="form-label">Cantidad Necesaria</label>
-                                <div class="input-group">
-                                    {{ form.cantidad_necesaria }}
-                                    <span class="input-group-text material-unit">-</span>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label">Material</label>
+                                        {{ form.material }}
+                                        {% if form.material.errors %}
+                                            <div class="text-danger small">{{ form.material.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label">Cantidad Necesaria</label>
+                                        <div class="input-group">
+                                            {{ form.cantidad_necesaria }}
+                                            <span class="input-group-text material-unit">-</span>
+                                        </div>
+                                        {% if form.cantidad_necesaria.errors %}
+                                            <div class="text-danger small">{{ form.cantidad_necesaria.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-2 d-flex align-items-center">
+                                        <span class="material-cost text-muted fw-bold">Costo: $0.00</span>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-1 d-flex align-items-center justify-content-end">
+                                        {% if action == 'editar' or forloop.counter0 > 0 %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRecetaForm(this)">
+                                                <i class="fas fa-trash"></i>
+                                                <span class="d-md-none ms-1">Eliminar</span>
+                                            </button>
+                                            {{ form.DELETE }}
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                {% if form.cantidad_necesaria.errors %}
-                                    <div class="text-danger small">{{ form.cantidad_necesaria.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <span class="material-cost text-muted">Costo: $0.00</span>
-                            </div>
-                            
-                            <div class="col-md-1">
-                                {% if action == 'editar' or forloop.counter0 > 0 %}
-                                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRecetaForm(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {{ form.DELETE }}
-                                {% endif %}
                             </div>
                         </div>
                     {% endfor %}
@@ -183,10 +188,10 @@
     <!-- Botones de Acción -->
     <div class="col-12 mt-4">
         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-            <a href="{% url 'inventario:lista_monos' %}" class="btn btn-secondary me-md-2">
+            <a href="{% url 'inventario:lista_monos' %}" class="btn btn-secondary btn-lg d-md-inline me-md-2">
                 <i class="fas fa-times me-1"></i>Cancelar
             </a>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary btn-lg d-md-inline">
                 <i class="fas fa-save me-1"></i>
                 {% if action == 'editar' %}Actualizar{% else %}Guardar{% endif %} Moño
             </button>
@@ -196,32 +201,37 @@
 
 <!-- Template para nuevos forms de receta -->
 <div id="empty-receta-form" class="d-none">
-    <div class="receta-form row align-items-end mb-3" data-form-idx="__prefix__">
+    <div class="receta-form card mb-3" data-form-idx="__prefix__">
         {% for hidden in formset.empty_form.hidden_fields %}
             {{ hidden }}
         {% endfor %}
         
-        <div class="col-md-5">
-            <label class="form-label">Material</label>
-            {{ formset.empty_form.material }}
-        </div>
-        
-        <div class="col-md-4">
-            <label class="form-label">Cantidad Necesaria</label>
-            <div class="input-group">
-                {{ formset.empty_form.cantidad_necesaria }}
-                <span class="input-group-text material-unit">-</span>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12 col-md-5">
+                    <label class="form-label">Material</label>
+                    {{ formset.empty_form.material }}
+                </div>
+                
+                <div class="col-12 col-md-4">
+                    <label class="form-label">Cantidad Necesaria</label>
+                    <div class="input-group">
+                        {{ formset.empty_form.cantidad_necesaria }}
+                        <span class="input-group-text material-unit">-</span>
+                    </div>
+                </div>
+                
+                <div class="col-12 col-md-2 d-flex align-items-center">
+                    <span class="material-cost text-muted fw-bold">Costo: $0.00</span>
+                </div>
+                
+                <div class="col-12 col-md-1 d-flex align-items-center justify-content-end">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRecetaForm(this)">
+                        <i class="fas fa-trash"></i>
+                        <span class="d-md-none ms-1">Eliminar</span>
+                    </button>
+                </div>
             </div>
-        </div>
-        
-        <div class="col-md-2">
-            <span class="material-cost text-muted">Costo: $0.00</span>
-        </div>
-        
-        <div class="col-md-1">
-            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRecetaForm(this)">
-                <i class="fas fa-trash"></i>
-            </button>
         </div>
     </div>
 </div>
