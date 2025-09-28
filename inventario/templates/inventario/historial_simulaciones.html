@@ -1,0 +1,263 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Historial de Simulaciones{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-history me-2"></i>Historial de Simulaciones
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'inventario:simulador' %}" class="btn btn-outline-primary">
+            <i class="fas fa-calculator me-1"></i>Nueva Simulación
+        </a>
+    </div>
+</div>
+
+<!-- Filtros de Búsqueda -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter me-2"></i>Filtros de Búsqueda
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="{{ form.monos.id_for_label }}" class="form-label">Moño:</label>
+                {{ form.monos }}
+            </div>
+            <div class="col-md-3">
+                <label for="{{ form.fecha_desde.id_for_label }}" class="form-label">Fecha Desde:</label>
+                {{ form.fecha_desde }}
+            </div>
+            <div class="col-md-3">
+                <label for="{{ form.fecha_hasta.id_for_label }}" class="form-label">Fecha Hasta:</label>
+                {{ form.fecha_hasta }}
+            </div>
+            <div class="col-md-3">
+                <label for="{{ form.necesita_compras.id_for_label }}" class="form-label">Estado:</label>
+                {{ form.necesita_compras }}
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search me-1"></i>Buscar
+                </button>
+                <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-1"></i>Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Estadísticas del Historial -->
+{% if page_obj %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-light">
+            <div class="card-body">
+                <div class="h4 text-primary">{{ page_obj.paginator.count }}</div>
+                <p class="card-text text-muted small">Total Simulaciones</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-light">
+            <div class="card-body">
+                <div class="h4 text-success">
+                    {% with necesitan=page_obj.object_list|length %}
+                        {{ page_obj.object_list|length }}
+                    {% endwith %}
+                </div>
+                <p class="card-text text-muted small">En esta página</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-light">
+            <div class="card-body">
+                <div class="h4 text-info">{{ page_obj.paginator.num_pages }}</div>
+                <p class="card-text text-muted small">Páginas Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-light">
+            <div class="card-body">
+                <div class="h4 text-warning">{{ page_obj.number }}</div>
+                <p class="card-text text-muted small">Página Actual</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tabla de Simulaciones -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-list me-2"></i>Simulaciones Registradas
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if page_obj.object_list %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Moño</th>
+                            <th>Cantidad</th>
+                            <th>Usuario</th>
+                            <th>Necesita Compras</th>
+                            <th>Costo Total</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for simulacion in page_obj %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-calendar me-2 text-muted"></i>
+                                        <div>
+                                            <div class="fw-bold">{{ simulacion.fecha_creacion|date:"d/m/Y" }}</div>
+                                            <small class="text-muted">{{ simulacion.fecha_creacion|time:"H:i" }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-tag me-2 text-info"></i>
+                                        <span class="fw-bold">{{ simulacion.monos.nombre }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary fs-6">{{ simulacion.cantidad_producir }}</span>
+                                </td>
+                                <td>
+                                    <i class="fas fa-user me-1 text-muted"></i>
+                                    {{ simulacion.usuario.username|default:"Sistema" }}
+                                </td>
+                                <td>
+                                    {% if simulacion.necesita_compras %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            Sí necesita
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>
+                                            No necesita
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-success">
+                                        <i class="fas fa-dollar-sign me-1"></i>
+                                        ${{ simulacion.costo_total|floatformat:0 }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'inventario:detalle_simulacion' simulacion.pk %}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Ver detalles">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary" 
+                                                onclick="copySimulation('{{ simulacion.pk }}')"
+                                                title="Copiar simulación">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No se encontraron simulaciones</h4>
+                <p class="text-muted">
+                    {% if request.GET %}
+                        Prueba ajustando los filtros de búsqueda o 
+                        <a href="{% url 'inventario:historial_simulaciones' %}">limpiar todos los filtros</a>.
+                    {% else %}
+                        Aún no hay simulaciones registradas.
+                    {% endif %}
+                </p>
+                <a href="{% url 'inventario:simulador' %}" class="btn btn-primary">
+                    <i class="fas fa-calculator me-1"></i>
+                    Crear Primera Simulación
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Paginación -->
+{% if page_obj.has_other_pages %}
+<nav aria-label="Navegación del historial" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if request.GET.monos %}&monos={{ request.GET.monos }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.necesita_compras %}&necesita_compras={{ request.GET.necesita_compras }}{% endif %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.monos %}&monos={{ request.GET.monos }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.necesita_compras %}&necesita_compras={{ request.GET.necesita_compras }}{% endif %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if request.GET.monos %}&monos={{ request.GET.monos }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.necesita_compras %}&necesita_compras={{ request.GET.necesita_compras }}{% endif %}">{{ num }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.monos %}&monos={{ request.GET.monos }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.necesita_compras %}&necesita_compras={{ request.GET.necesita_compras }}{% endif %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.monos %}&monos={{ request.GET.monos }}{% endif %}{% if request.GET.fecha_desde %}&fecha_desde={{ request.GET.fecha_desde }}{% endif %}{% if request.GET.fecha_hasta %}&fecha_hasta={{ request.GET.fecha_hasta }}{% endif %}{% if request.GET.necesita_compras %}&necesita_compras={{ request.GET.necesita_compras }}{% endif %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+<div class="text-center text-muted mt-3">
+    <small>
+        Mostrando {{ page_obj.start_index }}-{{ page_obj.end_index }} de {{ page_obj.paginator.count }} simulaciones
+    </small>
+</div>
+{% endif %}
+
+<script>
+function copySimulation(simulacionId) {
+    // Función para copiar una simulación existente
+    if (confirm('¿Deseas copiar esta simulación para crear una nueva?')) {
+        window.location.href = "{% url 'inventario:simulador' %}?copy=" + simulacionId;
+    }
+}
+</script>
+
+{% endblock %}

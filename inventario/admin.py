@@ -1,98 +1,364 @@
 from django.contrib import admin
-from .models import Material, Insumo, Movimiento, Reabastecimiento, TipoMono, RecetaProduccion, SimulacionProduccion
+from django.utils.html import format_html
+from .models import Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, Simulacion, DetalleSimulacion, MovimientoEfectivo
+
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
-    list_display = ['codigo', 'nombre', 'tipo_material', 'cantidad_disponible', 'costo_unitario', 'categoria']
-    list_filter = ['tipo_material', 'unidad_base', 'categoria']
-    search_fields = ['codigo', 'nombre', 'descripcion']
-    readonly_fields = ['costo_unitario', 'created_at', 'updated_at']
+    list_display = [
+        'codigo', 
+        'nombre', 
+        'categoria',
+        'tipo_material', 
+        'cantidad_disponible', 
+        'unidad_base',
+        'costo_unitario_formatted',
+        'valor_inventario_formatted',
+        'stock_status'
+    ]
+    list_filter = ['tipo_material', 'unidad_base', 'categoria', 'activo']
+    search_fields = ['codigo', 'nombre', 'categoria']
+    list_editable = ['cantidad_disponible']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'costo_unitario', 'valor_inventario']
     
     fieldsets = (
         ('Información Básica', {
-            'fields': ('codigo', 'nombre', 'descripcion', 'categoria')
+            'fields': ('codigo', 'nombre', 'descripcion', 'categoria', 'activo')
         }),
         ('Configuración de Material', {
             'fields': ('tipo_material', 'unidad_base', 'factor_conversion')
         }),
         ('Inventario y Costos', {
-            'fields': ('cantidad_disponible', 'precio_compra', 'costo_unitario')
+            'fields': ('cantidad_disponible', 'precio_compra', 'costo_unitario', 'valor_inventario')
         }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
+        ('Fechas', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
             'classes': ('collapse',)
-        }),
+        })
     )
+    
+    def costo_unitario_formatted(self, obj):
+        return f"${obj.costo_unitario:.2f}"
+    costo_unitario_formatted.short_description = "Costo Unitario"
+    
+    def valor_inventario_formatted(self, obj):
+        return f"${obj.valor_inventario:.2f}"
+    valor_inventario_formatted.short_description = "Valor Inventario"
+    
+    def stock_status(self, obj):
+        if obj.cantidad_disponible <= 10:
+            color = 'red'
+            status = 'Bajo'
+        elif obj.cantidad_disponible <= 50:
+            color = 'orange'
+            status = 'Medio'
+        else:
+            color = 'green'
+            status = 'Bueno'
+        
+        return format_html(
+            '<span style="color: {};">{}</span>',
+            color,
+            status
+        )
+    stock_status.short_description = "Estado Stock"
 
-@admin.register(Insumo)
-class InsumoAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'material', 'cantidad_por_unidad', 'unidad_consumo']
-    list_filter = ['unidad_consumo', 'material__categoria']
-    search_fields = ['nombre', 'descripcion', 'material__nombre']
-    readonly_fields = ['created_at', 'updated_at']
 
 @admin.register(Movimiento)
 class MovimientoAdmin(admin.ModelAdmin):
-    list_display = ['material', 'tipo_movimiento', 'cantidad', 'fecha', 'detalle']
+    list_display = [
+        'fecha',
+        'material',
+        'tipo_movimiento',
+        'cantidad',
+        'cantidad_anterior',
+        'cantidad_nueva',
+        'usuario'
+    ]
     list_filter = ['tipo_movimiento', 'fecha', 'material__categoria']
-    search_fields = ['material__nombre', 'material__codigo', 'detalle']
-    readonly_fields = ['created_at']
+    search_fields = ['material__codigo', 'material__nombre', 'detalle']
+    readonly_fields = ['fecha']
     date_hierarchy = 'fecha'
-
-@admin.register(Reabastecimiento)
-class ReabastecimientoAdmin(admin.ModelAdmin):
-    list_display = ['material', 'cantidad_solicitada', 'cantidad_recibida', 'estado', 'prioridad', 'proveedor', 'fecha_solicitud']
-    list_filter = ['estado', 'prioridad', 'automatico', 'fecha_solicitud', 'material__categoria']
-    search_fields = ['material__nombre', 'material__codigo', 'proveedor', 'notas']
-    readonly_fields = ['fecha_solicitud', 'created_at', 'updated_at', 'dias_desde_solicitud', 'esta_retrasado', 'porcentaje_completado']
-    date_hierarchy = 'fecha_solicitud'
     
     fieldsets = (
-        ('Información del Pedido', {
-            'fields': ('material', 'cantidad_solicitada', 'cantidad_recibida', 'proveedor')
+        ('Movimiento', {
+            'fields': ('material', 'tipo_movimiento', 'cantidad', 'detalle')
         }),
-        ('Estado y Prioridad', {
-            'fields': ('estado', 'prioridad', 'automatico')
+        ('Estado del Inventario', {
+            'fields': ('cantidad_anterior', 'cantidad_nueva')
+        }),
+        ('Información del Sistema', {
+            'fields': ('usuario', 'fecha'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('material', 'usuario')
+
+
+@admin.register(ConfiguracionSistema)
+class ConfiguracionSistemaAdmin(admin.ModelAdmin):
+    list_display = ['nombre_empresa', 'moneda', 'stock_minimo_alerta']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion']
+    
+    fieldsets = (
+        ('Configuración General', {
+            'fields': ('nombre_empresa', 'moneda', 'stock_minimo_alerta')
         }),
         ('Fechas', {
-            'fields': ('fecha_solicitud', 'fecha_estimada_llegada', 'fecha_recepcion')
-        }),
-        ('Costos', {
-            'fields': ('precio_estimado', 'precio_real')
-        }),
-        ('Configuración', {
-            'fields': ('stock_minimo_sugerido', 'notas')
-        }),
-        ('Métricas', {
-            'fields': ('dias_desde_solicitud', 'esta_retrasado', 'porcentaje_completado'),
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
             'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        })
     )
+    
+    def has_add_permission(self, request):
+        # Solo permitir una configuración
+        return not ConfiguracionSistema.objects.exists()
 
-@admin.register(TipoMono)
-class TipoMonoAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'precio_venta_sugerido', 'tiempo_produccion_minutos', 'activo']
-    list_filter = ['activo', 'created_at']
-    search_fields = ['nombre', 'descripcion']
-    readonly_fields = ['created_at', 'updated_at']
 
-class RecetaProduccionInline(admin.TabularInline):
-    model = RecetaProduccion
+class RecetaMonosInline(admin.TabularInline):
+    """Inline para gestionar recetas de moños"""
+    model = RecetaMonos
     extra = 1
+    fields = ['material', 'cantidad_necesaria']
+    autocomplete_fields = ['material']
 
-TipoMonoAdmin.inlines = [RecetaProduccionInline]
 
-@admin.register(RecetaProduccion)
-class RecetaProduccionAdmin(admin.ModelAdmin):
-    list_display = ['tipo_mono', 'insumo', 'cantidad_necesaria', 'es_opcional']
-    list_filter = ['tipo_mono', 'es_opcional']
+@admin.register(Monos)
+class MonosAdmin(admin.ModelAdmin):
+    list_display = [
+        'codigo',
+        'nombre',
+        'tipo_venta',
+        'precio_venta_formatted',
+        'costo_produccion_formatted',
+        'ganancia_unitaria_formatted',
+        'activo'
+    ]
+    list_filter = ['tipo_venta', 'activo']
+    search_fields = ['codigo', 'nombre', 'descripcion']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'costo_produccion', 'ganancia_unitaria']
+    inlines = [RecetaMonosInline]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('codigo', 'nombre', 'descripcion', 'activo')
+        }),
+        ('Venta y Costos', {
+            'fields': ('tipo_venta', 'precio_venta', 'costo_produccion', 'ganancia_unitaria')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def precio_venta_formatted(self, obj):
+        return f"${obj.precio_venta:.2f}"
+    precio_venta_formatted.short_description = "Precio Venta"
+    
+    def costo_produccion_formatted(self, obj):
+        return f"${obj.costo_produccion:.2f}"
+    costo_produccion_formatted.short_description = "Costo Producción"
+    
+    def ganancia_unitaria_formatted(self, obj):
+        ganancia = obj.ganancia_unitaria
+        color = 'green' if ganancia > 0 else 'red' if ganancia < 0 else 'orange'
+        return format_html(
+            '<span style="color: {};">${:.2f}</span>',
+            color,
+            ganancia
+        )
+    ganancia_unitaria_formatted.short_description = "Ganancia Unitaria"
 
-@admin.register(SimulacionProduccion)  
-class SimulacionProduccionAdmin(admin.ModelAdmin):
-    list_display = ['nombre_simulacion', 'tipo_mono', 'cantidad_a_producir', 'ganancia_neta', 'stock_suficiente']
-    list_filter = ['stock_suficiente', 'tipo_mono']
-    readonly_fields = ['costo_total_materiales', 'ingreso_total', 'ganancia_neta', 'margen_porcentaje', 'stock_suficiente', 'fecha_simulacion']
+
+@admin.register(RecetaMonos)
+class RecetaMonosAdmin(admin.ModelAdmin):
+    list_display = ['monos', 'material', 'cantidad_necesaria', 'costo_material_formatted']
+    list_filter = ['monos', 'material__categoria']
+    search_fields = ['monos__nombre', 'material__nombre']
+    autocomplete_fields = ['monos', 'material']
+    
+    def costo_material_formatted(self, obj):
+        return f"${obj.costo_material:.2f}"
+    costo_material_formatted.short_description = "Costo Material"
+
+
+class DetalleSimulacionInline(admin.TabularInline):
+    """Inline para ver detalles de simulación"""
+    model = DetalleSimulacion
+    extra = 0
+    readonly_fields = [
+        'material', 'cantidad_necesaria', 'cantidad_disponible', 
+        'cantidad_faltante', 'cantidad_a_comprar', 'unidades_completas_comprar',
+        'costo_compra_necesaria', 'suficiente_stock'
+    ]
+    can_delete = False
+
+
+@admin.register(Simulacion)
+class SimulacionAdmin(admin.ModelAdmin):
+    list_display = [
+        'fecha_creacion',
+        'monos',
+        'cantidad_producir',
+        'tipo_venta',
+        'cantidad_total_monos',
+        'costo_total_produccion_formatted',
+        'ingreso_total_venta_formatted',
+        'ganancia_estimada_formatted',
+        'necesita_compras'
+    ]
+    list_filter = ['necesita_compras', 'tipo_venta', 'fecha_creacion']
+    search_fields = ['monos__nombre', 'monos__codigo']
+    readonly_fields = [
+        'cantidad_total_monos', 'costo_total_produccion', 'ingreso_total_venta',
+        'ganancia_estimada', 'necesita_compras', 'costo_total_compras', 'fecha_creacion'
+    ]
+    date_hierarchy = 'fecha_creacion'
+    inlines = [DetalleSimulacionInline]
+    
+    fieldsets = (
+        ('Configuración de Simulación', {
+            'fields': ('monos', 'cantidad_producir', 'tipo_venta', 'precio_venta_unitario')
+        }),
+        ('Resultados Calculados', {
+            'fields': (
+                'cantidad_total_monos', 'costo_total_produccion', 'ingreso_total_venta',
+                'ganancia_estimada', 'necesita_compras', 'costo_total_compras'
+            )
+        }),
+        ('Sistema', {
+            'fields': ('usuario', 'fecha_creacion'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def costo_total_produccion_formatted(self, obj):
+        return f"${obj.costo_total_produccion:.2f}"
+    costo_total_produccion_formatted.short_description = "Costo Total"
+    
+    def ingreso_total_venta_formatted(self, obj):
+        return f"${obj.ingreso_total_venta:.2f}"
+    ingreso_total_venta_formatted.short_description = "Ingreso Total"
+    
+    def ganancia_estimada_formatted(self, obj):
+        ganancia = obj.ganancia_estimada
+        color = 'green' if ganancia > 0 else 'red' if ganancia < 0 else 'orange'
+        return format_html(
+            '<span style="color: {};">${:.2f}</span>',
+            color,
+            ganancia
+        )
+    ganancia_estimada_formatted.short_description = "Ganancia Estimada"
+
+
+@admin.register(DetalleSimulacion)
+class DetalleSimulacionAdmin(admin.ModelAdmin):
+    list_display = [
+        'simulacion',
+        'material',
+        'cantidad_necesaria',
+        'cantidad_disponible',
+        'suficiente_stock',
+        'cantidad_faltante',
+        'unidades_completas_comprar',
+        'costo_compra_necesaria_formatted'
+    ]
+    list_filter = ['suficiente_stock', 'material__categoria']
+    search_fields = ['simulacion__monos__nombre', 'material__nombre']
+    readonly_fields = [
+        'cantidad_faltante', 'cantidad_a_comprar', 'unidades_completas_comprar',
+        'costo_compra_necesaria', 'suficiente_stock'
+    ]
+    
+    def costo_compra_necesaria_formatted(self, obj):
+        return f"${obj.costo_compra_necesaria:.2f}" if obj.costo_compra_necesaria > 0 else "-"
+    costo_compra_necesaria_formatted.short_description = "Costo Compra"
+
+
+@admin.register(MovimientoEfectivo)
+class MovimientoEfectivoAdmin(admin.ModelAdmin):
+    """Administración de movimientos de efectivo"""
+    list_display = [
+        'fecha',
+        'concepto',
+        'tipo_movimiento_badge',
+        'categoria',
+        'monto_formatted',
+        'saldo_nuevo_formatted',
+        'automatico_badge',
+        'usuario'
+    ]
+    list_filter = [
+        'tipo_movimiento',
+        'categoria',
+        'automatico',
+        'fecha',
+        'usuario'
+    ]
+    search_fields = ['concepto', 'categoria']
+    readonly_fields = ['saldo_anterior', 'saldo_nuevo', 'automatico', 'movimiento_inventario', 'simulacion_relacionada']
+    date_hierarchy = 'fecha'
+    
+    fieldsets = [
+        ('Información del Movimiento', {
+            'fields': [
+                'concepto',
+                'tipo_movimiento',
+                'categoria',
+                'monto'
+            ]
+        }),
+        ('Saldos', {
+            'fields': [
+                'saldo_anterior',
+                'saldo_nuevo'
+            ],
+            'classes': ['collapse']
+        }),
+        ('Referencias del Sistema', {
+            'fields': [
+                'automatico',
+                'usuario',
+                'movimiento_inventario',
+                'simulacion_relacionada'
+            ],
+            'classes': ['collapse']
+        }),
+    ]
+    
+    def tipo_movimiento_badge(self, obj):
+        color = 'success' if obj.tipo_movimiento == 'ingreso' else 'danger'
+        texto = 'Ingreso' if obj.tipo_movimiento == 'ingreso' else 'Egreso'
+        return format_html(
+            '<span class="badge badge-{}">{}</span>',
+            color, texto
+        )
+    tipo_movimiento_badge.short_description = "Tipo"
+    
+    def monto_formatted(self, obj):
+        signo = "+" if obj.tipo_movimiento == 'ingreso' else "-"
+        color = 'green' if obj.tipo_movimiento == 'ingreso' else 'red'
+        return format_html(
+            '<span style="color: {};">{} ${:.2f}</span>',
+            color, signo, obj.monto
+        )
+    monto_formatted.short_description = "Monto"
+    
+    def saldo_nuevo_formatted(self, obj):
+        return f"${obj.saldo_nuevo:.2f}"
+    saldo_nuevo_formatted.short_description = "Saldo"
+    
+    def automatico_badge(self, obj):
+        if obj.automatico:
+            return format_html('<span class="badge badge-info">Automático</span>')
+        return format_html('<span class="badge badge-secondary">Manual</span>')
+    automatico_badge.short_description = "Origen"
+
+
+# Personalización del admin site
+admin.site.site_header = "Sistema de Inventario de Moños"
+admin.site.site_title = "Inventario Admin"
+admin.site.index_title = "Panel de Administración"

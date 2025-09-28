@@ -1,0 +1,201 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Reabastecimiento para Simulación{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-shopping-cart text-primary me-2"></i>
+                        Reabastecimiento Automático
+                    </h1>
+                    <p class="text-muted mb-0">Simulación #{{ simulacion.id }} - {{ simulacion.monos.nombre }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'inventario:procesar_simulacion_completa' simulacion.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver a Procesamiento
+                    </a>
+                </div>
+            </div>
+
+            {% if materiales_faltantes %}
+            <div class="row">
+                <!-- Resumen de Costos -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-calculator me-2"></i>
+                                Resumen de Compra
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <strong>Materiales Faltantes:</strong>
+                                <span class="badge bg-danger ms-1">{{ materiales_faltantes|length }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Costo Total Estimado:</strong>
+                                <div class="h4 text-success mb-0">${{ costo_total_estimado|floatformat:2 }}</div>
+                            </div>
+                            <hr>
+                            <div class="alert alert-info small mb-0">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Los cálculos incluyen cantidades completas (paquetes/rollos) según el factor de conversión de cada material.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de Materiales a Reabastecer -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Materiales que Necesitan Reabastecimiento
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Stock Actual</th>
+                                            <th>Cantidad Faltante</th>
+                                            <th>Cantidad a Comprar</th>
+                                            <th>Costo Estimado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in materiales_faltantes %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ item.material.nombre }}</strong>
+                                                <br><small class="text-muted">{{ item.material.codigo }}</small>
+                                                {% if item.material.factor_conversion > 1 %}
+                                                <br><small class="badge bg-info">{{ item.material.factor_conversion }} {{ item.material.unidad_base }}/{{ item.material.tipo_material }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ item.material.cantidad_disponible }} {{ item.material.unidad_base }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-danger">{{ item.faltante }} {{ item.material.unidad_base }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary">{{ item.cantidad_a_comprar }} {{ item.material.unidad_base }}</span>
+                                                {% if item.material.factor_conversion > 1 %}
+                                                <br><small class="text-muted">{{ item.cantidad_a_comprar|div:item.material.factor_conversion|floatformat:0 }} {{ item.material.tipo_material }}(s)</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <strong class="text-success">${{ item.costo|floatformat:2 }}</strong>
+                                                <br><small class="text-muted">${{ item.material.costo_unitario|floatformat:2 }}/{{ item.material.unidad_base }}</small>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Confirmar Reabastecimiento
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    ¿Qué sucederá al confirmar el reabastecimiento?
+                                </h6>
+                                <ul class="mb-0">
+                                    <li>Se registrarán automáticamente las <strong>entradas de materiales</strong> necesarias</li>
+                                    <li>Se <strong>actualizará el inventario</strong> con las nuevas cantidades</li>
+                                    <li>Se calculará el <strong>costo total de la compra</strong> basado en precios actuales</li>
+                                    <li>Después del reabastecimiento, se <strong>procesará automáticamente la simulación</strong></li>
+                                </ul>
+                            </div>
+
+                            <form method="post" class="d-flex gap-2" onsubmit="return confirmarReabastecimiento()">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-shopping-cart me-1"></i>
+                                    Reabastecer y Procesar (${​{ costo_total_estimado|floatformat:2 }})
+                                </button>
+                                <a href="{% url 'inventario:procesar_simulacion_completa' simulacion.id %}" class="btn btn-outline-warning btn-lg">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    Procesar sin Reabastecimiento
+                                </a>
+                                <a href="{% url 'inventario:detalle_simulacion' simulacion.id %}" class="btn btn-outline-secondary btn-lg">
+                                    <i class="fas fa-times me-1"></i>
+                                    Cancelar
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">
+                            <i class="fas fa-check-circle me-2"></i>
+                            No se Necesita Reabastecimiento
+                        </h4>
+                        <p class="mb-3">Todos los materiales tienen stock suficiente para completar esta simulación.</p>
+                        <a href="{% url 'inventario:procesar_simulacion_completa' simulacion.id %}" class="btn btn-success">
+                            <i class="fas fa-play me-1"></i>
+                            Procesar Simulación Directamente
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmarReabastecimiento() {
+    const costo = parseFloat('{{ costo_total_estimado|floatformat:2 }}');
+    const materiales = parseInt('{{ materiales_faltantes|length }}');
+    
+    return confirm(
+        `¿Confirmas el reabastecimiento automático?\n\n` +
+        `• ${materiales} materiales serán reabastecidos\n` +
+        `• Costo total: $${costo.toFixed(2)}\n` +
+        `• Después se procesará automáticamente la simulación\n\n` +
+        `Esta acción no se puede deshacer.`
+    );
+}
+
+// Filtro personalizado para división en templates
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar tooltips para información adicional
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

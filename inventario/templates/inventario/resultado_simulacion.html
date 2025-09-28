@@ -1,0 +1,405 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Resultado de Simulación - {{ simulacion.monos.nombre }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-chart-line me-2"></i>Resultado de Simulación
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'inventario:simulador' %}" class="btn btn-outline-primary">
+                <i class="fas fa-calculator me-1"></i>Nueva Simulación
+            </a>
+            <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-outline-info">
+                <i class="fas fa-history me-1"></i>Ver Historial
+            </a>
+        </div>
+        <div class="btn-group me-2">
+            {% if not resumen.necesita_compras %}
+                <button type="button" class="btn btn-warning" onclick="generar_salida_directa()">
+                    <i class="fas fa-arrow-down me-1"></i>Generar Salida
+                </button>
+            {% else %}
+                <button type="button" class="btn btn-primary" onclick="generar_entrada_faltante()">
+                    <i class="fas fa-arrow-up me-1"></i>Generar Entrada
+                </button>
+            {% endif %}
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'inventario:detalle_simulacion' simulacion.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-info-circle me-1"></i>Ver Detalle
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen General -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow bg-primary text-white">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="card-title mb-2">{{ simulacion.monos.nombre }}</h4>
+                        <p class="mb-1">
+                            <strong>Simulación:</strong> {{ simulacion.cantidad_producir }} 
+                            {% if simulacion.tipo_venta == 'par' %}pares{% else %}unidades{% endif %}
+                            = {{ simulacion.cantidad_total_monos }} moños totales
+                        </p>
+                        <p class="mb-0">
+                            <strong>Fecha:</strong> {{ simulacion.fecha_creacion|date:"d/m/Y H:i" }}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="display-6">
+                            <i class="fas fa-ribbon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Métricas Principales -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-info mb-2">
+                    ${{ simulacion.costo_total_produccion|floatformat:0 }}
+                </div>
+                <h6 class="card-title text-muted">Costo Total</h6>
+                <p class="text-muted small mb-0">Materiales necesarios</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 text-primary mb-2">
+                    ${{ simulacion.ingreso_total_venta|floatformat:0 }}
+                </div>
+                <h6 class="card-title text-muted">Ingreso Total</h6>
+                <p class="text-muted small mb-0">Precio de venta</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 {% if simulacion.ganancia_estimada > 0 %}text-success{% elif simulacion.ganancia_estimada < 0 %}text-danger{% else %}text-warning{% endif %} mb-2">
+                    ${{ simulacion.ganancia_estimada|floatformat:0 }}
+                </div>
+                <h6 class="card-title text-muted">Ganancia</h6>
+                <p class="text-muted small mb-0">
+                    {% if simulacion.ganancia_estimada > 0 %}
+                        Rentable
+                    {% elif simulacion.ganancia_estimada < 0 %}
+                        Pérdida
+                    {% else %}
+                        Sin ganancia
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="display-6 {% if simulacion.necesita_compras %}text-warning{% else %}text-success{% endif %} mb-2">
+                    {% if simulacion.necesita_compras %}
+                        <i class="fas fa-exclamation-triangle"></i>
+                    {% else %}
+                        <i class="fas fa-check"></i>
+                    {% endif %}
+                </div>
+                <h6 class="card-title text-muted">Inventario</h6>
+                <p class="text-muted small mb-0">
+                    {% if simulacion.necesita_compras %}
+                        Necesita compras
+                    {% else %}
+                        Stock suficiente
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Análisis por Materiales -->
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-boxes me-2"></i>Análisis de Materiales
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Material</th>
+                        <th>Necesario</th>
+                        <th>Disponible</th>
+                        <th>Estado</th>
+                        <th>Faltante</th>
+                        <th>A Comprar</th>
+                        <th>Costo Compra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in detalles %}
+                    <tr class="{% if not detalle.suficiente_stock %}table-warning{% endif %}">
+                        <td>
+                            <strong>{{ detalle.material.nombre }}</strong>
+                            <br><small class="text-muted">{{ detalle.material.codigo }}</small>
+                        </td>
+                        <td>
+                            {{ detalle.cantidad_necesaria }} {{ detalle.material.unidad_base }}
+                        </td>
+                        <td>
+                            {{ detalle.cantidad_disponible }} {{ detalle.material.unidad_base }}
+                        </td>
+                        <td>
+                            {% if detalle.suficiente_stock %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>Suficiente
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>Insuficiente
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detalle.cantidad_faltante > 0 %}
+                                <span class="text-danger">
+                                    {{ detalle.cantidad_faltante }} {{ detalle.material.unidad_base }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detalle.unidades_completas_comprar > 0 %}
+                                <strong>{{ detalle.unidades_completas_comprar }} {{ detalle.material.tipo_material }}(s)</strong>
+                                <br><small class="text-muted">
+                                    = {{ detalle.cantidad_a_comprar }} {{ detalle.material.unidad_base }}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detalle.costo_compra_necesaria > 0 %}
+                                <strong class="text-warning">${{ detalle.costo_compra_necesaria|floatformat:2 }}</strong>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen de Necesidades de Compra -->
+{% if simulacion.necesita_compras %}
+<div class="card shadow mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>Necesidades de Compra
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <h6><i class="fas fa-exclamation-triangle me-2"></i>Materiales Insuficientes</h6>
+            <p class="mb-0">Para completar esta producción necesitas comprar los siguientes materiales:</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <h6>Lista de Compras:</h6>
+                <ul class="list-group list-group-flush">
+                    {% for detalle in detalles %}
+                        {% if not detalle.suficiente_stock %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ detalle.material.nombre }}</strong>
+                                <br><small class="text-muted">
+                                    {{ detalle.unidades_completas_comprar }} {{ detalle.material.tipo_material }}(s) 
+                                    de {{ detalle.material.factor_conversion }} {{ detalle.material.unidad_base }} c/u
+                                </small>
+                            </div>
+                            <span class="badge bg-warning rounded-pill">
+                                ${{ detalle.costo_compra_necesaria|floatformat:2 }}
+                            </span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-warning">${{ simulacion.costo_total_compras|floatformat:2 }}</h3>
+                        <p class="mb-0">Total de Compras Necesarias</p>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-warning" onclick="window.print()">
+                        <i class="fas fa-print me-2"></i>Imprimir Lista
+                    </button>
+                    <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-boxes me-2"></i>Ver Inventario
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-success">
+    <h6><i class="fas fa-check-circle me-2"></i>¡Excelente!</h6>
+    <p class="mb-0">Tienes suficiente material en inventario para completar esta producción sin necesidad de compras adicionales.</p>
+</div>
+{% endif %}
+
+<!-- Análisis Financiero -->
+<div class="card shadow">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-chart-bar me-2"></i>Análisis Financiero
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Desglose de Costos:</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td>Costo de Materiales:</td>
+                        <td class="text-end">${{ simulacion.costo_total_produccion|floatformat:2 }}</td>
+                    </tr>
+                    {% if simulacion.necesita_compras %}
+                    <tr class="table-warning">
+                        <td>Compras Necesarias:</td>
+                        <td class="text-end">${{ simulacion.costo_total_compras|floatformat:2 }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="fw-bold">
+                        <td>Total de Ingresos:</td>
+                        <td class="text-end">${{ simulacion.ingreso_total_venta|floatformat:2 }}</td>
+                    </tr>
+                    <tr class="fw-bold {% if simulacion.ganancia_estimada > 0 %}table-success{% elif simulacion.ganancia_estimada < 0 %}table-danger{% else %}table-warning{% endif %}">
+                        <td>Ganancia Neta:</td>
+                        <td class="text-end">${{ simulacion.ganancia_estimada|floatformat:2 }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Métricas por Unidad:</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td>Costo por Moño:</td>
+                        <td class="text-end">
+                            {% widthratio simulacion.costo_total_produccion simulacion.cantidad_total_monos 1 as costo_por_mono %}
+                            ${{ costo_por_mono|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Precio por Moño:</td>
+                        <td class="text-end">
+                            {% if simulacion.tipo_venta == 'par' %}
+                                {% widthratio simulacion.precio_venta_unitario 2 1 as precio_por_mono %}
+                                ${{ precio_por_mono|floatformat:2 }}
+                            {% else %}
+                                ${{ simulacion.precio_venta_unitario|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="fw-bold">
+                        <td>Margen por Moño:</td>
+                        <td class="text-end">
+                            {% widthratio simulacion.ganancia_estimada simulacion.cantidad_total_monos 1 as margen_por_mono %}
+                            ${{ margen_por_mono|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Margen de Ganancia:</td>
+                        <td class="text-end">
+                            {% if simulacion.ingreso_total_venta > 0 %}
+                                {% widthratio simulacion.ganancia_estimada simulacion.ingreso_total_venta 100 %}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Acciones -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+            <a href="{% url 'inventario:simulador' %}" class="btn btn-primary me-md-2">
+                <i class="fas fa-calculator me-1"></i>Nueva Simulación
+            </a>
+            {% if simulacion.monos and simulacion.monos.id %}
+                <a href="{% url 'inventario:detalle_monos' simulacion.monos.id %}" class="btn btn-outline-info me-md-2">
+                    <i class="fas fa-ribbon me-1"></i>Ver Moño
+                </a>
+            {% else %}
+                <span class="btn btn-outline-secondary me-md-2 disabled">
+                    <i class="fas fa-ribbon me-1"></i>Ver Moño (No disponible)
+                </span>
+            {% endif %}
+            <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-outline-secondary me-md-2">
+                <i class="fas fa-history me-1"></i>Ver Historial
+            </a>
+            <button class="btn btn-outline-primary" onclick="window.print()">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Mejorar la presentación para impresión
+window.addEventListener('beforeprint', function() {
+    document.querySelectorAll('.btn, .navbar, .sidebar').forEach(element => {
+        element.style.display = 'none';
+    });
+});
+
+window.addEventListener('afterprint', function() {
+    document.querySelectorAll('.btn, .navbar, .sidebar').forEach(element => {
+        element.style.display = '';
+    });
+});
+
+// Funciones para los nuevos botones de acción
+function generar_salida_directa() {
+    if (confirm('¿Estás seguro de generar una salida directa de todos los materiales de esta simulación?\n\nEsto marcará los materiales como utilizados y actualizará el inventario.')) {
+        window.location.href = "{% url 'inventario:generar_salida_directa' simulacion.id %}";
+    }
+}
+
+function generar_entrada_faltante() {
+    if (confirm('¿Deseas generar entradas automáticas para los materiales faltantes?\n\nEsto agregará al inventario solo los materiales que no están disponibles.')) {
+        window.location.href = "{% url 'inventario:generar_entrada_faltante' simulacion.id %}";
+    }
+}
+</script>
+{% endblock %}

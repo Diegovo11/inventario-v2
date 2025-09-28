@@ -1,0 +1,307 @@
+{% extends "inventario/base.html" %}
+{% load static %}
+
+{% block title %}Análisis - {{ mono.nombre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mono-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        border-left: 5px solid #667eea;
+    }
+    
+    .stats-card h3 {
+        font-size: 2.2em;
+        margin-bottom: 10px;
+        color: #333;
+    }
+    
+    .stats-card p {
+        font-size: 1em;
+        margin: 0;
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .venta-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .venta-fecha {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    
+    .venta-cantidad {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .venta-monto {
+        font-size: 1.1em;
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .rendimiento-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        color: white;
+    }
+    
+    .rendimiento-excelente {
+        background: #28a745;
+    }
+    
+    .rendimiento-bueno {
+        background: #ffc107;
+        color: #333;
+    }
+    
+    .rendimiento-regular {
+        background: #fd7e14;
+    }
+    
+    .rendimiento-bajo {
+        background: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header del Moño -->
+    <div class="mono-header">
+        <h1><i class="fas fa-ribbon"></i> {{ mono.nombre }}</h1>
+        <p class="lead mb-0">Análisis detallado de ventas y rendimiento</p>
+    </div>
+    
+    <!-- Botón de regreso -->
+    <div class="mb-3">
+        <a href="{% url 'inventario:analytics_dashboard' %}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left"></i> Volver al Dashboard de Análisis
+        </a>
+    </div>
+    
+    <!-- Estadísticas del Moño -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3>{{ total_cantidad }}</h3>
+                <p>Unidades Vendidas</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3>${{ total_ingresos|floatformat:0 }}</h3>
+                <p>Ingresos Totales</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3>${{ total_ganancia|floatformat:0 }}</h3>
+                <p>Ganancia Total</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3>
+                    <span class="rendimiento-badge 
+                        {% if rendimiento >= 50 %}rendimiento-excelente
+                        {% elif rendimiento >= 25 %}rendimiento-bueno
+                        {% elif rendimiento >= 10 %}rendimiento-regular
+                        {% else %}rendimiento-bajo{% endif %}">
+                        {{ rendimiento|floatformat:1 }}%
+                    </span>
+                </h3>
+                <p>Rendimiento</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráfico de evolución -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="chart-container">
+                <h5 class="text-center mb-4">
+                    <i class="fas fa-chart-line"></i> Evolución de Ventas Mensual
+                </h5>
+                <canvas id="evolucionChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="chart-container">
+                <h5 class="text-center mb-4">
+                    <i class="fas fa-list-alt"></i> Últimas Ventas
+                </h5>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    {% for venta in ventas_detalle %}
+                    <div class="venta-item">
+                        <div class="venta-fecha">
+                            {{ venta.fecha|date:"d/m/Y H:i" }}
+                        </div>
+                        <div class="venta-cantidad">
+                            {{ venta.simulacion_relacionada.cantidad_producir }} unidades
+                        </div>
+                        <div class="venta-monto">
+                            ${{ venta.monto|floatformat:2 }}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted">
+                        <p>No hay ventas registradas para este moño</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Información del producto -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <h5 class="mb-4"><i class="fas fa-info-circle"></i> Información del Producto</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>Nombre:</strong> {{ mono.nombre }}</p>
+                        <p><strong>Descripción:</strong> {{ mono.descripcion|default:"Sin descripción" }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Tipo de venta:</strong> {{ mono.get_tipo_venta_display }}</p>
+                        <p><strong>Precio por {{ mono.tipo_venta }}:</strong> ${{ mono.precio_venta_unitario }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Total de costos:</strong> ${{ total_costos|floatformat:2 }}</p>
+                        <p><strong>Margen de ganancia:</strong> 
+                            {% widthratio total_ganancia total_ingresos 100 %}% del precio de venta</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Datos del servidor
+const chartDataRaw = "{{ chart_data_json|escapejs }}";
+let chartData;
+try {
+    chartData = JSON.parse(chartDataRaw);
+} catch (e) {
+    console.error('Error parsing chart data:', e);
+    chartData = { ventas_por_mes: [] };
+}
+
+// Preparar datos para el gráfico
+const ventasPorMes = chartData.ventas_por_mes || [];
+const labels = ventasPorMes.map(v => v.mes);
+const datosIngresos = ventasPorMes.map(v => v.ingresos);
+const datosCantidad = ventasPorMes.map(v => v.cantidad);
+
+// Gráfico de evolución
+const ctxEvolucion = document.getElementById('evolucionChart').getContext('2d');
+const evolucionChart = new Chart(ctxEvolucion, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Ingresos ($)',
+            data: datosIngresos,
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            yAxisID: 'y'
+        }, {
+            label: 'Cantidad Vendida',
+            data: datosCantidad,
+            borderColor: '#f093fb',
+            backgroundColor: 'rgba(240, 147, 251, 0.1)',
+            borderWidth: 3,
+            fill: false,
+            tension: 0.4,
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                title: {
+                    display: true,
+                    text: 'Mes'
+                }
+            },
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Ingresos ($)'
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Cantidad Vendida'
+                },
+                grid: {
+                    drawOnChartArea: false,
+                },
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Reabastecimiento Requerido{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Reabastecimiento Requerido
+                </h4>
+                <p class="mb-0">La simulación no se puede procesar completamente debido a materiales con stock insuficiente.</p>
+            </div>
+
+            <div class="row">
+                <!-- Materiales Procesados -->
+                {% if materiales_utilizados %}
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-check me-2"></i>
+                                Materiales Procesados ({{ materiales_utilizados|length }})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Cantidad Utilizada</th>
+                                            <th>Nuevo Stock</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in materiales_utilizados %}
+                                        <tr>
+                                            <td>{{ item.material }}</td>
+                                            <td><span class="badge bg-success">{{ item.cantidad }}</span></td>
+                                            <td><span class="badge bg-info">{{ item.nuevo_stock }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Materiales Faltantes -->
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-times me-2"></i>
+                                Materiales Faltantes ({{ materiales_faltantes|length }})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Disponible</th>
+                                            <th>Necesario</th>
+                                            <th>Faltante</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in materiales_faltantes %}
+                                        <tr>
+                                            <td>{{ item.material }}</td>
+                                            <td><span class="badge bg-warning">{{ item.disponible }}</span></td>
+                                            <td><span class="badge bg-info">{{ item.necesario }}</span></td>
+                                            <td><span class="badge bg-danger">{{ item.faltante }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Opciones de Acción -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-cogs me-2"></i>
+                                Opciones Disponibles
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a href="{% url 'inventario:reabastecer_desde_simulacion' simulacion.id %}" class="btn btn-success btn-lg">
+                                    <i class="fas fa-shopping-cart me-1"></i>
+                                    Reabastecer Materiales Faltantes
+                                </a>
+                                <a href="{% url 'inventario:entrada_material' %}" class="btn btn-outline-primary btn-lg">
+                                    <i class="fas fa-plus me-1"></i>
+                                    Entrada Manual de Materiales
+                                </a>
+                                <a href="{% url 'inventario:detalle_simulacion' simulacion.id %}" class="btn btn-outline-secondary btn-lg">
+                                    <i class="fas fa-arrow-left me-1"></i>
+                                    Volver a Simulación
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

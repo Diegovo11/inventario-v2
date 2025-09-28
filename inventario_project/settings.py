@@ -163,9 +163,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication settings
-LOGIN_URL = '/admin/login/'
+LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/inventario/'
-LOGOUT_REDIRECT_URL = '/admin/'
+LOGOUT_REDIRECT_URL = '/login/'
 
 # Security settings for production
 if not DEBUG:

@@ -1,0 +1,293 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-plus-circle me-2 text-success"></i>{{ title }}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Volver a Materiales
+            </a>
+            <a href="{% url 'inventario:historial_movimientos' %}" class="btn btn-outline-info">
+                <i class="fas fa-history me-1"></i>Ver Historial
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Alerta de material preseleccionado -->
+{% if form.material.value %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-success">
+            <h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Material Preseleccionado</h6>
+            <p class="mb-0">El material ya está seleccionado. Solo ingresa la cantidad a reabastecer.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Información del proceso -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Proceso de Reabastecimiento</h6>
+            <p class="mb-1">1. Seleccione el material a reabastecer</p>
+            <p class="mb-1">2. Ingrese la cantidad comprada en su presentación original (paquetes/rollos)</p>
+            <p class="mb-1">3. <strong>El precio se calculará automáticamente</strong> basado en el precio de compra del material</p>
+            <p class="mb-0">4. El sistema calculará automáticamente la conversión a unidad base y actualizará el stock</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Formulario de Entrada -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Registro de Entrada
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="entradaForm">
+                    {% csrf_token %}
+                    
+                    <!-- Material -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="{{ form.material.id_for_label }}" class="form-label">
+                                <i class="fas fa-cube me-1"></i>Material *
+                            </label>
+                            {{ form.material }}
+                            {% if form.material.errors %}
+                                <div class="text-danger small">{{ form.material.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.material.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Información del Material Seleccionado -->
+                    <div id="materialInfo" class="alert alert-light d-none mb-3">
+                        <h6 class="fw-bold mb-2">Información del Material:</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Código:</small>
+                                <div id="materialCodigo" class="fw-bold">-</div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Tipo:</small>
+                                <div id="materialTipo" class="fw-bold">-</div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Stock Actual:</small>
+                                <div id="materialStock" class="fw-bold text-primary">-</div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Factor Conversión:</small>
+                                <div id="materialFactor" class="fw-bold">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cantidad y Precio -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.cantidad_comprada.id_for_label }}" class="form-label">
+                                <i class="fas fa-shopping-cart me-1"></i>Cantidad Comprada *
+                            </label>
+                            {{ form.cantidad_comprada }}
+                            {% if form.cantidad_comprada.errors %}
+                                <div class="text-danger small">{{ form.cantidad_comprada.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.cantidad_comprada.help_text }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.precio_compra_total.id_for_label }}" class="form-label">
+                                <i class="fas fa-dollar-sign me-1"></i>Precio Total *
+                            </label>
+                            {{ form.precio_compra_total }}
+                            {% if form.precio_compra_total.errors %}
+                                <div class="text-danger small">{{ form.precio_compra_total.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.precio_compra_total.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Detalle -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="{{ form.detalle.id_for_label }}" class="form-label">
+                                <i class="fas fa-comment me-1"></i>Detalle
+                            </label>
+                            {{ form.detalle }}
+                            {% if form.detalle.errors %}
+                                <div class="text-danger small">{{ form.detalle.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">{{ form.detalle.help_text }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Errores generales -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <!-- Botones -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success" id="submitBtn">
+                            <i class="fas fa-save me-1"></i>Registrar Entrada
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Cálculos -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-calculator me-2"></i>Cálculos Automáticos
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="calculosContainer" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Cantidad en Unidad Base:</label>
+                        <div id="cantidadUnidadBase" class="h5 text-success">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Costo Unitario:</label>
+                        <div id="costoUnitario" class="h6 text-primary">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Nuevo Stock Total:</label>
+                        <div id="nuevoStock" class="h5 text-warning">-</div>
+                    </div>
+                </div>
+                <div id="sinCalculos" class="text-center text-muted py-4">
+                    <i class="fas fa-calculator fa-2x mb-2 opacity-50"></i>
+                    <p class="small">Selecciona un material e ingresa los datos para ver los cálculos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial Reciente del Material -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-clock me-2"></i>Movimientos Recientes
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="historialMaterial">
+                    <p class="text-muted small text-center py-2">Selecciona un material para ver su historial</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para cálculos dinámicos -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const materialSelect = document.getElementById('id_material');
+    const cantidadInput = document.getElementById('id_cantidad_comprada');
+    const precioInput = document.getElementById('id_precio_compra_total');
+    
+    let materialData = null;
+    
+    // Event listeners
+    materialSelect.addEventListener('change', loadMaterialInfo);
+    cantidadInput.addEventListener('input', calculateValues);
+    // El precio se calcula automáticamente, no necesitamos listener
+    
+    // Si el material está preseleccionado, cargar su información automáticamente
+    if (materialSelect.value) {
+        loadMaterialInfo();
+    }
+    
+    function loadMaterialInfo() {
+        const materialId = materialSelect.value;
+        if (!materialId) {
+            document.getElementById('materialInfo').classList.add('d-none');
+            document.getElementById('calculosContainer').classList.add('d-none');
+            document.getElementById('sinCalculos').classList.remove('d-none');
+            precioInput.value = '';
+            return;
+        }
+        
+        fetch(`/material-info-entrada/${materialId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    return;
+                }
+                
+                materialData = data;
+                
+                // Mostrar información del material
+                document.getElementById('materialCodigo').textContent = data.codigo;
+                document.getElementById('materialTipo').textContent = data.tipo_material;
+                document.getElementById('materialStock').textContent = `${data.cantidad_disponible} ${data.unidad_base}`;
+                document.getElementById('materialFactor').textContent = `1 ${data.tipo_material.toLowerCase()} = ${data.factor_conversion} ${data.unidad_base}`;
+                
+                // Mostrar precio unitario del material
+                document.getElementById('materialInfo').innerHTML += `
+                    <div class="col-md-6">
+                        <small class="text-muted">Precio Compra:</small>
+                        <div class="fw-bold text-success">$${data.precio_compra}</div>
+                    </div>
+                `;
+                
+                document.getElementById('materialInfo').classList.remove('d-none');
+                
+                calculateValues();
+            })
+            .catch(error => {
+                console.error('Error loading material info:', error);
+            });
+    }
+    
+    function calculateValues() {
+        if (!materialData) return;
+        
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        
+        if (cantidad > 0) {
+            // Calcular precio automáticamente
+            const precio = cantidad * materialData.precio_compra;
+            precioInput.value = precio.toFixed(2);
+            
+            const cantidadUnidadBase = cantidad * materialData.factor_conversion;
+            const costoUnitario = precio / cantidadUnidadBase;
+            const nuevoStock = materialData.cantidad_disponible + cantidadUnidadBase;
+            
+            document.getElementById('cantidadUnidadBase').textContent = `${cantidadUnidadBase} ${materialData.unidad_base}`;
+            document.getElementById('costoUnitario').textContent = `$${costoUnitario.toFixed(4)} / ${materialData.unidad_base}`;
+            document.getElementById('nuevoStock').textContent = `${nuevoStock} ${materialData.unidad_base}`;
+            
+            document.getElementById('calculosContainer').classList.remove('d-none');
+            document.getElementById('sinCalculos').classList.add('d-none');
+        } else {
+            precioInput.value = '';
+            document.getElementById('calculosContainer').classList.add('d-none');
+            document.getElementById('sinCalculos').classList.remove('d-none');
+        }
+    }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Lista de Moños{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-ribbon me-2"></i>Lista de Moños
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'inventario:agregar_monos' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Nuevo Moño
+        </a>
+    </div>
+</div>
+
+<!-- Filtros de búsqueda -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label for="q" class="form-label">Búsqueda</label>
+                <input type="text" class="form-control" id="q" name="q" value="{{ query }}" 
+                       placeholder="Código, nombre o descripción">
+            </div>
+            <div class="col-md-3">
+                <label for="tipo_venta" class="form-label">Tipo de Venta</label>
+                <select class="form-control" id="tipo_venta" name="tipo_venta">
+                    <option value="">Todos</option>
+                    {% for value, label in tipo_venta_choices %}
+                        <option value="{{ value }}" {% if tipo_venta == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-search me-1"></i>Buscar
+                </button>
+                <a href="{% url 'inventario:lista_monos' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resultados -->
+<div class="card shadow">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>Moños Registrados 
+            <span class="badge bg-primary">{{ page_obj.paginator.count }}</span>
+        </h5>
+        {% if page_obj.has_other_pages %}
+            <small class="text-muted">
+                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+            </small>
+        {% endif %}
+    </div>
+    
+    <div class="card-body p-0">
+        {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Tipo de Venta</th>
+                            <th>Precio Venta</th>
+                            <th>Costo Producción</th>
+                            <th>Ganancia</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for monos in page_obj %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-info">{{ monos.codigo }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ monos.nombre }}</strong>
+                                {% if monos.descripcion %}
+                                    <br><small class="text-muted">{{ monos.descripcion|truncatechars:50 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if monos.tipo_venta == 'par' %}bg-secondary{% else %}bg-primary{% endif %}">
+                                    {{ monos.get_tipo_venta_display }}
+                                </span>
+                            </td>
+                            <td>${{ monos.precio_venta|floatformat:2 }}</td>
+                            <td>${{ monos.costo_produccion|floatformat:2 }}</td>
+                            <td>
+                                {% if monos.ganancia_unitaria > 0 %}
+                                    <span class="text-success">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
+                                {% elif monos.ganancia_unitaria < 0 %}
+                                    <span class="text-danger">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
+                                {% else %}
+                                    <span class="text-warning">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if monos.activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'inventario:detalle_monos' monos.id %}" 
+                                       class="btn btn-outline-info" title="Ver detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'inventario:editar_monos' monos.id %}" 
+                                       class="btn btn-outline-primary" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'inventario:simulador' %}?monos={{ monos.id }}" 
+                                       class="btn btn-outline-success" title="Simular">
+                                        <i class="fas fa-calculator"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if page_obj.has_other_pages %}
+            <nav class="p-3">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if query %}&q={{ query }}{% endif %}{% if tipo_venta %}&tipo_venta={{ tipo_venta }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if tipo_venta %}&tipo_venta={{ tipo_venta }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if tipo_venta %}&tipo_venta={{ tipo_venta }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}{% if tipo_venta %}&tipo_venta={{ tipo_venta }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-ribbon fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No se encontraron moños.</p>
+                <a href="{% url 'inventario:agregar_monos' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Crear Primer Moño
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

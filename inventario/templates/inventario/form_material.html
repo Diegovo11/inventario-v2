@@ -1,0 +1,301 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }} - Sistema de Inventario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        {% if material %}
+            <i class="fas fa-edit me-2"></i>{{ titulo }}
+        {% else %}
+            <i class="fas fa-plus me-2"></i>{{ titulo }}
+        {% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if material %}
+            <div class="btn-group me-2">
+                <a href="{% url 'inventario:detalle_material' material.id %}" class="btn btn-sm btn-outline-info">
+                    <i class="fas fa-eye me-1"></i>Ver Detalles
+                </a>
+            </div>
+        {% endif %}
+        <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Volver a Lista
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Información del Material
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="row">
+                        <!-- Información Básica -->
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">Información Básica</h6>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.codigo.id_for_label }}" class="form-label">
+                                    <i class="fas fa-barcode me-1"></i>{{ form.codigo.label }} *
+                                </label>
+                                {{ form.codigo }}
+                                {% if form.codigo.errors %}
+                                    <div class="text-danger small">{{ form.codigo.errors }}</div>
+                                {% endif %}
+                                {% if form.codigo.help_text %}
+                                    <div class="form-text">{{ form.codigo.help_text }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                    <i class="fas fa-tag me-1"></i>{{ form.nombre.label }} *
+                                </label>
+                                {{ form.nombre }}
+                                {% if form.nombre.errors %}
+                                    <div class="text-danger small">{{ form.nombre.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.categoria.id_for_label }}" class="form-label">
+                                    <i class="fas fa-folder me-1"></i>{{ form.categoria.label }} *
+                                </label>
+                                {{ form.categoria }}
+                                {% if form.categoria.errors %}
+                                    <div class="text-danger small">{{ form.categoria.errors }}</div>
+                                {% endif %}
+                                {% if form.categoria.help_text %}
+                                    <div class="form-text">{{ form.categoria.help_text }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.descripcion.id_for_label }}" class="form-label">
+                                    <i class="fas fa-align-left me-1"></i>{{ form.descripcion.label }}
+                                </label>
+                                {{ form.descripcion }}
+                                {% if form.descripcion.errors %}
+                                    <div class="text-danger small">{{ form.descripcion.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Configuración Técnica -->
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">Configuración Técnica</h6>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.tipo_material.id_for_label }}" class="form-label">
+                                    <i class="fas fa-cube me-1"></i>{{ form.tipo_material.label }} *
+                                </label>
+                                {{ form.tipo_material }}
+                                {% if form.tipo_material.errors %}
+                                    <div class="text-danger small">{{ form.tipo_material.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.unidad_base.id_for_label }}" class="form-label">
+                                    <i class="fas fa-ruler me-1"></i>{{ form.unidad_base.label }} *
+                                </label>
+                                {{ form.unidad_base }}
+                                {% if form.unidad_base.errors %}
+                                    <div class="text-danger small">{{ form.unidad_base.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.factor_conversion.id_for_label }}" class="form-label">
+                                    <i class="fas fa-exchange-alt me-1"></i>{{ form.factor_conversion.label }} *
+                                </label>
+                                {{ form.factor_conversion }}
+                                {% if form.factor_conversion.errors %}
+                                    <div class="text-danger small">{{ form.factor_conversion.errors }}</div>
+                                {% endif %}
+                                {% if form.factor_conversion.help_text %}
+                                    <div class="form-text">{{ form.factor_conversion.help_text }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form.activo }}
+                                    <label class="form-check-label" for="{{ form.activo.id_for_label }}">
+                                        <i class="fas fa-check-circle me-1"></i>{{ form.activo.label }}
+                                    </label>
+                                </div>
+                                {% if form.activo.errors %}
+                                    <div class="text-danger small">{{ form.activo.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Información de Stock y Precios -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-3">Stock y Precios</h6>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.cantidad_disponible.id_for_label }}" class="form-label">
+                                    <i class="fas fa-warehouse me-1"></i>{{ form.cantidad_disponible.label }} *
+                                </label>
+                                {{ form.cantidad_disponible }}
+                                {% if form.cantidad_disponible.errors %}
+                                    <div class="text-danger small">{{ form.cantidad_disponible.errors }}</div>
+                                {% endif %}
+                                {% if form.cantidad_disponible.help_text %}
+                                    <div class="form-text">{{ form.cantidad_disponible.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.precio_compra.id_for_label }}" class="form-label">
+                                    <i class="fas fa-dollar-sign me-1"></i>{{ form.precio_compra.label }} *
+                                </label>
+                                {{ form.precio_compra }}
+                                {% if form.precio_compra.errors %}
+                                    <div class="text-danger small">{{ form.precio_compra.errors }}</div>
+                                {% endif %}
+                                {% if form.precio_compra.help_text %}
+                                    <div class="form-text">{{ form.precio_compra.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            {% if material %}
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="fas fa-calculator me-1"></i>Costo Unitario Calculado
+                                    </label>
+                                    <div class="form-control-plaintext fw-bold text-success" id="costo-unitario">
+                                        $<span id="costo-valor">{{ material.costo_unitario|floatformat:4 }}</span> / {{ material.unidad_base }}
+                                    </div>
+                                    <div class="form-text">Calculado automáticamente</div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Botones de Acción -->
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if material %}Actualizar Material{% else %}Crear Material{% endif %}
+                            </button>
+                            <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-outline-secondary ms-2">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </a>
+                        </div>
+                        
+                        {% if material %}
+                            <div>
+                                <a href="{% url 'inventario:detalle_material' material.id %}" class="btn btn-outline-info">
+                                    <i class="fas fa-eye me-1"></i>Ver Detalles
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Ayuda -->
+    <div class="col-md-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Ayuda
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>Campos Obligatorios (*)</h6>
+                <ul class="list-unstyled small">
+                    <li><strong>Código:</strong> Identificador único (ej: M001, L001)</li>
+                    <li><strong>Nombre:</strong> Nombre descriptivo del material</li>
+                    <li><strong>Categoría:</strong> Clasificación (listón, piedra, adorno)</li>
+                    <li><strong>Tipo:</strong> Paquete o Rollo</li>
+                    <li><strong>Unidad Base:</strong> Unidades o Centímetros</li>
+                    <li><strong>Factor Conversión:</strong> Cantidad por paquete/rollo</li>
+                </ul>
+
+                <hr>
+
+                <h6>Ejemplo de Configuración</h6>
+                <div class="bg-light p-3 rounded">
+                    <small>
+                        <strong>Listón Rojo:</strong><br>
+                        • Tipo: Rollo<br>
+                        • Unidad Base: Centímetros<br>
+                        • Factor: 1000 (1 rollo = 1000 cm)<br>
+                        • Precio: $85.00 por rollo<br>
+                        • Costo unitario: $0.085/cm
+                    </small>
+                </div>
+
+                {% if material %}
+                    <hr>
+                    <h6>Información del Material</h6>
+                    <div class="bg-info bg-opacity-10 p-3 rounded">
+                        <small>
+                            <strong>Creado:</strong> {{ material.fecha_creacion|date:"d/m/Y H:i" }}<br>
+                            <strong>Modificado:</strong> {{ material.fecha_modificacion|date:"d/m/Y H:i" }}<br>
+                            <strong>Stock Actual:</strong> {{ material.cantidad_disponible }} {{ material.unidad_base }}<br>
+                            <strong>Valor Total:</strong> ${{ material.valor_inventario|floatformat:2 }}
+                        </small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calcular costo unitario en tiempo real al editar
+document.addEventListener('DOMContentLoaded', function() {
+    const precioInput = document.querySelector('#id_precio_compra');
+    const factorInput = document.querySelector('#id_factor_conversion');
+    const costoElement = document.querySelector('#costo-valor');
+    
+    if (precioInput && factorInput && costoElement) {
+        function calcularCosto() {
+            const precio = parseFloat(precioInput.value) || 0;
+            const factor = parseFloat(factorInput.value) || 1;
+            const costo = factor > 0 ? (precio / factor) : 0;
+            costoElement.textContent = costo.toFixed(4);
+        }
+        
+        precioInput.addEventListener('input', calcularCosto);
+        factorInput.addEventListener('input', calcularCosto);
+    }
+});
+</script>
+{% endblock %}

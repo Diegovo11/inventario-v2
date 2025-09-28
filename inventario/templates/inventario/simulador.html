@@ -1,350 +1,303 @@
 {% extends 'inventario/base.html' %}
-{% load static %}
 
-{% block title %}Simulador - Inventario{% endblock %}
-
-{% block extra_css %}
-<style>
-    .simulator-card {
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        border: none;
-    }
-    .simulator-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px 15px 0 0;
-        padding: 2rem;
-    }
-    .result-card {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        border-radius: 15px;
-    }
-    .metric-item {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-    .profit-positive {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-    }
-    .profit-negative {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-    .breakdown-item {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
-        border-left: 4px solid #667eea;
-    }
-</style>
-{% endblock %}
+{% block title %}Simulador de Producción{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <!-- Header -->
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="fw-bold text-primary mb-1">
-                        <i class="fas fa-calculator me-2"></i>Simulador de Producción
-                    </h2>
-                    <p class="text-muted mb-0">Calcula costos, ganancias y planifica tu producción</p>
-                </div>
-                <div class="btn-group">
-                    <a href="{% url 'tipos_mono_list' %}" class="btn btn-outline-primary">
-                        <i class="fas fa-list me-1"></i>Tipos de Moños
-                    </a>
-                    <a href="{% url 'simulaciones_list' %}" class="btn btn-info">
-                        <i class="fas fa-history me-1"></i>Simulaciones
-                    </a>
-                </div>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-calculator me-2"></i>Simulador de Producción
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-outline-info">
+            <i class="fas fa-history me-1"></i>Ver Historial
+        </a>
+    </div>
+</div>
+
+<!-- Estadísticas Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-6 text-primary">{{ total_monos }}</div>
+                <p class="card-text text-muted">Tipos de Moños</p>
             </div>
         </div>
     </div>
-
-    <div class="row">
-        <!-- Formulario del Simulador -->
-        <div class="col-lg-6 mb-4">
-            <div class="card simulator-card">
-                <div class="simulator-header text-center">
-                    <h3 class="mb-2">
-                        <i class="fas fa-play-circle me-2"></i>Nuevo Simulacro
-                    </h3>
-                    <p class="mb-0 opacity-75">Configura los parámetros de producción</p>
-                </div>
-                
-                <div class="card-body p-4">
-                    {% if mensaje_error %}
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>{{ mensaje_error }}
-                        </div>
-                    {% endif %}
-
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        <!-- Tipo de Moño -->
-                        <div class="mb-3">
-                            <label for="{{ form.tipo_mono.id_for_label }}" class="form-label">
-                                <i class="fas fa-ribbon me-1"></i>{{ form.tipo_mono.label }}
-                            </label>
-                            {{ form.tipo_mono }}
-                            {% if form.tipo_mono.errors %}
-                                <div class="text-danger small mt-1">{{ form.tipo_mono.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Cantidad -->
-                        <div class="mb-3">
-                            <label for="{{ form.cantidad_a_producir.id_for_label }}" class="form-label">
-                                <i class="fas fa-hashtag me-1"></i>{{ form.cantidad_a_producir.label }}
-                            </label>
-                            {{ form.cantidad_a_producir }}
-                            {% if form.cantidad_a_producir.errors %}
-                                <div class="text-danger small mt-1">{{ form.cantidad_a_producir.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Precio de Venta -->
-                        <div class="mb-3">
-                            <label for="{{ form.precio_venta_unitario.id_for_label }}" class="form-label">
-                                <i class="fas fa-dollar-sign me-1"></i>{{ form.precio_venta_unitario.label }}
-                            </label>
-                            {{ form.precio_venta_unitario }}
-                            {% if form.precio_venta_unitario.errors %}
-                                <div class="text-danger small mt-1">{{ form.precio_venta_unitario.errors }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Opciones de Guardado -->
-                        <div class="mb-3">
-                            <div class="form-check">
-                                {{ form.guardar_simulacion }}
-                                <label class="form-check-label" for="{{ form.guardar_simulacion.id_for_label }}">
-                                    {{ form.guardar_simulacion.label }}
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="mb-4" id="nombre-simulacion" style="display: none;">
-                            <label for="{{ form.nombre_simulacion.id_for_label }}" class="form-label">
-                                {{ form.nombre_simulacion.label }}
-                            </label>
-                            {{ form.nombre_simulacion }}
-                        </div>
-
-                        <!-- Botón Simular -->
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-play me-1"></i>Ejecutar Simulación
-                            </button>
-                        </div>
-                    </form>
-                </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-6 text-success">{{ simulaciones_recientes|length }}</div>
+                <p class="card-text text-muted">Simulaciones Recientes</p>
             </div>
         </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="display-6 text-info">
+                    <i class="fas fa-calculator"></i>
+                </div>
+                <p class="card-text text-muted">Listo para Simular</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-        <!-- Resultados -->
-        <div class="col-lg-6 mb-4">
-            {% if resultado %}
-                <div class="card simulator-card">
-                    <div class="card-header result-card text-center p-4">
-                        <h3 class="mb-2">
-                            <i class="fas fa-chart-line me-2"></i>Resultados
-                        </h3>
-                        <p class="mb-0 opacity-75">{{ resultado.cantidad }} {{ resultado.tipo_mono.nombre }}</p>
+<div class="row">
+    <!-- Formulario de Simulación -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-play me-2"></i>Nueva Simulación
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="simulacion-form">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.monos.id_for_label }}" class="form-label">{{ form.monos.label }}</label>
+                            {{ form.monos }}
+                            {% if form.monos.errors %}
+                                <div class="text-danger">{{ form.monos.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.cantidad_producir.id_for_label }}" class="form-label">{{ form.cantidad_producir.label }}</label>
+                            {{ form.cantidad_producir }}
+                            {% if form.cantidad_producir.errors %}
+                                <div class="text-danger">{{ form.cantidad_producir.errors.0 }}</div>
+                            {% endif %}
+                        </div>
                     </div>
                     
-                    <div class="card-body p-4">
-                        <!-- Métricas Principales -->
-                        <div class="row mb-4">
-                            <div class="col-6">
-                                <div class="metric-item text-center {% if resultado.ganancia_neta >= 0 %}profit-positive{% else %}profit-negative{% endif %}">
-                                    <h4 class="mb-1">${{ resultado.ganancia_neta|floatformat:2 }}</h4>
-                                    <small class="opacity-75">Ganancia Total</small>
-                                </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.tipo_venta.id_for_label }}" class="form-label">{{ form.tipo_venta.label }}</label>
+                            {{ form.tipo_venta }}
+                            <div class="form-text">
+                                <strong>Individual:</strong> Se calcula por unidades<br>
+                                <strong>Par:</strong> Cantidad x 2 (se vende en pares)
                             </div>
-                            <div class="col-6">
-                                <div class="metric-item text-center" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
-                                    <h4 class="mb-1">{{ resultado.margen_porcentaje|floatformat:1 }}%</h4>
-                                    <small class="opacity-75">Margen</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Desglose Financiero -->
-                        <div class="mb-4">
-                            <h5 class="mb-3">
-                                <i class="fas fa-coins me-2"></i>Desglose Financiero
-                            </h5>
-                            <div class="breakdown-item">
-                                <div class="d-flex justify-content-between">
-                                    <span><i class="fas fa-shopping-cart me-2"></i>Ingresos Totales:</span>
-                                    <strong>${{ resultado.ingreso_total|floatformat:2 }}</strong>
-                                </div>
-                            </div>
-                            <div class="breakdown-item">
-                                <div class="d-flex justify-content-between">
-                                    <span><i class="fas fa-box me-2"></i>Costo Materiales:</span>
-                                    <strong>${{ resultado.costo_total|floatformat:2 }}</strong>
-                                </div>
-                            </div>
-                            <div class="breakdown-item">
-                                <div class="d-flex justify-content-between">
-                                    <span><i class="fas fa-clock me-2"></i>Tiempo Total:</span>
-                                    <strong>{{ resultado.tiempo_horas|floatformat:1 }} horas</strong>
-                                </div>
-                            </div>
-                            <div class="breakdown-item">
-                                <div class="d-flex justify-content-between">
-                                    <span><i class="fas fa-tachometer-alt me-2"></i>Ganancia/Hora:</span>
-                                    <strong>${{ resultado.ganancia_por_hora|floatformat:2 }}</strong>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Estado del Stock -->
-                        <div class="mb-4">
-                            <h5 class="mb-3">
-                                <i class="fas fa-warehouse me-2"></i>Estado del Stock
-                            </h5>
-                            {% if resultado.puede_producir %}
-                                <div class="alert alert-success d-flex align-items-center">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    <span>Stock suficiente para producir {{ resultado.cantidad }} unidades</span>
-                                </div>
-                            {% else %}
-                                <div class="alert alert-warning d-flex align-items-center">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    <span>{{ resultado.mensaje_stock }}</span>
-                                </div>
+                            {% if form.tipo_venta.errors %}
+                                <div class="text-danger">{{ form.tipo_venta.errors.0 }}</div>
                             {% endif %}
                         </div>
-
-                        <!-- Materiales Necesarios -->
-                        {% if resultado.recetas %}
-                            <div class="mb-4">
-                                <h5 class="mb-3">
-                                    <i class="fas fa-list-ul me-2"></i>Materiales Necesarios
-                                </h5>
-                                {% for receta in resultado.recetas %}
-                                    <div class="breakdown-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <strong>{{ receta.insumo.material.nombre }}</strong>
-                                                <br>
-                                                <small class="text-muted">{{ receta.insumo.nombre }}</small>
-                                            </div>
-                                            <div class="text-end">
-                                                <span class="badge bg-primary">
-                                                    {{ receta.cantidad_necesaria|floatformat:1 }} × {{ resultado.cantidad }} = 
-                                                    {% widthratio receta.cantidad_necesaria resultado.cantidad 1 as total_necesario %}
-                                                    {{ total_necesario }} {{ receta.insumo.material.unidad_base }}
-                                                </span>
-                                                <br>
-                                                <small class="text-muted">
-                                                    Stock: {{ receta.insumo.material.cantidad_disponible }} {{ receta.insumo.material.unidad_base }}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.precio_venta_unitario.id_for_label }}" class="form-label">{{ form.precio_venta_unitario.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.precio_venta_unitario }}
                             </div>
-                        {% endif %}
-                    </div>
-                </div>
-            {% else %}
-                <div class="card simulator-card">
-                    <div class="card-body text-center py-5">
-                        <div class="mb-4">
-                            <i class="fas fa-calculator fa-4x text-muted"></i>
+                            <div class="form-text">Precio por unidad o par según tipo de venta</div>
+                            {% if form.precio_venta_unitario.errors %}
+                                <div class="text-danger">{{ form.precio_venta_unitario.errors.0 }}</div>
+                            {% endif %}
                         </div>
-                        <h5 class="text-muted">Ejecuta una simulación</h5>
-                        <p class="text-muted">Completa el formulario y presiona "Ejecutar Simulación" para ver los resultados</p>
                     </div>
-                </div>
-            {% endif %}
+                    
+                    <!-- Vista Previa de Cálculos -->
+                    <div id="preview-calculations" class="d-none">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>Vista Previa</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Moños Totales:</strong> <span id="preview-total-monos">-</span></p>
+                                    <p class="mb-1"><strong>Costo Estimado:</strong> $<span id="preview-costo">0.00</span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Ingreso Estimado:</strong> $<span id="preview-ingreso">0.00</span></p>
+                                    <p class="mb-0"><strong>Ganancia Estimada:</strong> $<span id="preview-ganancia">0.00</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Ejecutar Simulación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Instrucciones -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>¿Cómo funciona el simulador?
+                </h6>
+            </div>
+            <div class="card-body">
+                <ol class="mb-0">
+                    <li><strong>Selecciona un moño:</strong> Elige el tipo de moño que quieres producir</li>
+                    <li><strong>Define la cantidad:</strong> Ingresa cuántos quieres producir</li>
+                    <li><strong>Tipo de venta:</strong> Individual (por unidades) o Pares (cantidad x 2)</li>
+                    <li><strong>Precio de venta:</strong> Define el precio por unidad o par</li>
+                    <li><strong>Ejecuta:</strong> El sistema calculará materiales necesarios, costos y ganancias</li>
+                </ol>
+            </div>
         </div>
     </div>
-
+    
     <!-- Simulaciones Recientes -->
-    {% if simulaciones_recientes %}
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-history me-2"></i>Simulaciones Recientes
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Tipo de Moño</th>
-                                        <th>Cantidad</th>
-                                        <th>Ganancia</th>
-                                        <th>Fecha</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for sim in simulaciones_recientes %}
-                                    <tr>
-                                        <td>{{ sim.nombre_simulacion }}</td>
-                                        <td>{{ sim.tipo_mono.nombre }}</td>
-                                        <td>{{ sim.cantidad_a_producir }}</td>
-                                        <td>
-                                            <span class="badge {% if sim.ganancia_neta >= 0 %}bg-success{% else %}bg-danger{% endif %}">
-                                                ${{ sim.ganancia_neta|floatformat:2 }}
-                                            </span>
-                                        </td>
-                                        <td>{{ sim.fecha_simulacion|date:"d/m/Y H:i" }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>Simulaciones Recientes
+                </h6>
+                {% if simulaciones_recientes %}
+                    <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-sm btn-outline-primary">
+                        Ver Todas
+                    </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if simulaciones_recientes %}
+                    {% for simulacion in simulaciones_recientes %}
+                        <div class="d-flex justify-content-between align-items-start mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ simulacion.monos.nombre }}</h6>
+                                <small class="text-muted d-block">
+                                    {{ simulacion.cantidad_producir }} 
+                                    {% if simulacion.tipo_venta == 'par' %}pares{% else %}unidades{% endif %}
+                                </small>
+                                <small class="text-muted">
+                                    {{ simulacion.fecha_creacion|date:"d/m/Y H:i" }}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-success fw-bold">
+                                    ${{ simulacion.ganancia_estimada|floatformat:0 }}
+                                </div>
+                                <a href="{% url 'inventario:detalle_simulacion' simulacion.id %}" 
+                                   class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
                         </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-calculator fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No hay simulaciones recientes</p>
                     </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Accesos Rápidos -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Accesos Rápidos
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'inventario:lista_monos' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-ribbon me-2"></i>Ver Moños
+                    </a>
+                    <a href="{% url 'inventario:agregar_monos' %}" class="btn btn-outline-success">
+                        <i class="fas fa-plus me-2"></i>Nuevo Moño
+                    </a>
+                    <a href="{% url 'inventario:lista_materiales' %}" class="btn btn-outline-info">
+                        <i class="fas fa-boxes me-2"></i>Ver Materiales
+                    </a>
+                    <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-history me-2"></i>Historial Completo
+                    </a>
                 </div>
             </div>
         </div>
-    {% endif %}
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Mostrar/ocultar campo de nombre cuando se marca guardar simulación
-    const checkGuardar = document.querySelector('input[name="guardar_simulacion"]');
-    const campoNombre = document.getElementById('nombre-simulacion');
+    const monosSelect = document.getElementById('id_monos');
+    const cantidadInput = document.getElementById('id_cantidad_producir');
+    const tipoVentaSelect = document.getElementById('id_tipo_venta');
+    const precioInput = document.getElementById('id_precio_venta');
+    const previewDiv = document.getElementById('preview-calculations');
     
-    if (checkGuardar) {
-        checkGuardar.addEventListener('change', function() {
-            if (this.checked) {
-                campoNombre.style.display = 'block';
-            } else {
-                campoNombre.style.display = 'none';
-            }
-        });
+    // Cargar datos del moño seleccionado
+    function loadMonosData() {
+        const monosId = monosSelect.value;
+        if (monosId) {
+            fetch(`/api/monos/${monosId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    // Pre-cargar precio y tipo de venta
+                    precioInput.value = data.precio_venta.toFixed(2);
+                    tipoVentaSelect.value = data.tipo_venta;
+                    
+                    updatePreview();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        } else {
+            hidePreview();
+        }
     }
     
-    // Auto-llenar precio sugerido cuando se selecciona un tipo de moño
-    const selectTipo = document.querySelector('select[name="tipo_mono"]');
-    const inputPrecio = document.querySelector('input[name="precio_venta_unitario"]');
+    // Actualizar vista previa
+    function updatePreview() {
+        const cantidad = parseInt(cantidadInput.value) || 0;
+        const precio = parseFloat(precioInput.value) || 0;
+        const tipoVenta = tipoVentaSelect.value;
+        const monosId = monosSelect.value;
+        
+        if (cantidad > 0 && precio > 0 && monosId) {
+            const cantidadTotal = tipoVenta === 'par' ? cantidad * 2 : cantidad;
+            const ingresoTotal = tipoVenta === 'par' ? precio * cantidad : precio * cantidadTotal;
+            
+            // Obtener costo de producción (simplificado)
+            fetch(`/api/monos/${monosId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const costoTotal = data.costo_produccion * cantidadTotal;
+                    const ganancia = ingresoTotal - costoTotal;
+                    
+                    document.getElementById('preview-total-monos').textContent = cantidadTotal;
+                    document.getElementById('preview-costo').textContent = costoTotal.toFixed(2);
+                    document.getElementById('preview-ingreso').textContent = ingresoTotal.toFixed(2);
+                    document.getElementById('preview-ganancia').textContent = ganancia.toFixed(2);
+                    
+                    previewDiv.classList.remove('d-none');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    hidePreview();
+                });
+        } else {
+            hidePreview();
+        }
+    }
     
-    if (selectTipo && inputPrecio) {
-        selectTipo.addEventListener('change', function() {
-            // En una implementación futura, podríamos hacer AJAX para obtener el precio sugerido
-            console.log('Tipo seleccionado:', this.value);
-        });
+    function hidePreview() {
+        previewDiv.classList.add('d-none');
+    }
+    
+    // Event listeners
+    monosSelect.addEventListener('change', loadMonosData);
+    cantidadInput.addEventListener('input', updatePreview);
+    tipoVentaSelect.addEventListener('change', updatePreview);
+    precioInput.addEventListener('input', updatePreview);
+    
+    // Cargar datos iniciales si hay un moño pre-seleccionado
+    if (monosSelect.value) {
+        loadMonosData();
     }
 });
 </script>

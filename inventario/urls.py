@@ -1,40 +1,61 @@
 from django.urls import path
 from . import views
+from .views_contaduria import contaduria_home, flujo_efectivo, registrar_movimiento_efectivo, estado_resultados, exportar_excel_efectivo
+from . import views_analytics
+
+app_name = 'inventario'
 
 urlpatterns = [
-    # Dashboard principal
-    path('', views.dashboard, name='dashboard'),
+    # Vista principal
+    path('', views.home, name='home'),
     
-    # Listas
-    path('materiales/', views.materiales_list, name='materiales_list'),
-    path('insumos/', views.insumos_list, name='insumos_list'),
-    path('movimientos/', views.movimientos_list, name='movimientos_list'),
+    # Materiales
+    path('materiales/', views.lista_materiales, name='lista_materiales'),
+    path('material/<int:material_id>/', views.detalle_material, name='detalle_material'),
+    path('material/agregar/', views.agregar_material, name='agregar_material'),
+    path('material/<int:material_id>/editar/', views.editar_material, name='editar_material'),
     
-    # Sistema de reabastecimiento
-    path('reabastecimiento/', views.reabastecimiento_list, name='reabastecimiento_list'),
-    path('reabastecimiento/nuevo/', views.reabastecimiento_create, name='reabastecimiento_create'),
-    path('reabastecimiento/<int:pk>/editar/', views.reabastecimiento_update, name='reabastecimiento_update'),
-    path('stock-bajo/', views.stock_bajo_check, name='stock_bajo_check'),
+    # Moños
+    path('monos/', views.lista_monos, name='lista_monos'),
+    path('monos/<int:monos_id>/', views.detalle_monos, name='detalle_monos'),
+    path('monos/agregar/', views.agregar_monos, name='agregar_monos'),
+    path('monos/<int:monos_id>/editar/', views.editar_monos, name='editar_monos'),
     
-    # Sistema de producción y simulador
+    # Sistema de Simulación
     path('simulador/', views.simulador, name='simulador'),
-    path('tipos-mono/', views.tipos_mono_list, name='tipos_mono_list'),
-    path('tipos-mono/nuevo/', views.tipo_mono_create, name='tipo_mono_create'),
-    path('simulaciones/', views.simulaciones_list, name='simulaciones_list'),
+    path('simulaciones/', views.historial_simulaciones, name='historial_simulaciones'),
+    path('simulacion/<int:simulacion_id>/', views.detalle_simulacion, name='detalle_simulacion'),
     
-    # Otras funcionalidades
-    path('reportes/', views.reportes, name='reportes'),
+    # Sistema de Entrada y Salida
+    path('entrada-material/', views.entrada_material, name='entrada_material'),
+    path('salida-material/', views.salida_material, name='salida_material'),
+    path('historial-movimientos/', views.historial_movimientos, name='historial_movimientos'),
     
-    # Gestión de Materiales
-    path('material/nuevo/', views.material_create, name='material_create'),
-    path('material/<int:pk>/editar/', views.material_edit, name='material_edit'),
-    path('material/<int:pk>/eliminar/', views.material_delete, name='material_delete'),
+    # Integración Simulación-Inventario
+    path('confirmar-produccion/<int:simulacion_id>/', views.confirmar_produccion, name='confirmar_produccion'),
+    path('reabastecer-automatico/<int:simulacion_id>/', views.reabastecer_automatico, name='reabastecer_automatico'),
+    path('procesar-simulacion/<int:simulacion_id>/', views.procesar_simulacion_completa, name='procesar_simulacion_completa'),
+    path('reabastecer-simulacion/<int:simulacion_id>/', views.reabastecer_desde_simulacion, name='reabastecer_desde_simulacion'),
+    path('entrada-rapida-simulacion/<int:simulacion_id>/', views.entrada_rapida_simulacion, name='entrada_rapida_simulacion'),
+    path('generar-salida-directa/<int:simulacion_id>/', views.generar_salida_directa, name='generar_salida_directa'),
+    path('generar-entrada-faltante/<int:simulacion_id>/', views.generar_entrada_faltante, name='generar_entrada_faltante'),
     
-    # Gestión de Insumos  
-    path('insumo/nuevo/', views.insumo_create, name='insumo_create'),
-    path('insumo/<int:pk>/editar/', views.insumo_edit, name='insumo_edit'),
-    path('insumo/<int:pk>/eliminar/', views.insumo_delete, name='insumo_delete'),
+    # Sistema de Contaduría y Finanzas
+    path('contaduria/', contaduria_home, name='contaduria_home'),
+    path('contaduria/flujo-efectivo/', flujo_efectivo, name='flujo_efectivo'),
+    path('contaduria/registrar-movimiento/', registrar_movimiento_efectivo, name='registrar_movimiento_efectivo'),
+    path('contaduria/estado-resultados/', estado_resultados, name='estado_resultados'),
+    path('contaduria/exportar-excel/', exportar_excel_efectivo, name='exportar_excel_efectivo'),
     
-    # Gestión de Movimientos
-    path('movimiento/nuevo/', views.movimiento_create, name='movimiento_create'),
+    # Sistema de Análisis y Reportes
+    path('analytics/', views_analytics.analytics_dashboard, name='analytics_dashboard'),
+    path('analytics/mono/<int:mono_id>/', views_analytics.analytics_detalle_mono, name='analytics_detalle_mono'),
+    
+    # AJAX
+    path('api/monos/<int:monos_id>/', views.get_monos_info, name='get_monos_info'),
+    path('material-info-entrada/<int:material_id>/', views.material_info_entrada, name='material_info_entrada'),
+    path('material-info-salida/<int:material_id>/', views.material_info_salida, name='material_info_salida'),
+    path('api/material-info/', views.material_info_api, name='material_info_api'),
+    path('detalle-movimiento/<int:movimiento_id>/', views.detalle_movimiento_ajax, name='detalle_movimiento_ajax'),
+
 ]

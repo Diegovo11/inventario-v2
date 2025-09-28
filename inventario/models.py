@@ -1,8 +1,12 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
+
 class Material(models.Model):
+    """Modelo para materiales/artículos del inventario"""
+    
     TIPO_MATERIAL_CHOICES = [
         ('paquete', 'Paquete'),
         ('rollo', 'Rollo'),
@@ -13,446 +17,418 @@ class Material(models.Model):
         ('cm', 'Centímetros'),
     ]
     
-    codigo = models.CharField(max_length=10, unique=True, help_text="Identificador único (ej. M001)")
-    nombre = models.CharField(max_length=100, help_text="Nombre del material (ej. Listón rojo)")
+    codigo = models.CharField(max_length=10, unique=True, help_text="Ej: M001")
+    nombre = models.CharField(max_length=100, help_text="Ej: Listón rojo")
     descripcion = models.TextField(blank=True, help_text="Detalle del material")
     tipo_material = models.CharField(max_length=10, choices=TIPO_MATERIAL_CHOICES)
     unidad_base = models.CharField(max_length=10, choices=UNIDAD_BASE_CHOICES)
     factor_conversion = models.PositiveIntegerField(
         help_text="Cantidad que representa 1 paquete o 1 rollo en unidad base"
     )
-    cantidad_disponible = models.PositiveIntegerField(default=0, help_text="Stock actual en unidad base")
+    cantidad_disponible = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Stock actual en unidad base"
+    )
     precio_compra = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Precio total de la compra (reabastecer)"
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Precio total de la compra"
     )
-    costo_unitario = models.DecimalField(
-        max_digits=10, decimal_places=4, default=Decimal('0.0000'),
-        validators=[MinValueValidator(Decimal('0.0000'))],
-        help_text="Precio por unidad base (precio_compra / factor_conversion)"
-    )
-    categoria = models.CharField(max_length=50, help_text="Clasificación (ej. listón, piedra, adorno)")
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    categoria = models.CharField(max_length=50, help_text="Ej: listón, piedra, adorno")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True)
     
     class Meta:
         verbose_name = "Material"
         verbose_name_plural = "Materiales"
         ordering = ['codigo']
     
+    @property
+    def costo_unitario(self):
+        """Calcula el costo por unidad base"""
+        if self.factor_conversion > 0:
+            return self.precio_compra / self.factor_conversion
+        return 0
+    
+    @property
+    def valor_inventario(self):
+        """Calcula el valor total del inventario disponible"""
+        return self.cantidad_disponible * self.costo_unitario
+    
+    @property
+    def unidad(self):
+        """Alias para unidad_base para mantener consistencia en templates"""
+        return self.unidad_base
+    
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
-    
-    def save(self, *args, **kwargs):
-        # Calcular costo unitario automáticamente
-        if self.precio_compra and self.factor_conversion:
-            self.costo_unitario = self.precio_compra / self.factor_conversion
-        super().save(*args, **kwargs)
-
-
-class Insumo(models.Model):
-    nombre = models.CharField(max_length=100, help_text="Nombre del insumo (ej. Moño básico)")
-    descripcion = models.TextField(blank=True, help_text="Detalle del insumo")
-    cantidad_por_unidad = models.PositiveIntegerField(
-        help_text="Cantidad de material que se usa por cada moño"
-    )
-    unidad_consumo = models.CharField(
-        max_length=10, 
-        choices=Material.UNIDAD_BASE_CHOICES,
-        help_text="Unidad en la que se descuenta (unidades | cm)"
-    )
-    material = models.ForeignKey(
-        Material, 
-        on_delete=models.CASCADE,
-        help_text="Material al que está vinculado"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Insumo"
-        verbose_name_plural = "Insumos"
-        ordering = ['nombre']
-    
-    def __str__(self):
-        return f"{self.nombre} - {self.material.nombre}"
-    
-    def costo_por_unidad(self):
-        """Calcula el costo de material por cada unidad de insumo"""
-        return self.material.costo_unitario * self.cantidad_por_unidad
 
 
 class Movimiento(models.Model):
+    """Modelo para registrar movimientos de inventario"""
+    
     TIPO_MOVIMIENTO_CHOICES = [
-        ('entrada', 'Entrada'),
-        ('salida', 'Salida'),
-        ('ajuste', 'Ajuste'),
+        ('entrada', 'Entrada/Reabastecimiento'),
+        ('salida', 'Salida Normal'),
+        ('produccion', 'Salida por Producción'),
+        ('ajuste', 'Ajuste de Inventario'),
     ]
     
-    material = models.ForeignKey(Material, on_delete=models.CASCADE)
-    tipo_movimiento = models.CharField(max_length=10, choices=TIPO_MOVIMIENTO_CHOICES)
-    cantidad = models.IntegerField(help_text="Cantidad afectada en unidad base (puede ser negativa)")
+    material = models.ForeignKey(Material, on_delete=models.CASCADE, related_name='movimientos')
+    tipo_movimiento = models.CharField(max_length=15, choices=TIPO_MOVIMIENTO_CHOICES)
+    cantidad = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Cantidad afectada en unidad base (positiva para entrada, negativa para salida)"
+    )
+    cantidad_anterior = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Cantidad antes del movimiento"
+    )
+    cantidad_nueva = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Cantidad después del movimiento"
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Precio unitario al momento del movimiento"
+    )
+    costo_total_movimiento = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Costo total del movimiento"
+    )
+    detalle = models.TextField(help_text="Motivo del movimiento")
     fecha = models.DateTimeField(auto_now_add=True)
-    detalle = models.TextField(help_text='Motivo (ej. "Compra proveedor X", "Producción de 50 moños")')
-    
-    created_at = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    simulacion_relacionada = models.ForeignKey(
+        'Simulacion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Simulación relacionada (si aplica)"
+    )
     
     class Meta:
         verbose_name = "Movimiento"
         verbose_name_plural = "Movimientos"
         ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['material', 'fecha']),
+            models.Index(fields=['tipo_movimiento', 'fecha']),
+            models.Index(fields=['usuario', 'fecha']),
+        ]
     
     def __str__(self):
-        return f"{self.get_tipo_movimiento_display()} - {self.material.codigo} - {self.cantidad}"
+        return f"{self.material.codigo} - {self.get_tipo_movimiento_display()} - {self.cantidad} ({self.fecha.strftime('%d/%m/%Y')})"
+    
+    @property
+    def es_entrada(self):
+        """Retorna True si es un movimiento de entrada"""
+        return self.cantidad > 0
+    
+    @property
+    def es_salida(self):
+        """Retorna True si es un movimiento de salida"""
+        return self.cantidad < 0
+    
+    @property
+    def cantidad_absoluta(self):
+        """Retorna la cantidad en valor absoluto"""
+        return abs(self.cantidad)
 
 
-class Reabastecimiento(models.Model):
-    ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente'),
-        ('solicitado', 'Solicitado'),
-        ('en_transito', 'En Tránsito'),
-        ('recibido', 'Recibido'),
-        ('cancelado', 'Cancelado'),
-    ]
+class ConfiguracionSistema(models.Model):
+    """Configuraciones generales del sistema"""
     
-    PRIORIDAD_CHOICES = [
-        ('baja', 'Baja'),
-        ('media', 'Media'),
-        ('alta', 'Alta'),
-        ('critica', 'Crítica'),
-    ]
-    
-    material = models.ForeignKey(
-        Material, 
-        on_delete=models.CASCADE,
-        help_text="Material a reabastecer"
-    )
-    cantidad_solicitada = models.PositiveIntegerField(
-        help_text="Cantidad a solicitar en unidad base"
-    )
-    cantidad_recibida = models.PositiveIntegerField(
-        default=0,
-        help_text="Cantidad realmente recibida"
-    )
-    proveedor = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Nombre del proveedor o lugar de compra"
-    )
-    precio_estimado = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Precio estimado total de la compra"
-    )
-    precio_real = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Precio real pagado"
-    )
-    estado = models.CharField(
-        max_length=15, 
-        choices=ESTADO_CHOICES, 
-        default='pendiente'
-    )
-    prioridad = models.CharField(
-        max_length=10, 
-        choices=PRIORIDAD_CHOICES, 
-        default='media'
-    )
-    fecha_solicitud = models.DateTimeField(auto_now_add=True)
-    fecha_estimada_llegada = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text="Fecha estimada de llegada del pedido"
-    )
-    fecha_recepcion = models.DateTimeField(
-        null=True, 
-        blank=True,
-        help_text="Fecha real cuando se recibió el pedido"
-    )
-    notas = models.TextField(
-        blank=True,
-        help_text="Observaciones adicionales del reabastecimiento"
-    )
-    stock_minimo_sugerido = models.PositiveIntegerField(
-        null=True, 
-        blank=True,
-        help_text="Nivel mínimo de stock sugerido para este material"
-    )
-    automatico = models.BooleanField(
-        default=False,
-        help_text="Si fue generado automáticamente por stock bajo"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    nombre_empresa = models.CharField(max_length=100, default="Mi Empresa")
+    moneda = models.CharField(max_length=5, default="MXN")
+    stock_minimo_alerta = models.PositiveIntegerField(default=10)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
     
     class Meta:
-        verbose_name = "Reabastecimiento"
-        verbose_name_plural = "Reabastecimientos"
-        ordering = ['-fecha_solicitud']
+        verbose_name = "Configuración del Sistema"
+        verbose_name_plural = "Configuraciones del Sistema"
     
     def __str__(self):
-        return f"{self.material.codigo} - {self.get_estado_display()} - {self.cantidad_solicitada}"
-    
-    def save(self, *args, **kwargs):
-        # Si se marca como recibido y no tiene fecha de recepción, asignarla
-        if self.estado == 'recibido' and not self.fecha_recepcion:
-            from django.utils import timezone
-            self.fecha_recepcion = timezone.now()
-            
-            # Crear movimiento de entrada automáticamente
-            if self.cantidad_recibida > 0:
-                Movimiento.objects.create(
-                    material=self.material,
-                    tipo_movimiento='entrada',
-                    cantidad=self.cantidad_recibida,
-                    detalle=f'Reabastecimiento recibido - {self.proveedor or "Proveedor no especificado"}'
-                )
-                
-                # Actualizar stock del material
-                self.material.cantidad_disponible += self.cantidad_recibida
-                self.material.save()
-                
-        super().save(*args, **kwargs)
-    
-    def dias_desde_solicitud(self):
-        """Retorna los días transcurridos desde la solicitud"""
-        from django.utils import timezone
-        return (timezone.now() - self.fecha_solicitud).days
-    
-    def esta_retrasado(self):
-        """Verifica si el pedido está retrasado"""
-        if self.fecha_estimada_llegada and self.estado not in ['recibido', 'cancelado']:
-            from django.utils import timezone
-            return timezone.now() > self.fecha_estimada_llegada
-        return False
-    
-    def porcentaje_completado(self):
-        """Calcula el porcentaje de completado del pedido"""
-        if self.cantidad_solicitada == 0:
-            return 0
-        return min(100, (self.cantidad_recibida * 100) // self.cantidad_solicitada)
+        return f"Configuración - {self.nombre_empresa}"
 
 
-class TipoMono(models.Model):
-    """Modelo para diferentes tipos de moños que se pueden producir"""
+class Monos(models.Model):
+    """Modelo para definir tipos de moños"""
     
-    nombre = models.CharField(
-        max_length=100, 
-        unique=True,
-        help_text="Nombre del tipo de moño (ej. Moño Básico, Moño Premium)"
-    )
-    descripcion = models.TextField(
-        blank=True,
-        help_text="Descripción detallada del moño"
-    )
-    precio_venta_sugerido = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Precio de venta sugerido por unidad"
-    )
-    tiempo_produccion_minutos = models.PositiveIntegerField(
-        default=30,
-        help_text="Tiempo estimado de producción en minutos"
-    )
-    activo = models.BooleanField(
-        default=True,
-        help_text="Si el tipo de moño está disponible para producción"
-    )
-
+    TIPO_VENTA_CHOICES = [
+        ('individual', 'Individual'),
+        ('par', 'Par'),
+    ]
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Tipo de Moño"
-        verbose_name_plural = "Tipos de Moños"
-        ordering = ['nombre']
-    
-    def __str__(self):
-        return self.nombre
-    
-    def calcular_costo_materiales(self):
-        """Calcula el costo total de materiales necesarios"""
-        recetas = self.recetaproduccion_set.all()
-        costo_total = Decimal('0.00')
-        
-        for receta in recetas:
-            costo_material = receta.insumo.costo_por_unidad()
-            costo_total += costo_material * receta.cantidad_necesaria
-            
-        return costo_total
-    
-    def margen_ganancia(self):
-        """Calcula el margen de ganancia"""
-        costo = self.calcular_costo_materiales()
-        if costo == 0:
-            return Decimal('100.00')
-        
-        ganancia = self.precio_venta_sugerido - costo
-        return (ganancia / self.precio_venta_sugerido) * 100
-    
-    def puede_producir(self, cantidad=1):
-        """Verifica si se puede producir la cantidad especificada"""
-        recetas = self.recetaproduccion_set.all()
-        
-        for receta in recetas:
-            material_necesario = receta.cantidad_necesaria * cantidad
-            if receta.insumo.material.cantidad_disponible < material_necesario:
-                return False, f"Stock insuficiente de {receta.insumo.material.nombre}"
-        
-        return True, "Stock suficiente"
-
-
-class RecetaProduccion(models.Model):
-    """Modelo que define qué materiales e insumos se necesitan para cada tipo de moño"""
-    
-    tipo_mono = models.ForeignKey(
-        TipoMono, 
-        on_delete=models.CASCADE,
-        help_text="Tipo de moño al que pertenece esta receta"
-    )
-    insumo = models.ForeignKey(
-        Insumo, 
-        on_delete=models.CASCADE,
-        help_text="Insumo/material necesario"
-    )
-    cantidad_necesaria = models.DecimalField(
+    codigo = models.CharField(max_length=10, unique=True, help_text="Ej: MO001")
+    nombre = models.CharField(max_length=100, help_text="Ej: Moño básico")
+    descripcion = models.TextField(blank=True, help_text="Detalle del moño")
+    precio_venta = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
-        help_text="Cantidad del insumo necesaria para producir 1 moño"
+        help_text="Precio de venta por unidad o par"
     )
-    es_opcional = models.BooleanField(
-        default=False,
-        help_text="Si este insumo es opcional para la producción"
-    )
-    notas = models.TextField(
-        blank=True,
-        help_text="Notas sobre el uso de este insumo"
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
+    tipo_venta = models.CharField(max_length=10, choices=TIPO_VENTA_CHOICES, default='individual')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    activo = models.BooleanField(default=True)
     
     class Meta:
-        verbose_name = "Receta de Producción"
-        verbose_name_plural = "Recetas de Producción"
-        unique_together = ['tipo_mono', 'insumo']
-        ordering = ['tipo_mono', 'insumo']
+        verbose_name = "Moño"
+        verbose_name_plural = "Moños"
+        ordering = ['codigo']
     
     def __str__(self):
-        return f"{self.tipo_mono.nombre} - {self.insumo.nombre} ({self.cantidad_necesaria})"
+        return f"{self.codigo} - {self.nombre}"
     
-    def costo_total_insumo(self, cantidad_monos=1):
-        """Calcula el costo total de este insumo para producir X moños"""
-        costo_unitario = self.insumo.costo_por_unidad()
-        cantidad_total = self.cantidad_necesaria * cantidad_monos
-        return costo_unitario * cantidad_total
+    @property
+    def costo_produccion(self):
+        """Calcula el costo total de producción basado en la receta"""
+        total = 0
+        for receta in self.recetas.all():
+            total += receta.material.costo_unitario * receta.cantidad_necesaria
+        return total
+    
+    @property
+    def ganancia_unitaria(self):
+        """Calcula la ganancia por unidad/par"""
+        return self.precio_venta - self.costo_produccion
 
 
-class SimulacionProduccion(models.Model):
+class RecetaMonos(models.Model):
+    """Modelo para definir qué materiales necesita cada moño"""
+    
+    monos = models.ForeignKey(Monos, on_delete=models.CASCADE, related_name='recetas')
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    cantidad_necesaria = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text="Cantidad de material necesaria por moño en unidad base"
+    )
+    
+    class Meta:
+        verbose_name = "Receta de Moño"
+        verbose_name_plural = "Recetas de Moños"
+        unique_together = ['monos', 'material']
+        ordering = ['material__nombre']
+    
+    def __str__(self):
+        return f"{self.monos.nombre} - {self.material.nombre}: {self.cantidad_necesaria} {self.material.unidad_base}"
+    
+    @property
+    def costo_material(self):
+        """Calcula el costo de este material para un moño"""
+        return self.cantidad_necesaria * self.material.costo_unitario
+
+
+class Simulacion(models.Model):
     """Modelo para guardar simulaciones de producción"""
     
-    nombre_simulacion = models.CharField(
-        max_length=150,
-        help_text="Nombre para identificar esta simulación"
-    )
-    tipo_mono = models.ForeignKey(
-        TipoMono, 
-        on_delete=models.CASCADE,
-        help_text="Tipo de moño a simular"
-    )
-    cantidad_a_producir = models.PositiveIntegerField(
-        help_text="Cantidad de moños a producir en la simulación"
-    )
+    monos = models.ForeignKey(Monos, on_delete=models.CASCADE, related_name='simulaciones')
+    cantidad_producir = models.PositiveIntegerField(help_text="Cantidad de moños a producir")
+    tipo_venta = models.CharField(max_length=10, choices=Monos.TIPO_VENTA_CHOICES)
     precio_venta_unitario = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
-        help_text="Precio de venta por unidad para esta simulación"
+        help_text="Precio de venta por unidad o par"
     )
     
-    # Campos calculados
-    costo_total_materiales = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        help_text="Costo total de todos los materiales"
-    )
-    ingreso_total = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        help_text="Ingreso total estimado"
-    )
-    ganancia_neta = models.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        help_text="Ganancia neta estimada"
-    )
-    margen_porcentaje = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=Decimal('0.00'),
-        help_text="Margen de ganancia en porcentaje"
-    )
+    # Resultados calculados
+    cantidad_total_monos = models.PositiveIntegerField(help_text="Cantidad total considerando tipo de venta")
+    costo_total_produccion = models.DecimalField(max_digits=12, decimal_places=2)
+    ingreso_total_venta = models.DecimalField(max_digits=12, decimal_places=2)
+    ganancia_estimada = models.DecimalField(max_digits=12, decimal_places=2)
     
-    stock_suficiente = models.BooleanField(
-        default=True,
-        help_text="Si hay stock suficiente para producir esta cantidad"
-    )
+    # Necesidades de compra
+    necesita_compras = models.BooleanField(default=False)
+    costo_total_compras = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     
-    fecha_simulacion = models.DateTimeField(auto_now_add=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     
     class Meta:
-        verbose_name = "Simulación de Producción"
-        verbose_name_plural = "Simulaciones de Producción"
-        ordering = ['-fecha_simulacion']
+        verbose_name = "Simulación"
+        verbose_name_plural = "Simulaciones"
+        ordering = ['-fecha_creacion']
     
     def __str__(self):
-        return f"{self.nombre_simulacion} - {self.cantidad_a_producir} {self.tipo_mono.nombre}"
+        return f"Simulación {self.monos.nombre} - {self.cantidad_producir} unidades - {self.fecha_creacion.strftime('%d/%m/%Y')}"
     
-    def save(self, *args, **kwargs):
-        # Calcular todos los valores automáticamente
-        self.calcular_metricas()
-        super().save(*args, **kwargs)
+    @property
+    def puede_ejecutar_produccion(self):
+        """Verifica si hay suficientes materiales para ejecutar la producción"""
+        detalles = self.detalles.all()
+        return all(detalle.faltante <= 0 for detalle in detalles)
     
-    def calcular_metricas(self):
-        """Calcula todas las métricas de la simulación"""
-        costo_unitario = self.tipo_mono.calcular_costo_materiales()
+    @property
+    def costo_total(self):
+        """Alias para compatibilidad con el template"""
+        return self.costo_total_produccion
+    
+    @property
+    def ingresos_total(self):
+        """Alias para compatibilidad con el template"""
+        return self.ingreso_total_venta
+    
+    @property
+    def ganancia_neta(self):
+        """Alias para compatibilidad con el template"""
+        return self.ganancia_estimada
+    
+    @property
+    def margen_ganancia(self):
+        """Calcula el margen de ganancia en porcentaje"""
+        if self.ingreso_total_venta > 0:
+            return (self.ganancia_estimada / self.ingreso_total_venta) * 100
+        return 0
+
+
+class DetalleSimulacion(models.Model):
+    """Detalle de materiales necesarios por simulación"""
+    
+    simulacion = models.ForeignKey(Simulacion, on_delete=models.CASCADE, related_name='detalles')
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    cantidad_necesaria = models.DecimalField(max_digits=10, decimal_places=2)
+    cantidad_disponible = models.DecimalField(max_digits=10, decimal_places=2)
+    cantidad_faltante = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cantidad_a_comprar = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unidades_completas_comprar = models.PositiveIntegerField(default=0)
+    costo_compra_necesaria = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    suficiente_stock = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = "Detalle de Simulación"
+        verbose_name_plural = "Detalles de Simulaciones"
+        unique_together = ['simulacion', 'material']
+    
+    def __str__(self):
+        return f"{self.simulacion} - {self.material.nombre}"
+
+
+class MovimientoEfectivo(models.Model):
+    """Modelo para registrar movimientos de efectivo/finanzas"""
+    
+    TIPO_MOVIMIENTO_CHOICES = [
+        ('ingreso', 'Ingreso'),
+        ('egreso', 'Egreso'),
+    ]
+    
+    CATEGORIA_CHOICES = [
+        ('venta', 'Venta de Productos'),
+        ('inventario', 'Compra de Inventario'),
+        ('produccion', 'Costo de Producción'),
+        ('sueldo', 'Sueldos'),
+        ('renta', 'Renta'),
+        ('servicio', 'Servicios (luz, agua, etc.)'),
+        ('otro_gasto', 'Otros Gastos'),
+        ('otro_ingreso', 'Otros Ingresos'),
+    ]
+    
+    fecha = models.DateTimeField(auto_now_add=True)
+    concepto = models.CharField(max_length=200, help_text="Descripción del movimiento")
+    tipo_movimiento = models.CharField(max_length=10, choices=TIPO_MOVIMIENTO_CHOICES)
+    categoria = models.CharField(max_length=15, choices=CATEGORIA_CHOICES)
+    monto = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        help_text="Monto del movimiento (siempre positivo)"
+    )
+    saldo_anterior = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0,
+        help_text="Saldo antes del movimiento"
+    )
+    saldo_nuevo = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0,
+        help_text="Saldo después del movimiento"
+    )
+    automatico = models.BooleanField(
+        default=False, 
+        help_text="True si fue generado automáticamente por el sistema"
+    )
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Referencias opcionales a otros modelos
+    movimiento_inventario = models.ForeignKey(
+        'Movimiento', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="Movimiento de inventario relacionado"
+    )
+    simulacion_relacionada = models.ForeignKey(
+        'Simulacion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Simulación relacionada"
+    )
+    
+    class Meta:
+        verbose_name = "Movimiento de Efectivo"
+        verbose_name_plural = "Movimientos de Efectivo"
+        ordering = ['-fecha']
+    
+    def __str__(self):
+        tipo_signo = "+" if self.tipo_movimiento == 'ingreso' else "-"
+        return f"{self.fecha.strftime('%d/%m/%Y')} - {self.concepto}: {tipo_signo}${self.monto}"
+    
+    @property
+    def monto_con_signo(self):
+        """Retorna el monto con signo según el tipo de movimiento"""
+        return self.monto if self.tipo_movimiento == 'ingreso' else -self.monto
+    
+    @classmethod
+    def calcular_saldo_actual(cls):
+        """Calcula el saldo actual de efectivo"""
+        movimientos = cls.objects.all()
+        saldo = 0
+        for mov in movimientos:
+            saldo += mov.monto_con_signo
+        return saldo
+    
+    @classmethod
+    def registrar_movimiento(cls, concepto, tipo_movimiento, categoria, monto, usuario=None, 
+                           movimiento_inventario=None, simulacion_relacionada=None):
+        """
+        Registra un nuevo movimiento de efectivo y actualiza el saldo
+        """
+        saldo_anterior = cls.calcular_saldo_actual()
         
-        self.costo_total_materiales = costo_unitario * self.cantidad_a_producir
-        self.ingreso_total = self.precio_venta_unitario * self.cantidad_a_producir
-        self.ganancia_neta = self.ingreso_total - self.costo_total_materiales
+        if tipo_movimiento == 'ingreso':
+            saldo_nuevo = saldo_anterior + monto
+        else:  # egreso
+            saldo_nuevo = saldo_anterior - monto
         
-        if self.ingreso_total > 0:
-            self.margen_porcentaje = (self.ganancia_neta / self.ingreso_total) * 100
-        else:
-            self.margen_porcentaje = Decimal('0.00')
+        movimiento = cls.objects.create(
+            concepto=concepto,
+            tipo_movimiento=tipo_movimiento,
+            categoria=categoria,
+            monto=monto,
+            saldo_anterior=saldo_anterior,
+            saldo_nuevo=saldo_nuevo,
+            automatico=True if movimiento_inventario or simulacion_relacionada else False,
+            usuario=usuario,
+            movimiento_inventario=movimiento_inventario,
+            simulacion_relacionada=simulacion_relacionada
+        )
         
-        # Verificar si hay stock suficiente
-        puede_producir, mensaje = self.tipo_mono.puede_producir(self.cantidad_a_producir)
-        self.stock_suficiente = puede_producir
-    
-    def tiempo_total_produccion(self):
-        """Calcula el tiempo total de producción en horas"""
-        minutos_totales = self.tipo_mono.tiempo_produccion_minutos * self.cantidad_a_producir
-        return minutos_totales / 60
-    
-    def rentabilidad_por_hora(self):
-        """Calcula la rentabilidad por hora de trabajo"""
-        tiempo_horas = self.tiempo_total_produccion()
-        if tiempo_horas > 0:
-            return self.ganancia_neta / Decimal(str(tiempo_horas))
-        return Decimal('0.00')
+        return movimiento

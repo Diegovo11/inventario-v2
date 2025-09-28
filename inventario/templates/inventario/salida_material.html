@@ -1,0 +1,188 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}Salida de Material{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Salida de Material</h1>
+    
+    <!-- Alerta de material preseleccionado -->
+    {% if form.material.value %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-success">
+                <h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Material Preseleccionado</h6>
+                <p class="mb-0">El material ya está seleccionado. Solo ingresa la cantidad y el destino.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Registrar Salida</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="form-salida">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Material</label>
+                            {{ form.material }}
+                        </div>
+
+                        <div id="info-material" class="alert alert-info d-none">
+                            <div>Stock Actual: <span id="stock-actual">-</span></div>
+                            <div>Costo Unitario: <span id="costo-unitario">-</span></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Cantidad Utilizada</label>
+                            {{ form.cantidad_utilizada }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Destino</label>
+                            {{ form.destino }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Detalle</label>
+                            {{ form.detalle }}
+                        </div>
+
+                        <div id="calculos" class="alert alert-light d-none">
+                            <div>Costo Total: <span id="costo-total">$0.00</span></div>
+                            <div>Nuevo Stock: <span id="nuevo-stock">-</span></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger" id="btn-registrar" disabled>
+                            Registrar Salida
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">
+                            Limpiar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const materialSelect = document.getElementById('id_material');
+    const cantidadInput = document.getElementById('id_cantidad_utilizada');
+    const btnRegistrar = document.getElementById('btn-registrar');
+    
+    cantidadInput.disabled = true;
+    
+    materialSelect.addEventListener('change', function() {
+        cargarInfoMaterial(this.value);
+    });
+    
+    cantidadInput.addEventListener('input', function() {
+        calcularTotales();
+        validarFormulario();
+    });
+    
+    // Si el material está preseleccionado, cargar su información automáticamente
+    if (materialSelect.value) {
+        cargarInfoMaterial(materialSelect.value);
+    }
+    
+    function cargarInfoMaterial(materialId) {
+        if (!materialId) {
+            limpiarFormulario();
+            return;
+        }
+        
+        fetch(`{% url 'inventario:material_info_api' %}?material_id=${materialId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                document.getElementById('stock-actual').textContent = 
+                    `${data.stock_actual} ${data.unidad}`;
+                document.getElementById('costo-unitario').textContent = 
+                    `$${data.costo_unitario.toFixed(2)}`;
+                
+                window.materialData = data;
+                
+                document.getElementById('info-material').classList.remove('d-none');
+                cantidadInput.disabled = false;
+                cantidadInput.max = data.stock_actual;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error de conexión');
+            });
+    }
+    
+    function calcularTotales() {
+        if (!window.materialData || !cantidadInput.value) {
+            document.getElementById('calculos').classList.add('d-none');
+            return;
+        }
+        
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        const stockActual = window.materialData.stock_actual;
+        const costoUnitario = window.materialData.costo_unitario;
+        
+        if (cantidad <= 0) {
+            document.getElementById('calculos').classList.add('d-none');
+            return;
+        }
+        
+        const costoTotal = cantidad * costoUnitario;
+        const nuevoStock = stockActual - cantidad;
+        
+        document.getElementById('costo-total').textContent = `$${costoTotal.toFixed(2)}`;
+        document.getElementById('nuevo-stock').textContent = `${nuevoStock.toFixed(2)} ${window.materialData.unidad}`;
+        
+        document.getElementById('calculos').classList.remove('d-none');
+    }
+    
+    function validarFormulario() {
+        let esValido = true;
+        
+        if (!materialSelect.value) {
+            esValido = false;
+        }
+        
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        if (cantidad <= 0) {
+            esValido = false;
+        }
+        
+        if (window.materialData && cantidad > window.materialData.stock_actual) {
+            esValido = false;
+        }
+        
+        btnRegistrar.disabled = !esValido;
+    }
+    
+    window.limpiarFormulario = function() {
+        materialSelect.value = '';
+        cantidadInput.value = '';
+        document.getElementById('id_destino').value = '';
+        document.getElementById('id_detalle').value = '';
+        
+        document.getElementById('info-material').classList.add('d-none');
+        document.getElementById('calculos').classList.add('d-none');
+        
+        cantidadInput.disabled = true;
+        btnRegistrar.disabled = true;
+        
+        window.materialData = null;
+    }
+});
+</script>
+{% endblock %}

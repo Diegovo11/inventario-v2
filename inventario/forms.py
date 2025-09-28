@@ -1,373 +1,537 @@
 from django import forms
-from django.utils import timezone
-from .models import Reabastecimiento, Material, TipoMono, RecetaProduccion, SimulacionProduccion, Insumo, Movimiento
+from django.forms import formset_factory, inlineformset_factory
+from django.contrib.auth.models import User
+from .models import Material, Movimiento, Monos, RecetaMonos, Simulacion, MovimientoEfectivo
+from decimal import Decimal
 
-class ReabastecimientoForm(forms.ModelForm):
-    class Meta:
-        model = Reabastecimiento
-        fields = [
-            'material', 'cantidad_solicitada', 'proveedor', 'precio_estimado',
-            'fecha_estimada_llegada', 'prioridad', 'stock_minimo_sugerido', 'notas'
-        ]
-        widgets = {
-            'material': forms.Select(attrs={'class': 'form-select'}),
-            'cantidad_solicitada': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'min': '1',
-                'placeholder': 'Cantidad a solicitar'
-            }),
-            'proveedor': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Nombre del proveedor'
-            }),
-            'precio_estimado': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'step': '0.01',
-                'placeholder': '0.00'
-            }),
-            'fecha_estimada_llegada': forms.DateTimeInput(attrs={
-                'class': 'form-control',
-                'type': 'datetime-local'
-            }),
-            'prioridad': forms.Select(attrs={'class': 'form-select'}),
-            'stock_minimo_sugerido': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'placeholder': 'Stock mínimo recomendado'
-            }),
-            'notas': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '3',
-                'placeholder': 'Observaciones adicionales...'
-            }),
-        }
-        labels = {
-            'material': 'Material',
-            'cantidad_solicitada': 'Cantidad a Solicitar',
-            'proveedor': 'Proveedor',
-            'precio_estimado': 'Precio Estimado',
-            'fecha_estimada_llegada': 'Fecha Estimada de Llegada',
-            'prioridad': 'Prioridad',
-            'stock_minimo_sugerido': 'Stock Mínimo Sugerido',
-            'notas': 'Notas',
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Agregar información de stock actual en el dropdown de materiales
-        self.fields['material'].queryset = Material.objects.all().order_by('nombre')
-        
-        # Hacer que algunos campos sean opcionales para mejor UX
-        self.fields['proveedor'].required = False
-        self.fields['precio_estimado'].required = False
-        self.fields['fecha_estimada_llegada'].required = False
-        self.fields['stock_minimo_sugerido'].required = False
-        self.fields['notas'].required = False
-
-class ReabastecimientoUpdateForm(forms.ModelForm):
-    class Meta:
-        model = Reabastecimiento
-        fields = [
-            'cantidad_recibida', 'precio_real', 'estado', 'prioridad',
-            'fecha_estimada_llegada', 'notas'
-        ]
-        widgets = {
-            'cantidad_recibida': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0'
-            }),
-            'precio_real': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'step': '0.01'
-            }),
-            'estado': forms.Select(attrs={'class': 'form-select'}),
-            'prioridad': forms.Select(attrs={'class': 'form-select'}),
-            'fecha_estimada_llegada': forms.DateTimeInput(attrs={
-                'class': 'form-control',
-                'type': 'datetime-local'
-            }),
-            'notas': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '3'
-            }),
-        }
-        labels = {
-            'cantidad_recibida': 'Cantidad Recibida',
-            'precio_real': 'Precio Real',
-            'estado': 'Estado',
-            'prioridad': 'Prioridad',
-            'fecha_estimada_llegada': 'Fecha Estimada de Llegada',
-            'notas': 'Notas',
-        }
-
-class StockBajoForm(forms.Form):
-    """Formulario para generar reabastecimientos automáticos por stock bajo"""
-    stock_minimo = forms.IntegerField(
-        min_value=1,
-        initial=50,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: 50'
-        }),
-        label='Stock Mínimo'
-    )
-    cantidad_a_solicitar = forms.IntegerField(
-        min_value=1,
-        initial=200,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: 200'
-        }),
-        label='Cantidad a Solicitar por Defecto'
-    )
-    proveedor_default = forms.CharField(
-        max_length=100,
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Proveedor por defecto'
-        }),
-        label='Proveedor por Defecto'
-    )
-
-class TipoMonoForm(forms.ModelForm):
-    class Meta:
-        model = TipoMono
-        fields = ['nombre', 'descripcion', 'precio_venta_sugerido', 'tiempo_produccion_minutos']
-        widgets = {
-            'nombre': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: Moño Básico'
-            }),
-            'descripcion': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '3',
-                'placeholder': 'Descripción del tipo de moño...'
-            }),
-            'precio_venta_sugerido': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'step': '0.01',
-                'placeholder': '0.00'
-            }),
-            'tiempo_produccion_minutos': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'placeholder': '30'
-            }),
-        }
-        labels = {
-            'nombre': 'Nombre del Tipo de Moño',
-            'descripcion': 'Descripción',
-            'precio_venta_sugerido': 'Precio de Venta Sugerido',
-            'tiempo_produccion_minutos': 'Tiempo de Producción (minutos)',
-        }
-
-class SimuladorForm(forms.Form):
-    tipo_mono = forms.ModelChoiceField(
-        queryset=TipoMono.objects.filter(activo=True),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Tipo de Moño'
-    )
-    cantidad_a_producir = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'min': '1',
-            'placeholder': '1'
-        }),
-        label='Cantidad a Producir'
-    )
-    precio_venta_unitario = forms.DecimalField(
-        min_value=0.01,
-        decimal_places=2,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'min': '0.01',
-            'step': '0.01',
-            'placeholder': '0.00'
-        }),
-        label='Precio de Venta por Unidad'
-    )
-    guardar_simulacion = forms.BooleanField(
-        required=False,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        label='Guardar esta simulación'
-    )
-    nombre_simulacion = forms.CharField(
-        max_length=150,
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Nombre para la simulación (opcional)'
-        }),
-        label='Nombre de la Simulación'
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Pre-llenar precio con el sugerido si se selecciona un tipo
-        if self.initial.get('tipo_mono'):
-            try:
-                tipo = TipoMono.objects.get(id=self.initial['tipo_mono'])
-                self.initial['precio_venta_unitario'] = tipo.precio_venta_sugerido
-            except TipoMono.DoesNotExist:
-                pass
-
-class RecetaProduccionForm(forms.ModelForm):
-    class Meta:
-        model = RecetaProduccion
-        fields = ['insumo', 'cantidad_necesaria', 'es_opcional', 'notas']
-        widgets = {
-            'insumo': forms.Select(attrs={'class': 'form-select'}),
-            'cantidad_necesaria': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0.01',
-                'step': '0.01'
-            }),
-            'es_opcional': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'notas': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '2'
-            }),
-        }
-        labels = {
-            'insumo': 'Material/Insumo',
-            'cantidad_necesaria': 'Cantidad Necesaria',
-            'es_opcional': 'Es Opcional',
-            'notas': 'Notas',
-        }
 
 class MaterialForm(forms.ModelForm):
     class Meta:
         model = Material
-        fields = ['codigo', 'nombre', 'descripcion', 'tipo_material', 'unidad_base', 
-                 'factor_conversion', 'cantidad_disponible', 'precio_compra', 'categoria']
+        fields = [
+            'codigo', 'nombre', 'descripcion', 'tipo_material', 
+            'unidad_base', 'factor_conversion', 'precio_compra', 'categoria'
+        ]
+        widgets = {
+            'codigo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: M001'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Listón rojo'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'tipo_material': forms.Select(attrs={'class': 'form-control'}),
+            'unidad_base': forms.Select(attrs={'class': 'form-control'}),
+            'factor_conversion': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'precio_compra': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'categoria': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: listón, piedra, adorno'}),
+        }
+    
+    def clean_codigo(self):
+        codigo = self.cleaned_data.get('codigo', '').upper()
+        
+        # Verificar que el código no exista (excepto en edición)
+        existing = Material.objects.filter(codigo=codigo)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise forms.ValidationError('Ya existe un material con este código.')
+        
+        return codigo
+
+
+class MonosForm(forms.ModelForm):
+    """Formulario para crear y editar moños"""
+    
+    class Meta:
+        model = Monos
+        fields = ['codigo', 'nombre', 'descripcion', 'tipo_venta', 'precio_venta']
         widgets = {
             'codigo': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: M001'
+                'class': 'form-control', 
+                'placeholder': 'Ej: MO001'
             }),
             'nombre': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: Listón rojo'
-            }),
-            'descripcion': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '3',
-                'placeholder': 'Descripción detallada del material...'
-            }),
-            'tipo_material': forms.Select(attrs={'class': 'form-select'}),
-            'unidad_base': forms.Select(attrs={'class': 'form-select'}),
-            'factor_conversion': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'placeholder': '100'
-            }),
-            'cantidad_disponible': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'placeholder': '0'
-            }),
-            'precio_compra': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'step': '0.01',
-                'placeholder': '0.00'
-            }),
-            'categoria': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: listón, piedra, adorno'
-            }),
-        }
-        labels = {
-            'codigo': 'Código',
-            'nombre': 'Nombre del Material',
-            'descripcion': 'Descripción',
-            'tipo_material': 'Tipo de Material',
-            'unidad_base': 'Unidad Base',
-            'factor_conversion': 'Factor de Conversión',
-            'cantidad_disponible': 'Cantidad Disponible',
-            'precio_compra': 'Precio de Compra',
-            'categoria': 'Categoría',
-        }
-
-class InsumoForm(forms.ModelForm):
-    class Meta:
-        model = Insumo
-        fields = ['nombre', 'descripcion', 'cantidad_por_unidad', 'unidad_consumo', 'material']
-        widgets = {
-            'nombre': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control', 
                 'placeholder': 'Ej: Moño básico'
             }),
             'descripcion': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': '3',
-                'placeholder': 'Descripción del insumo...'
+                'class': 'form-control', 
+                'rows': 3,
+                'placeholder': 'Descripción del moño'
             }),
-            'cantidad_por_unidad': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'placeholder': '10'
+            'tipo_venta': forms.Select(attrs={
+                'class': 'form-control'
             }),
-            'unidad_consumo': forms.Select(attrs={'class': 'form-select'}),
-            'material': forms.Select(attrs={'class': 'form-select'}),
+            'precio_venta': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.01',
+                'placeholder': 'Precio de venta'
+            }),
         }
-        labels = {
-            'nombre': 'Nombre del Insumo',
-            'descripcion': 'Descripción',
-            'cantidad_por_unidad': 'Cantidad por Unidad',
-            'unidad_consumo': 'Unidad de Consumo',
-            'material': 'Material Asociado',
-        }
+    
+    def clean_codigo(self):
+        codigo = self.cleaned_data.get('codigo', '').upper()
+        
+        # Verificar que el código no exista (excepto en edición)
+        existing = Monos.objects.filter(codigo=codigo)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise forms.ValidationError('Ya existe un moño con este código.')
+        
+        return codigo
 
-class MovimientoForm(forms.ModelForm):
+
+class RecetaMonosForm(forms.ModelForm):
+    """Formulario para agregar materiales a la receta de moños"""
+    
     class Meta:
-        model = Movimiento
-        fields = ['material', 'tipo_movimiento', 'cantidad', 'detalle']
+        model = RecetaMonos
+        fields = ['material', 'cantidad_necesaria']
         widgets = {
-            'material': forms.Select(attrs={'class': 'form-select'}),
-            'tipo_movimiento': forms.Select(attrs={'class': 'form-select'}),
-            'cantidad': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': '0'
+            'material': forms.Select(attrs={
+                'class': 'form-control'
             }),
-            'detalle': forms.Textarea(attrs={
+            'cantidad_necesaria': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'rows': '3',
-                'placeholder': 'Motivo del movimiento...'
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': 'Cantidad necesaria'
             }),
         }
-        labels = {
-            'material': 'Material',
-            'tipo_movimiento': 'Tipo de Movimiento',
-            'cantidad': 'Cantidad',
-            'detalle': 'Detalle/Motivo',
-        }
-
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Personalizar help text para cantidad según tipo de movimiento
-        self.fields['cantidad'].help_text = "Para salidas, usar número positivo (se convertirá automáticamente)"
+        # Solo mostrar materiales activos
+        self.fields['material'].queryset = Material.objects.filter(activo=True).order_by('nombre')
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
+
+# Crear formset para recetas
+RecetaMonosFormSet = inlineformset_factory(
+    Monos, 
+    RecetaMonos,
+    form=RecetaMonosForm,
+    extra=1,
+    can_delete=True,
+    min_num=1,
+    validate_min=True
+)
+
+
+class SimulacionForm(forms.ModelForm):
+    """Formulario para ejecutar simulaciones de producción"""
+    
+    class Meta:
+        model = Simulacion
+        fields = ['monos', 'cantidad_producir', 'tipo_venta', 'precio_venta_unitario']
+        widgets = {
+            'monos': forms.Select(attrs={
+                'class': 'form-control',
+                'id': 'id_monos'
+            }),
+            'cantidad_producir': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': 'Cantidad a producir',
+                'id': 'id_cantidad_producir'
+            }),
+            'tipo_venta': forms.Select(attrs={
+                'class': 'form-control',
+                'id': 'id_tipo_venta'
+            }),
+            'precio_venta_unitario': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': 'Precio de venta',
+                'id': 'id_precio_venta'
+            }),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Solo mostrar moños activos
+        self.fields['monos'].queryset = Monos.objects.filter(activo=True).order_by('nombre')
         
-        # Convertir salidas a negativo automáticamente
-        if instance.tipo_movimiento == 'salida' and instance.cantidad > 0:
-            instance.cantidad = -instance.cantidad
+        # Si hay un moño seleccionado, pre-cargar su precio
+        if self.instance.pk and self.instance.monos:
+            self.fields['precio_venta_unitario'].initial = self.instance.monos.precio_venta
+            self.fields['tipo_venta'].initial = self.instance.monos.tipo_venta
+
+
+class SimulacionBusquedaForm(forms.Form):
+    """Formulario para buscar y filtrar simulaciones"""
+    
+    monos = forms.ModelChoiceField(
+        queryset=Monos.objects.filter(activo=True).order_by('nombre'),
+        required=False,
+        empty_label="Todos los moños",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    fecha_desde = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    fecha_hasta = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    necesita_compras = forms.ChoiceField(
+        choices=[('', 'Todas'), ('true', 'Necesitan compra'), ('false', 'No necesitan compra')],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+
+class EntradaMaterialForm(forms.Form):
+    """Formulario para registrar entrada/reabastecimiento de materiales"""
+    
+    material = forms.ModelChoiceField(
+        queryset=Material.objects.filter(activo=True).order_by('nombre'),
+        empty_label="Seleccionar material",
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'id': 'id_material_entrada'
+        }),
+        help_text="Material a reabastecer"
+    )
+    
+    cantidad_comprada = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=0.01,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0.01',
+            'placeholder': 'Cantidad comprada',
+            'id': 'id_cantidad_comprada'
+        }),
+        help_text="Cantidad comprada en su presentación original (paquetes/rollos)"
+    )
+    
+    # El precio se calculará automáticamente: cantidad_comprada * precio_compra del material
+    precio_compra_total = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,  # No requerido porque se calcula automáticamente
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'readonly': 'readonly',
+            'placeholder': 'Se calculará automáticamente',
+            'id': 'id_precio_compra'
+        }),
+        help_text="Se calcula automáticamente: cantidad × precio unitario del material"
+    )
+    
+    detalle = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Compra proveedor ABC',
+            'id': 'id_detalle_entrada'
+        }),
+        help_text="Descripción opcional del reabastecimiento"
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Cargar información del material seleccionado via AJAX
         
-        if commit:
-            instance.save()
+    def clean(self):
+        cleaned_data = super().clean()
+        material = cleaned_data.get('material')
+        cantidad_comprada = cleaned_data.get('cantidad_comprada')
+        
+        if material and cantidad_comprada:
+            # Calcular precio automáticamente basado en el precio de compra del material
+            precio_compra_total = cantidad_comprada * material.precio_compra
+            cleaned_data['precio_compra_total'] = precio_compra_total
             
-            # Actualizar el stock del material
-            if instance.tipo_movimiento in ['entrada', 'salida']:
-                material = instance.material
-                material.cantidad_disponible += instance.cantidad
-                material.save()
+            # Calcular conversiones automáticamente
+            cleaned_data['cantidad_en_unidad_base'] = cantidad_comprada * material.factor_conversion
+            cleaned_data['costo_unitario'] = precio_compra_total / (cantidad_comprada * material.factor_conversion)
+            cleaned_data['nuevo_stock'] = material.cantidad_disponible + cleaned_data['cantidad_en_unidad_base']
+            
+        return cleaned_data
+
+
+class SalidaMaterialForm(forms.Form):
+    """Formulario para registrar salida normal de materiales"""
+    
+    material = forms.ModelChoiceField(
+        queryset=Material.objects.filter(activo=True).order_by('nombre'),
+        empty_label="Seleccionar material",
+        widget=forms.Select(attrs={
+            'class': 'form-control'
+        }),
+        help_text="Material del que se realizará la salida"
+    )
+    
+    cantidad_utilizada = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=0.01,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0.01',
+            'placeholder': 'Cantidad utilizada'
+        }),
+        help_text="Cantidad utilizada en unidad base del material"
+    )
+    
+    destino = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Producción, Venta, Uso interno'
+        }),
+        help_text="Destino o propósito de la salida"
+    )
+    
+    detalle = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Información adicional sobre la salida (opcional)'
+        }),
+        help_text="Detalles adicionales sobre la salida (opcional)"
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        material = cleaned_data.get('material')
+        cantidad_retirar = cleaned_data.get('cantidad_retirar')
+        
+        if material and cantidad_retirar:
+            # Verificar stock disponible
+            if cantidad_retirar > material.cantidad_disponible:
+                raise forms.ValidationError(
+                    f"No hay suficiente stock. Disponible: {material.cantidad_disponible} {material.unidad_base}, "
+                    f"solicitado: {cantidad_retirar} {material.unidad_base}"
+                )
+            
+            cleaned_data['nuevo_stock'] = material.cantidad_disponible - cantidad_retirar
+            cleaned_data['costo_total_movimiento'] = cantidad_retirar * material.costo_unitario
+            
+        return cleaned_data
+
+
+class MovimientoFiltroForm(forms.Form):
+    """Formulario para filtrar el historial de movimientos"""
+    
+    material = forms.ModelChoiceField(
+        queryset=Material.objects.filter(activo=True).order_by('nombre'),
+        required=False,
+        empty_label="Todos los materiales",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    tipo_movimiento = forms.ChoiceField(
+        choices=[('', 'Todos los tipos')] + Movimiento.TIPO_MOVIMIENTO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    fecha_desde = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
+    fecha_hasta = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+
+
+class EntradaDesdeSimulacionForm(forms.Form):
+    """Formulario para entrada de materiales desde simulación"""
+    
+    def __init__(self, simulacion=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.simulacion = simulacion
+        
+        if simulacion:
+            # Crear campos dinámicos para cada material faltante
+            for detalle in simulacion.detallesimulacion_set.all():
+                material = detalle.material
+                cantidad_necesaria = detalle.cantidad_requerida
                 
-        return instance
+                if material.cantidad_disponible < cantidad_necesaria:
+                    cantidad_faltante = cantidad_necesaria - material.cantidad_disponible
+                    
+                    # Campo para cantidad a comprar
+                    self.fields[f'cantidad_{material.id}'] = forms.DecimalField(
+                        label=f'{material.nombre} (Falta: {cantidad_faltante} {material.unidad_base})',
+                        initial=cantidad_faltante,
+                        min_value=0,
+                        max_digits=10,
+                        decimal_places=2,
+                        widget=forms.NumberInput(attrs={
+                            'class': 'form-control',
+                            'step': '0.01'
+                        }),
+                        help_text=f'Stock actual: {material.cantidad_disponible} {material.unidad_base}'
+                    )
+                    
+                    # Campo para precio de compra (opcional)
+                    self.fields[f'precio_{material.id}'] = forms.DecimalField(
+                        label=f'Precio total de compra para {material.nombre}',
+                        required=False,
+                        min_value=0,
+                        max_digits=10,
+                        decimal_places=2,
+                        widget=forms.NumberInput(attrs={
+                            'class': 'form-control',
+                            'step': '0.01',
+                            'placeholder': f'Precio sugerido: ${(cantidad_faltante * material.costo_unitario):.2f}'
+                        }),
+                        help_text='Dejar vacío para usar precio actual del material'
+                    )
+
+
+class SalidaDesdeSimulacionForm(forms.Form):
+    """Formulario para confirmar salidas desde simulación"""
+    
+    def __init__(self, simulacion=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.simulacion = simulacion
+        
+        if simulacion:
+            # Crear campos de confirmación para cada material
+            for detalle in simulacion.detallesimulacion_set.all():
+                material = detalle.material
+                cantidad_necesaria = detalle.cantidad_requerida
+                
+                self.fields[f'confirmar_{material.id}'] = forms.BooleanField(
+                    label=f'{material.nombre}: {cantidad_necesaria} {material.unidad_base}',
+                    initial=True,
+                    required=False,
+                    widget=forms.CheckboxInput(attrs={
+                        'class': 'form-check-input'
+                    }),
+                    help_text=f'Stock disponible: {material.cantidad_disponible} {material.unidad_base}'
+                )
+                
+                # Campo para observaciones específicas del material
+                self.fields[f'observacion_{material.id}'] = forms.CharField(
+                    label=f'Observaciones para {material.nombre}',
+                    required=False,
+                    max_length=255,
+                    widget=forms.TextInput(attrs={
+                        'class': 'form-control',
+                        'placeholder': 'Observaciones específicas (opcional)'
+                    })
+                )
+
+
+class MovimientoEfectivoForm(forms.ModelForm):
+    """Formulario para registrar movimientos de efectivo manuales"""
+    
+    class Meta:
+        model = MovimientoEfectivo
+        fields = ['concepto', 'tipo_movimiento', 'categoria', 'monto']
+        widgets = {
+            'concepto': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Descripción del movimiento (ej: Pago de renta)'
+            }),
+            'tipo_movimiento': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'categoria': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'monto': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': '0.00'
+            })
+        }
+        labels = {
+            'concepto': 'Descripción',
+            'tipo_movimiento': 'Tipo de Movimiento',
+            'categoria': 'Categoría',
+            'monto': 'Monto'
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtrar categorías según el tipo de movimiento
+        self.fields['categoria'].choices = [
+            ('sueldo', 'Sueldos'),
+            ('renta', 'Renta'),
+            ('servicio', 'Servicios (luz, agua, etc.)'),
+            ('otro_gasto', 'Otros Gastos'),
+            ('otro_ingreso', 'Otros Ingresos'),
+        ]
+    
+    def clean_monto(self):
+        monto = self.cleaned_data.get('monto')
+        if monto and monto <= 0:
+            raise forms.ValidationError('El monto debe ser mayor a cero.')
+        return monto
+
+
+class FiltroMovimientosEfectivoForm(forms.Form):
+    """Formulario para filtrar movimientos de efectivo"""
+    
+    fecha_inicio = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        }),
+        label='Fecha Inicio'
+    )
+    
+    fecha_fin = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        }),
+        label='Fecha Fin'
+    )
+    
+    tipo_movimiento = forms.ChoiceField(
+        choices=[('', 'Todos')] + MovimientoEfectivo.TIPO_MOVIMIENTO_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Tipo'
+    )
+    
+    categoria = forms.ChoiceField(
+        choices=[('', 'Todas')] + MovimientoEfectivo.CATEGORIA_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Categoría'
+    )
+    
+    automatico = forms.ChoiceField(
+        choices=[('', 'Todos'), ('true', 'Automático'), ('false', 'Manual')],
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Origen'
+    )
+
+
