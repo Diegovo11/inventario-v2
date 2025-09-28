@@ -93,8 +93,9 @@ WSGI_APPLICATION = 'inventario_project.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Configuración de base de datos que funciona tanto en desarrollo como en Railway
-database_url = config('DATABASE_URL', default=None)
-railway_env = config('RAILWAY_ENVIRONMENT', default=None)
+# Usar os.environ directamente para mayor confiabilidad en Railway
+database_url = os.environ.get('DATABASE_URL')
+railway_env = os.environ.get('RAILWAY_ENVIRONMENT')
 
 print(f"🔍 DEBUG: DATABASE_URL exists: {database_url is not None}")
 print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
@@ -102,6 +103,8 @@ print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
 if database_url:
     # Configuración para Railway (PostgreSQL)
     import dj_database_url
+    print(f"🔗 DATABASE_URL detectada: {database_url[:50]}...")
+    
     DATABASES = {
         'default': dj_database_url.config(
             default=database_url,
@@ -109,8 +112,9 @@ if database_url:
             conn_health_checks=True,
         )
     }
-    print(f"🚀 USANDO POSTGRESQL: {DATABASES['default'].get('HOST', 'No host')}")
+    print(f"✅ USANDO POSTGRESQL CORRECTAMENTE")
     print(f"🚀 ENGINE: {DATABASES['default'].get('ENGINE', 'No engine')}")
+    print(f"🚀 HOST: {DATABASES['default'].get('HOST', 'No host')}")
     print(f"🚀 NAME: {DATABASES['default'].get('NAME', 'No name')}")
 elif railway_env:
     # Estamos en Railway pero no hay DATABASE_URL - PROBLEMA!
@@ -125,13 +129,13 @@ elif railway_env:
     }
 else:
     # Configuración para desarrollo local (SQLite)
+    print("🔧 Usando SQLite para desarrollo local")
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-    print("🔧 Usando SQLite para desarrollo local")
 
 
 # Password validation
