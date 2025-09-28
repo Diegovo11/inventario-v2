@@ -197,10 +197,9 @@
 <!-- Template para nuevos forms de receta -->
 <div id="empty-receta-form" class="d-none">
     <div class="receta-form row align-items-end mb-3" data-form-idx="__prefix__">
-        {{ formset.empty_form.material.as_hidden }}
-        {{ formset.empty_form.cantidad_necesaria.as_hidden }}
-        {{ formset.empty_form.id.as_hidden }}
-        {{ formset.empty_form.DELETE.as_hidden }}
+        {% for hidden in formset.empty_form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
         
         <div class="col-md-5">
             <label class="form-label">Material</label>
@@ -245,8 +244,11 @@ function addRecetaForm() {
     
     formsetContainer.appendChild(newFormElement);
     
-    // Actualizar el management form
-    document.getElementById('id_recetas-TOTAL_FORMS').value = formIdx + 1;
+    // Actualizar el management form - usar el nombre correcto del formset
+    const totalFormsField = document.querySelector('input[name$="TOTAL_FORMS"]');
+    if (totalFormsField) {
+        totalFormsField.value = parseInt(totalFormsField.value) + 1;
+    }
     
     // Agregar event listeners
     addFormEventListeners(newFormElement);
@@ -287,20 +289,19 @@ function updateMaterialInfo() {
     const unitSpan = formRow.querySelector('.material-unit');
     
     if (materialSelect.value) {
-        // Aquí podrías hacer una llamada AJAX para obtener la unidad del material
-        // Por simplicidad, asumiré que tienes los datos disponibles
-        fetch(`/inventario/api/material/${materialSelect.value}/`)
-            .then(response => response.json())
-            .then(data => {
-                unitSpan.textContent = data.unidad_base;
-                updateMaterialCost.call(formRow.querySelector('input[name$="-cantidad_necesaria"]'));
-            })
-            .catch(() => {
-                unitSpan.textContent = '-';
-            });
+        // Obtener la unidad del material seleccionado desde el dropdown
+        const selectedOption = materialSelect.options[materialSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            // Por ahora usar unidades como predeterminado, se puede mejorar con AJAX
+            unitSpan.textContent = 'unidades';
+            updateMaterialCost.call(formRow.querySelector('input[name$="-cantidad_necesaria"]'));
+        }
     } else {
         unitSpan.textContent = '-';
+        const costSpan = formRow.querySelector('.material-cost');
+        costSpan.textContent = 'Costo: $0.00';
     }
+    updateCostoTotal();
 }
 
 function updateMaterialCost() {
@@ -310,12 +311,10 @@ function updateMaterialCost() {
     const costSpan = formRow.querySelector('.material-cost');
     
     if (materialSelect.value && cantidadInput.value) {
-        // Aquí harías una llamada AJAX para calcular el costo
-        // Por simplicidad, usaré un cálculo básico
         const cantidad = parseFloat(cantidadInput.value) || 0;
-        // Asumiendo que tienes el costo unitario disponible
-        // En una implementación real, obtendrías esto via AJAX
-        costSpan.textContent = `Costo: $${(cantidad * 0.5).toFixed(2)}`;
+        // Calcular costo básico (se puede mejorar con AJAX para obtener precio real)
+        const costoEstimado = cantidad * 1.0; // $1 por unidad como ejemplo
+        costSpan.textContent = `Costo: $${costoEstimado.toFixed(2)}`;
     } else {
         costSpan.textContent = 'Costo: $0.00';
     }

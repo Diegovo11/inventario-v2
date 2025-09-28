@@ -200,13 +200,32 @@ def agregar_monos(request):
         form = MonosForm(request.POST)
         formset = RecetaMonosFormSet(request.POST)
         
-        if form.is_valid() and formset.is_valid():
-            monos = form.save()
-            formset.instance = monos
-            formset.save()
+        # Debug: mostrar errores si los hay
+        if not form.is_valid():
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'Error en {field}: {error}')
+        
+        if not formset.is_valid():
+            for form_errors in formset.errors:
+                for field, errors in form_errors.items():
+                    for error in errors:
+                        messages.error(request, f'Error en receta - {field}: {error}')
             
-            messages.success(request, f'Moño {monos.codigo} agregado exitosamente.')
-            return redirect('inventario:detalle_monos', monos_id=monos.id)
+            if formset.non_form_errors():
+                for error in formset.non_form_errors():
+                    messages.error(request, f'Error general en recetas: {error}')
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                monos = form.save()
+                formset.instance = monos
+                formset.save()
+                
+                messages.success(request, f'Moño {monos.codigo} agregado exitosamente.')
+                return redirect('inventario:detalle_monos', monos_id=monos.id)
+            except Exception as e:
+                messages.error(request, f'Error al guardar: {str(e)}')
     else:
         form = MonosForm()
         formset = RecetaMonosFormSet()
@@ -230,12 +249,31 @@ def editar_monos(request, monos_id):
         form = MonosForm(request.POST, instance=monos)
         formset = RecetaMonosFormSet(request.POST, instance=monos)
         
-        if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
+        # Debug: mostrar errores si los hay
+        if not form.is_valid():
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'Error en {field}: {error}')
+        
+        if not formset.is_valid():
+            for form_errors in formset.errors:
+                for field, errors in form_errors.items():
+                    for error in errors:
+                        messages.error(request, f'Error en receta - {field}: {error}')
             
-            messages.success(request, f'Moño {monos.codigo} actualizado exitosamente.')
-            return redirect('inventario:detalle_monos', monos_id=monos.id)
+            if formset.non_form_errors():
+                for error in formset.non_form_errors():
+                    messages.error(request, f'Error general en recetas: {error}')
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                form.save()
+                formset.save()
+                
+                messages.success(request, f'Moño {monos.codigo} actualizado exitosamente.')
+                return redirect('inventario:detalle_monos', monos_id=monos.id)
+            except Exception as e:
+                messages.error(request, f'Error al actualizar: {str(e)}')
     else:
         form = MonosForm(instance=monos)
         formset = RecetaMonosFormSet(instance=monos)
