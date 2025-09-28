@@ -103,6 +103,8 @@ if config('DATABASE_URL', default=None):
             conn_health_checks=True,
         )
     }
+    # Log para confirmar que estamos usando PostgreSQL
+    print(f"🚀 Usando PostgreSQL en Railway: {DATABASES['default']['HOST']}")
 else:
     # Configuración para desarrollo local (SQLite)
     DATABASES = {
@@ -111,6 +113,7 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+    print("🔧 Usando SQLite para desarrollo local")
 
 
 # Password validation
