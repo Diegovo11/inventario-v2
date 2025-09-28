@@ -198,7 +198,12 @@ def agregar_monos(request):
     """Vista para agregar un nuevo moño"""
     if request.method == 'POST':
         form = MonosForm(request.POST)
-        formset = RecetaMonosFormSet(request.POST)
+        
+        # Debug: Imprimir los datos del POST para ver qué estamos recibiendo
+        print("POST data:", dict(request.POST))
+        
+        # Para un nuevo objeto, crear el formset sin instancia inicialmente
+        formset = RecetaMonosFormSet(request.POST, instance=None)
         
         # Debug: mostrar errores si los hay
         if not form.is_valid():
@@ -207,6 +212,8 @@ def agregar_monos(request):
                     messages.error(request, f'Error en {field}: {error}')
         
         if not formset.is_valid():
+            print("Formset errors:", formset.errors)
+            print("Formset non form errors:", formset.non_form_errors())
             for form_errors in formset.errors:
                 for field, errors in form_errors.items():
                     for error in errors:
@@ -226,9 +233,10 @@ def agregar_monos(request):
                 return redirect('inventario:detalle_monos', monos_id=monos.id)
             except Exception as e:
                 messages.error(request, f'Error al guardar: {str(e)}')
+                print("Exception:", str(e))
     else:
         form = MonosForm()
-        formset = RecetaMonosFormSet()
+        formset = RecetaMonosFormSet(instance=None)
     
     context = {
         'form': form,

@@ -229,7 +229,7 @@
 
 {% block extra_js %}
 <script>
-let formIdx = {{ formset.total_form_count }};
+let formIdx = parseInt('{{ formset.total_form_count }}') || 0;
 
 function addRecetaForm() {
     const emptyForm = document.getElementById('empty-receta-form').innerHTML;
