@@ -1,0 +1,340 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }} - Inventario{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lista-card {
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .lista-card:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    }
+    
+    .lista-card.selected {
+        border-color: #0d6efd;
+        background-color: #f8f9ff;
+    }
+    
+    .material-row {
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .material-row:last-child {
+        border-bottom: none;
+    }
+    
+    .cantidad-badge {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .costo-total {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #198754;
+    }
+    
+    .sin-materiales {
+        color: #6c757d;
+        font-style: italic;
+        text-align: center;
+        padding: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-shopping-list me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Consolida materiales de múltiples listas
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- Sección de Listas Disponibles -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Listas de Producción Disponibles
+                        </h5>
+                        <span class="badge bg-primary">{{ listas_disponibles.count }}</span>
+                    </div>
+                    <div class="card-body">
+                        {% if listas_disponibles %}
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="seleccionarTodas()">
+                                    <i class="fas fa-check-square me-1"></i>
+                                    Seleccionar Todas
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="limpiarSeleccion()">
+                                    <i class="fas fa-times me-1"></i>
+                                    Limpiar
+                                </button>
+                            </div>
+                            
+                            <div class="lista-container" style="max-height: 400px; overflow-y: auto;">
+                                {% for lista in listas_disponibles %}
+                                    <div class="lista-card p-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input lista-checkbox" type="checkbox" 
+                                                   name="listas_seleccionadas" value="{{ lista.id }}" 
+                                                   id="lista_{{ lista.id }}"
+                                                   {% if lista.id|stringformat:"s" in request.POST.listas_seleccionadas %}checked{% endif %}>
+                                            <label class="form-check-label w-100" for="lista_{{ lista.id }}">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <h6 class="mb-1">{{ lista.nombre }}</h6>
+                                                        <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
+                                                        <div class="mt-2">
+                                                            <span class="badge bg-{% if lista.estado == 'borrador' %}secondary{% else %}warning{% endif %}">
+                                                                {{ lista.get_estado_display }}
+                                                            </span>
+                                                            <small class="text-muted ms-2">
+                                                                {{ lista.detalles_monos.count }} tipo{{ lista.detalles_monos.count|pluralize }}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end">
+                                                        <small class="text-muted d-block">{{ lista.fecha_creacion|date:"d/m/Y" }}</small>
+                                                        {% if lista.ganancia_estimada %}
+                                                            <small class="text-success fw-bold">${{ lista.ganancia_estimada|floatformat:2 }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mt-3 d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-calculator me-2"></i>
+                                    Generar Lista de Compras
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="sin-materiales">
+                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                <h5>No hay listas disponibles</h5>
+                                <p class="mb-0">Crea una nueva lista de producción para generar una lista de compras.</p>
+                                <a href="{% url 'crear_lista_produccion' %}" class="btn btn-primary mt-3">
+                                    <i class="fas fa-plus me-1"></i>
+                                    Crear Lista de Producción
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de Lista de Compras Consolidada -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shopping-cart me-2"></i>
+                            Lista de Compras Consolidada
+                        </h5>
+                        {% if materiales_consolidados %}
+                            <span class="badge bg-success">{{ materiales_consolidados|length }} materiales</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if materiales_consolidados %}
+                            <!-- Resumen de Listas Seleccionadas -->
+                            <div class="mb-4">
+                                <h6 class="text-muted mb-2">Listas Incluidas:</h6>
+                                {% for lista in listas_seleccionadas %}
+                                    <span class="badge bg-info me-1 mb-1">{{ lista.nombre }}</span>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Lista de Materiales -->
+                            <div class="materiales-container" style="max-height: 400px; overflow-y: auto;">
+                                {% for material_data in materiales_consolidados %}
+                                    <div class="material-row p-3">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-6">
+                                                <h6 class="mb-1">{{ material_data.material.nombre }}</h6>
+                                                <small class="text-muted">{{ material_data.material.categoria.nombre|default:"Sin categoría" }}</small>
+                                            </div>
+                                            <div class="col-md-3 text-center">
+                                                <div class="mb-1">
+                                                    <span class="badge bg-primary cantidad-badge">
+                                                        Necesario: {{ material_data.cantidad_necesaria|floatformat:2 }}
+                                                    </span>
+                                                </div>
+                                                <div class="mb-1">
+                                                    <span class="badge bg-success cantidad-badge">
+                                                        Disponible: {{ material_data.cantidad_disponible|floatformat:2 }}
+                                                    </span>
+                                                </div>
+                                                {% if material_data.cantidad_faltante > 0 %}
+                                                    <div>
+                                                        <span class="badge bg-warning cantidad-badge">
+                                                            Comprar: {{ material_data.cantidad_faltante|floatformat:2 }}
+                                                        </span>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-3 text-end">
+                                                {% if material_data.cantidad_faltante > 0 %}
+                                                    <div class="costo-total">
+                                                        ${{ material_data.costo_total|floatformat:2 }}
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        ${{ material_data.precio_unitario|floatformat:2 }}/{{ material_data.material.unidad_medida }}
+                                                    </small>
+                                                {% else %}
+                                                    <span class="text-success fw-bold">
+                                                        <i class="fas fa-check-circle me-1"></i>
+                                                        Suficiente
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Resumen Total -->
+                            <div class="border-top pt-3 mt-3">
+                                {% with costo_total=materiales_consolidados|dictsort:"costo_total" %}
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted mb-1">Costo Total de Compras:</h6>
+                                        </div>
+                                        <div class="col-md-6 text-end">
+                                            <h4 class="costo-total mb-0">
+                                                ${% widthratio materiales_consolidados 1 1 as temp %}
+                                                {% for material in materiales_consolidados %}
+                                                    {% if forloop.first %}{{ material.costo_total|add:0|floatformat:2 }}{% else %}{% endif %}
+                                                {% endfor %}
+                                            </h4>
+                                        </div>
+                                    </div>
+                                {% endwith %}
+                            </div>
+
+                            <!-- Acción de Confirmar Compra -->
+                            <div class="d-grid mt-3">
+                                <button type="submit" name="confirmar_compra" class="btn btn-success">
+                                    <i class="fas fa-check me-2"></i>
+                                    Marcar como Comprado
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="sin-materiales">
+                                <i class="fas fa-shopping-cart fa-3x mb-3 d-block"></i>
+                                <h5>Selecciona listas para generar</h5>
+                                <p class="mb-0">Marca las casillas de las listas de producción para consolidar sus materiales.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Funcionalidad de selección múltiple
+    const checkboxes = document.querySelectorAll('.lista-checkbox');
+    const cards = document.querySelectorAll('.lista-card');
+    
+    // Actualizar apariencia de cards al cambiar checkbox
+    checkboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            const card = this.closest('.lista-card');
+            if (this.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+        
+        // Aplicar estado inicial
+        if (checkbox.checked) {
+            checkbox.closest('.lista-card').classList.add('selected');
+        }
+    });
+    
+    // Funciones globales para los botones
+    window.seleccionarTodas = function() {
+        checkboxes.forEach(function(checkbox) {
+            checkbox.checked = true;
+            checkbox.closest('.lista-card').classList.add('selected');
+        });
+    };
+    
+    window.limpiarSeleccion = function() {
+        checkboxes.forEach(function(checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('.lista-card').classList.remove('selected');
+        });
+    };
+    
+    // Calcular costo total dinámicamente
+    function calcularCostoTotal() {
+        const materiales = document.querySelectorAll('.material-row');
+        let costoTotal = 0;
+        
+        materiales.forEach(function(material) {
+            const costoElement = material.querySelector('.costo-total');
+            if (costoElement) {
+                const costo = parseFloat(costoElement.textContent.replace('$', '').replace(',', ''));
+                if (!isNaN(costo)) {
+                    costoTotal += costo;
+                }
+            }
+        });
+        
+        // Actualizar display del costo total si existe
+        const costoTotalElement = document.querySelector('.border-top .costo-total');
+        if (costoTotalElement && materiales.length > 0) {
+            costoTotalElement.textContent = '$' + costoTotal.toFixed(2);
+        }
+    }
+    
+    // Ejecutar cálculo al cargar
+    calcularCostoTotal();
+});
+</script>
+{% endblock %}

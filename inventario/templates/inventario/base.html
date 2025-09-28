@@ -245,6 +245,11 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'lista_de_compras' %}active{% endif %}" href="{% url 'inventario:lista_de_compras' %}">
+                                <i class="fas fa-shopping-list me-2"></i>Lista de Compras
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'listas_produccion' %}active{% endif %}" href="{% url 'inventario:listas_produccion' %}">
                                 <i class="fas fa-clipboard-list me-2"></i>Listas de Producción
                             </a>

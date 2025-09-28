@@ -779,6 +779,88 @@ def calcular_costos_estimados(lista_produccion):
     lista_produccion.ganancia_estimada = ganancia_estimada - costo_total
 
 
+@login_required
+def lista_de_compras(request):
+    """Vista para generar lista consolidada de compras"""
+    
+    # Obtener listas de producción disponibles para compra
+    listas_disponibles = ListaProduccion.objects.filter(
+        usuario=request.user,
+        estado__in=['borrador', 'pendiente_compra']
+    ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material')
+    
+    # Procesar selección de listas si es POST
+    materiales_consolidados = []
+    listas_seleccionadas = []
+    
+    if request.method == 'POST':
+        listas_ids = request.POST.getlist('listas_seleccionadas')
+        if listas_ids:
+            listas_seleccionadas = ListaProduccion.objects.filter(
+                id__in=listas_ids,
+                usuario=request.user
+            )
+            
+            # Consolidar materiales de las listas seleccionadas
+            materiales_consolidados = consolidar_materiales_listas(listas_seleccionadas)
+            
+            # Si se confirma la compra, actualizar estados
+            if 'confirmar_compra' in request.POST:
+                for lista in listas_seleccionadas:
+                    lista.estado = 'comprado'
+                    lista.save()
+                
+                messages.success(request, f'Se han marcado {len(listas_seleccionadas)} listas como compradas.')
+                return redirect('lista_de_compras')
+    
+    context = {
+        'listas_disponibles': listas_disponibles,
+        'listas_seleccionadas': listas_seleccionadas,
+        'materiales_consolidados': materiales_consolidados,
+        'titulo': 'Lista de Compras'
+    }
+    
+    return render(request, 'inventario/lista_de_compras.html', context)
+
+
+def consolidar_materiales_listas(listas_produccion):
+    """Consolida materiales necesarios de múltiples listas de producción"""
+    
+    materiales_consolidados = {}
+    
+    for lista in listas_produccion:
+        for resumen in lista.resumen_materiales.all():
+            material_id = resumen.material.id
+            
+            if material_id in materiales_consolidados:
+                materiales_consolidados[material_id]['cantidad_necesaria'] += resumen.cantidad_necesaria
+                materiales_consolidados[material_id]['cantidad_faltante'] += resumen.cantidad_faltante
+            else:
+                materiales_consolidados[material_id] = {
+                    'material': resumen.material,
+                    'cantidad_necesaria': resumen.cantidad_necesaria,
+                    'cantidad_disponible': resumen.cantidad_disponible,
+                    'cantidad_faltante': resumen.cantidad_faltante,
+                    'precio_unitario': resumen.material.precio_compra / resumen.material.factor_conversion if resumen.material.precio_compra > 0 else 0,
+                }
+    
+    # Recalcular cantidad faltante con stock actual
+    for material_data in materiales_consolidados.values():
+        material = material_data['material']
+        cantidad_necesaria = material_data['cantidad_necesaria']
+        cantidad_disponible = material.cantidad_disponible
+        
+        material_data['cantidad_disponible'] = cantidad_disponible
+        material_data['cantidad_faltante'] = max(0, cantidad_necesaria - cantidad_disponible)
+        material_data['costo_total'] = material_data['precio_unitario'] * material_data['cantidad_faltante']
+    
+    # Convertir a lista ordenada por nombre de material
+    return sorted(
+        materiales_consolidados.values(), 
+        key=lambda x: x['material'].nombre
+    )
+
+
 def ejecutar_simulacion(data, usuario):
     """
     Función principal para ejecutar simulación de producción
