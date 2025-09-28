@@ -93,18 +93,36 @@ WSGI_APPLICATION = 'inventario_project.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Configuración de base de datos que funciona tanto en desarrollo como en Railway
-if config('DATABASE_URL', default=None):
+database_url = config('DATABASE_URL', default=None)
+railway_env = config('RAILWAY_ENVIRONMENT', default=None)
+
+print(f"🔍 DEBUG: DATABASE_URL exists: {database_url is not None}")
+print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
+
+if database_url:
     # Configuración para Railway (PostgreSQL)
     import dj_database_url
     DATABASES = {
         'default': dj_database_url.config(
-            default=config('DATABASE_URL'),
+            default=database_url,
             conn_max_age=600,
             conn_health_checks=True,
         )
     }
-    # Log para confirmar que estamos usando PostgreSQL
-    print(f"🚀 Usando PostgreSQL en Railway: {DATABASES['default']['HOST']}")
+    print(f"🚀 USANDO POSTGRESQL: {DATABASES['default'].get('HOST', 'No host')}")
+    print(f"🚀 ENGINE: {DATABASES['default'].get('ENGINE', 'No engine')}")
+    print(f"🚀 NAME: {DATABASES['default'].get('NAME', 'No name')}")
+elif railway_env:
+    # Estamos en Railway pero no hay DATABASE_URL - PROBLEMA!
+    print("❌ ERROR: Estamos en Railway pero no hay DATABASE_URL!")
+    print("❌ Esto causará pérdida de datos. Agrega PostgreSQL en Railway.")
+    # Usar SQLite como fallback pero con advertencia
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 else:
     # Configuración para desarrollo local (SQLite)
     DATABASES = {
