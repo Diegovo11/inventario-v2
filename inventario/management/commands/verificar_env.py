@@ -10,6 +10,17 @@ class Command(BaseCommand):
             self.style.SUCCESS('=== VERIFICACIÓN DE VARIABLES DE ENTORNO ===')
         )
         
+        # Mostrar TODAS las variables de entorno para debugging
+        self.stdout.write('\n🔍 TODAS LAS VARIABLES DISPONIBLES:')
+        all_vars = dict(os.environ)
+        for key, value in sorted(all_vars.items()):
+            if any(keyword in key.upper() for keyword in ['DATABASE', 'RAILWAY', 'POSTGRES']):
+                if 'PASSWORD' in key.upper() or 'SECRET' in key.upper():
+                    masked_value = value[:10] + '***' if len(value) > 10 else '***'
+                    self.stdout.write(f'🔑 {key}: {masked_value}')
+                else:
+                    self.stdout.write(f'📍 {key}: {value}')
+        
         # Variables importantes
         important_vars = [
             'DATABASE_URL',
