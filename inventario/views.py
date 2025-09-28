@@ -383,6 +383,12 @@ def editar_monos(request, monos_id):
     """Vista para editar un moño existente"""
     monos = get_object_or_404(Monos, id=monos_id, activo=True)
     
+    # Crear formset siempre (para el contexto)
+    if request.method == 'POST':
+        formset = RecetaMonosFormSet(request.POST, instance=monos)
+    else:
+        formset = RecetaMonosFormSet(instance=monos)
+    
     if request.method == 'POST':
         form = MonosForm(request.POST, instance=monos)
         
@@ -452,22 +458,37 @@ def editar_monos(request, monos_id):
         
         if form.is_valid() and len(recetas_con_errores) == 0 and len(recetas_validas) > 0:
             try:
-                # 1. Actualizar el moño
-                monos_actualizado = form.save()
+                from django.db import transaction
                 
-                # 2. Eliminar todas las recetas existentes y crear nuevas
-                # (Más simple que manejar actualizaciones individuales)
-                RecetaMonos.objects.filter(monos=monos_actualizado).delete()
-                
-                # 3. Crear todas las recetas nuevamente
-                recetas_guardadas = 0
-                for receta_data in recetas_validas:
-                    RecetaMonos.objects.create(
-                        monos=monos_actualizado,
-                        material=receta_data['material'],
-                        cantidad_necesaria=receta_data['cantidad']
-                    )
-                    recetas_guardadas += 1
+                with transaction.atomic():
+                    # 1. Actualizar el moño
+                    monos_actualizado = form.save()
+                    
+                    # 2. Debug: ver recetas existentes antes de eliminar
+                    recetas_existentes = RecetaMonos.objects.filter(monos=monos_actualizado)
+                    print(f"Recetas existentes antes de eliminar: {list(recetas_existentes.values_list('material_id', 'cantidad_necesaria'))}")
+                    
+                    # 3. Eliminar todas las recetas existentes
+                    eliminadas = recetas_existentes.delete()
+                    print(f"Recetas eliminadas: {eliminadas}")
+                    
+                    # 4. Verificar que no quedan recetas
+                    verificacion = RecetaMonos.objects.filter(monos=monos_actualizado).count()
+                    print(f"Recetas restantes después de eliminar: {verificacion}")
+                    
+                    if verificacion > 0:
+                        raise Exception(f"Error: Aún quedan {verificacion} recetas después de la eliminación")
+                    
+                    # 5. Crear todas las recetas nuevamente
+                    recetas_guardadas = 0
+                    for receta_data in recetas_validas:
+                        print(f"Creando receta: Material {receta_data['material'].id}, Cantidad {receta_data['cantidad']}")
+                        RecetaMonos.objects.create(
+                            monos=monos_actualizado,
+                            material=receta_data['material'],
+                            cantidad_necesaria=receta_data['cantidad']
+                        )
+                        recetas_guardadas += 1
                 
                 messages.success(request, f'Moño {monos_actualizado.codigo} actualizado exitosamente con {recetas_guardadas} material(es).')
                 return redirect('inventario:detalle_monos', monos_id=monos_actualizado.id)
@@ -477,7 +498,6 @@ def editar_monos(request, monos_id):
                 print("Exception en edición:", str(e))
     else:
         form = MonosForm(instance=monos)
-        formset = RecetaMonosFormSet(instance=monos)
     
     context = {
         'form': form,
