@@ -1,0 +1,430 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .formset-row {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f8f9fa;
+    }
+    
+    .delete-row {
+        background-color: #ffe6e6 !important;
+        opacity: 0.6;
+    }
+    
+    .btn-add-mono {
+        background: linear-gradient(45deg, #28a745, #20c997);
+        border: none;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    
+    .btn-remove-mono {
+        background: linear-gradient(45deg, #dc3545, #e83e8c);
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 12px;
+    }
+    
+    .mono-info {
+        background-color: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 5px;
+        padding: 8px;
+        margin-top: 10px;
+        font-size: 12px;
+    }
+    
+    .cantidad-input {
+        text-align: center;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-list-ul me-2"></i>{{ titulo }}
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <form method="post" id="lista-form">
+                        {% csrf_token %}
+                        
+                        <!-- Información básica de la lista -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                    <strong>Nombre de la Lista</strong>
+                                </label>
+                                {{ form.nombre }}
+                                {% if form.nombre.help_text %}
+                                    <div class="form-text">{{ form.nombre.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.descripcion.id_for_label }}" class="form-label">
+                                    <strong>Descripción (Opcional)</strong>
+                                </label>
+                                {{ form.descripcion }}
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Sección de moños -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-ribbon me-2"></i>Moños a Producir
+                            </h5>
+                            <button type="button" class="btn btn-add-mono" id="add-mono">
+                                <i class="fas fa-plus me-1"></i>Agregar Moño
+                            </button>
+                        </div>
+                        
+                        <!-- Formset de moños -->
+                        <div id="formset-container">
+                            {{ formset.management_form }}
+                            
+                            <div id="formset-forms">
+                                {% for form in formset %}
+                                    <div class="formset-row" data-form-index="{{ forloop.counter0 }}">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-4">
+                                                <label class="form-label">
+                                                    <strong>Moño</strong>
+                                                </label>
+                                                {{ form.monos }}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">
+                                                    <strong>Cantidad Pares</strong>
+                                                </label>
+                                                {{ form.cantidad_pares }}
+                                                <div class="form-text">{{ form.cantidad_pares.help_text }}</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">
+                                                    <strong>Cantidad Individuales</strong>
+                                                </label>
+                                                {{ form.cantidad_individuales }}
+                                                <div class="form-text">{{ form.cantidad_individuales.help_text }}</div>
+                                            </div>
+                                            <div class="col-md-2 text-end">
+                                                {% if formset.can_delete %}
+                                                    <button type="button" class="btn btn-remove-mono delete-form" data-form-index="{{ forloop.counter0 }}">
+                                                        <i class="fas fa-trash me-1"></i>Eliminar
+                                                    </button>
+                                                    {{ form.DELETE }}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Información del moño seleccionado -->
+                                        <div class="mono-info d-none" id="info-{{ forloop.counter0 }}">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <strong>Precio por moño:</strong> $<span class="precio-mono">0.00</span>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <strong>Total estimado:</strong> $<span class="total-estimado">0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- Resumen total -->
+                        <div class="row mt-4">
+                            <div class="col-md-12">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6>Resumen de la Lista</h6>
+                                        <div class="row text-center">
+                                            <div class="col-md-3">
+                                                <strong>Total Moños:</strong>
+                                                <div class="h4 text-primary" id="total-monos">0</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>Tipos de Moños:</strong>
+                                                <div class="h4 text-info" id="tipos-monos">0</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>Ganancia Estimada:</strong>
+                                                <div class="h4 text-success" id="ganancia-estimada">$0.00</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>Estado:</strong>
+                                                <div class="h6 text-muted">Borrador</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Botones de acción -->
+                        <div class="row mt-4">
+                            <div class="col-12 text-end">
+                                <a href="{% url 'inventario:historial_simulaciones' %}" class="btn btn-secondary me-2">
+                                    <i class="fas fa-arrow-left me-1"></i>Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-save me-1"></i>Crear Lista de Producción
+                                </button>
+                            </div>
+                        </div>
+                        
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template para nuevos formularios -->
+<div id="empty-form-template" class="d-none">
+    <div class="formset-row" data-form-index="__prefix__">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <label class="form-label">
+                    <strong>Moño</strong>
+                </label>
+                <!-- Aquí se insertará el select dinámicamente -->
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">
+                    <strong>Cantidad Pares</strong>
+                </label>
+                <input type="number" name="form-__prefix__-cantidad_pares" class="form-control cantidad-input" min="0" value="0" placeholder="0">
+                <div class="form-text">Cantidad de pares a producir</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">
+                    <strong>Cantidad Individuales</strong>
+                </label>
+                <input type="number" name="form-__prefix__-cantidad_individuales" class="form-control cantidad-input" min="0" value="0" placeholder="0">
+                <div class="form-text">Cantidad de moños individuales a producir</div>
+            </div>
+            <div class="col-md-2 text-end">
+                <button type="button" class="btn btn-remove-mono delete-form">
+                    <i class="fas fa-trash me-1"></i>Eliminar
+                </button>
+            </div>
+        </div>
+        
+        <div class="mono-info d-none" id="info-__prefix__">
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Precio por moño:</strong> $<span class="precio-mono">0.00</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Total estimado:</strong> $<span class="total-estimado">0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obtener valores de Django con validación
+    const formsetData = {
+        totalForms: parseInt('{{ formset.total_form_count|default:"0" }}') || 0,
+        maxForms: parseInt('{{ formset.max_num|default:"1000" }}') || 1000
+    };
+    
+    let formCount = formsetData.totalForms;
+    const maxForms = formsetData.maxForms;
+    const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
+    
+    // Validar que el input existe
+    if (!totalFormsInput) {
+        console.error('No se encontró el input TOTAL_FORMS');
+        return;
+    }
+    
+    // Datos de moños para el select dinámico
+    const moñosDisponibles = [
+        {% for mono in moños_disponibles %}
+        {
+            id: {{ mono.id }},
+            nombre: "{{ mono.nombre|escapejs }}",
+            codigo: "{{ mono.codigo|escapejs }}",
+            precio: parseFloat("{{ mono.precio_venta|floatformat:2|default:'0.00' }}")
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // Agregar nuevo formulario con validación
+    const addButton = document.getElementById('add-mono');
+    if (addButton) {
+        addButton.addEventListener('click', function() {
+            if (formCount < maxForms) {
+                const template = document.getElementById('empty-form-template');
+                const container = document.getElementById('formset-forms');
+                
+                if (!template || !container) {
+                    console.error('No se encontraron los elementos necesarios para agregar formulario');
+                    return;
+                }
+                
+                const newForm = template.innerHTML.replace(/__prefix__/g, formCount);
+                container.insertAdjacentHTML('beforeend', newForm);
+            
+            // Crear y configurar el select de moños
+            const newFormDiv = container.lastElementChild;
+            const selectContainer = newFormDiv.querySelector('.col-md-4 label').nextElementSibling;
+            
+            const select = document.createElement('select');
+            select.name = `form-${formCount}-monos`;
+            select.className = 'form-control moños-select';
+            select.innerHTML = '<option value="">Seleccionar moño</option>';
+            
+            moñosDisponibles.forEach(mono => {
+                const option = document.createElement('option');
+                option.value = mono.id;
+                option.textContent = `${mono.codigo} - ${mono.nombre}`;
+                option.setAttribute('data-precio', mono.precio);
+                select.appendChild(option);
+            });
+            
+            selectContainer.replaceWith(select);
+            
+            // Configurar eventos para el nuevo formulario
+            configurarEventosFormulario(newFormDiv, formCount);
+            
+            formCount++;
+            totalFormsInput.value = formCount;
+            
+            actualizarResumen();
+        }
+    });
+    
+    // Configurar eventos para formularios existentes
+    document.querySelectorAll('.formset-row').forEach((formDiv, index) => {
+        configurarEventosFormulario(formDiv, index);
+    });
+    
+    // Eliminar formulario
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-form')) {
+            const formDiv = e.target.closest('.formset-row');
+            formDiv.classList.add('delete-row');
+            
+            const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
+            if (deleteInput) {
+                deleteInput.checked = true;
+            } else {
+                formDiv.remove();
+            }
+            
+            actualizarResumen();
+        }
+    });
+    
+    function configurarEventosFormulario(formDiv, formIndex) {
+        const monosSelect = formDiv.querySelector('[name$="-monos"]');
+        const paresInput = formDiv.querySelector('[name$="-cantidad_pares"]');
+        const individualesInput = formDiv.querySelector('[name$="-cantidad_individuales"]');
+        const infoDiv = formDiv.querySelector('.mono-info');
+        
+        // Evento cambio de moño
+        if (monosSelect) {
+            monosSelect.addEventListener('change', function() {
+                if (this.value) {
+                    const precio = this.selectedOptions[0]?.getAttribute('data-precio') || 0;
+                    infoDiv.querySelector('.precio-mono').textContent = parseFloat(precio).toFixed(2);
+                    infoDiv.classList.remove('d-none');
+                    calcularTotalFormulario(formDiv);
+                } else {
+                    infoDiv.classList.add('d-none');
+                }
+                actualizarResumen();
+            });
+        }
+        
+        // Eventos cambio de cantidad
+        [paresInput, individualesInput].forEach(input => {
+            if (input) {
+                input.addEventListener('input', function() {
+                    calcularTotalFormulario(formDiv);
+                    actualizarResumen();
+                });
+            }
+        });
+    }
+    
+    function calcularTotalFormulario(formDiv) {
+        const precio = parseFloat(formDiv.querySelector('.precio-mono')?.textContent || 0);
+        const pares = parseInt(formDiv.querySelector('[name$="-cantidad_pares"]')?.value || 0);
+        const individuales = parseInt(formDiv.querySelector('[name$="-cantidad_individuales"]')?.value || 0);
+        
+        const total = precio * (pares + individuales);
+        const totalSpan = formDiv.querySelector('.total-estimado');
+        if (totalSpan) {
+            totalSpan.textContent = total.toFixed(2);
+        }
+    }
+    
+    function actualizarResumen() {
+        let totalMonos = 0;
+        let tiposMonos = 0;
+        let gananciaTotal = 0;
+        
+        document.querySelectorAll('.formset-row:not(.delete-row)').forEach(formDiv => {
+            const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
+            if (deleteInput && deleteInput.checked) return;
+            
+            const monosSelect = formDiv.querySelector('[name$="-monos"]');
+            if (monosSelect && monosSelect.value) {
+                const pares = parseInt(formDiv.querySelector('[name$="-cantidad_pares"]')?.value || 0);
+                const individuales = parseInt(formDiv.querySelector('[name$="-cantidad_individuales"]')?.value || 0);
+                
+                if (pares > 0 || individuales > 0) {
+                    tiposMonos++;
+                    totalMonos += pares + individuales;
+                    
+                    const totalFormulario = parseFloat(formDiv.querySelector('.total-estimado')?.textContent || 0);
+                    gananciaTotal += totalFormulario;
+                }
+            }
+        });
+        
+        // Actualizar elementos con validación
+        const totalMonosEl = document.getElementById('total-monos');
+        const tiposMonosEl = document.getElementById('tipos-monos');
+        const gananciaEl = document.getElementById('ganancia-estimada');
+        
+        if (totalMonosEl) totalMonosEl.textContent = totalMonos;
+        if (tiposMonosEl) tiposMonosEl.textContent = tiposMonos;
+        if (gananciaEl) gananciaEl.textContent = '$' + gananciaTotal.toFixed(2);
+    }
+    
+    // Inicializar resumen después de que el DOM esté listo
+    setTimeout(function() {
+        actualizarResumen();
+    }, 100);
+});
+</script>
+{% endblock %}

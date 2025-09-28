@@ -1,7 +1,8 @@
 from django import forms
 from django.forms import formset_factory, inlineformset_factory
 from django.contrib.auth.models import User
-from .models import Material, Movimiento, Monos, RecetaMonos, Simulacion, MovimientoEfectivo
+from .models import (Material, Movimiento, Monos, RecetaMonos, Simulacion, MovimientoEfectivo,
+                   ListaProduccion, DetalleListaMonos, ResumenMateriales)
 from decimal import Decimal
 
 
@@ -577,5 +578,74 @@ class FiltroMovimientosEfectivoForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label='Origen'
     )
+
+
+class ListaProduccionForm(forms.ModelForm):
+    """Formulario para crear listas de producción"""
+    
+    class Meta:
+        model = ListaProduccion
+        fields = ['nombre', 'descripcion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Lista Navidad 2024'
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Descripción opcional de la lista de producción'
+            }),
+        }
+
+
+class DetalleListaMonosForm(forms.Form):
+    """Formulario para especificar cantidades de moños en la lista"""
+    
+    monos = forms.ModelChoiceField(
+        queryset=Monos.objects.filter(activo=True),
+        widget=forms.Select(attrs={'class': 'form-control moños-select'}),
+        empty_label="Seleccionar moño"
+    )
+    cantidad_pares = forms.IntegerField(
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': '0'
+        }),
+        help_text="Cantidad de pares a producir"
+    )
+    cantidad_individuales = forms.IntegerField(
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': '0'
+        }),
+        help_text="Cantidad de moños individuales a producir"
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        cantidad_pares = cleaned_data.get('cantidad_pares', 0)
+        cantidad_individuales = cleaned_data.get('cantidad_individuales', 0)
+        
+        if cantidad_pares == 0 and cantidad_individuales == 0:
+            raise forms.ValidationError(
+                'Debe especificar al menos una cantidad (pares o individuales).'
+            )
+        
+        return cleaned_data
+
+
+# Crear formset para múltiples moños
+DetalleListaMonosFormSet = formset_factory(
+    DetalleListaMonosForm,
+    extra=1,
+    can_delete=True,
+    min_num=1,
+    validate_min=True
+)
 
 

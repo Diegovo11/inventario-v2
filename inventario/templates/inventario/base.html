@@ -240,13 +240,18 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'simulador' %}active{% endif %}" href="{% url 'inventario:simulador' %}">
-                                <i class="fas fa-calculator me-2"></i>Simulador
+                            <a class="nav-link {% if request.resolver_match.url_name == 'crear_lista_produccion' %}active{% endif %}" href="{% url 'inventario:crear_lista_produccion' %}">
+                                <i class="fas fa-list-ul me-2"></i>Crear Lista
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'historial_simulaciones' %}active{% endif %}" href="{% url 'inventario:historial_simulaciones' %}">
-                                <i class="fas fa-history me-2"></i>Historial
+                            <a class="nav-link {% if request.resolver_match.url_name == 'listas_produccion' %}active{% endif %}" href="{% url 'inventario:listas_produccion' %}">
+                                <i class="fas fa-clipboard-list me-2"></i>Listas de Producción
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'simulador' %}active{% endif %}" href="{% url 'inventario:simulador' %}">
+                                <i class="fas fa-calculator me-2"></i>Simulador (Legacy)
                             </a>
                         </li>
                     </ul>

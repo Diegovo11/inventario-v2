@@ -4,10 +4,13 @@ from django.contrib import messages
 from django.db.models import Q
 from django.http import JsonResponse
 import math
-from .models import Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, Simulacion, DetalleSimulacion, MovimientoEfectivo
+from .models import (Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, 
+                   Simulacion, DetalleSimulacion, MovimientoEfectivo, ListaProduccion,
+                   DetalleListaMonos, ResumenMateriales)
 from .forms import (MaterialForm, MonosForm, RecetaMonosFormSet, SimulacionForm, 
                    SimulacionBusquedaForm, EntradaMaterialForm, SalidaMaterialForm, MovimientoFiltroForm,
-                   EntradaDesdeSimulacionForm, SalidaDesdeSimulacionForm, MovimientoEfectivoForm, FiltroMovimientosEfectivoForm)
+                   EntradaDesdeSimulacionForm, SalidaDesdeSimulacionForm, MovimientoEfectivoForm, 
+                   FiltroMovimientosEfectivoForm, ListaProduccionForm, DetalleListaMonosFormSet)
 from django.core.paginator import Paginator
 from decimal import Decimal
 import math
@@ -613,6 +616,167 @@ def detalle_simulacion(request, simulacion_id):
     }
     
     return render(request, 'inventario/detalle_simulacion.html', context)
+
+
+# ============================================================================
+# VISTAS DE LISTAS DE PRODUCCIÓN - NUEVO SISTEMA
+# ============================================================================
+
+@login_required
+def crear_lista_produccion(request):
+    """Vista para crear una nueva lista de producción con múltiples moños"""
+    
+    if request.method == 'POST':
+        form = ListaProduccionForm(request.POST)
+        formset = DetalleListaMonosFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            try:
+                from django.db import transaction
+                
+                with transaction.atomic():
+                    # 1. Crear la lista de producción
+                    lista = form.save(commit=False)
+                    lista.usuario_creador = request.user
+                    lista.save()
+                    
+                    # 2. Procesar moños del formset
+                    moños_agregados = 0
+                    total_moños_planificados = 0
+                    
+                    for form_detalle in formset:
+                        if form_detalle.cleaned_data and not form_detalle.cleaned_data.get('DELETE', False):
+                            monos = form_detalle.cleaned_data['monos']
+                            cantidad_pares = form_detalle.cleaned_data.get('cantidad_pares', 0)
+                            cantidad_individuales = form_detalle.cleaned_data.get('cantidad_individuales', 0)
+                            
+                            if cantidad_pares > 0 or cantidad_individuales > 0:
+                                # Crear detalle de moños
+                                DetalleListaMonos.objects.create(
+                                    lista_produccion=lista,
+                                    monos=monos,
+                                    cantidad_pares=cantidad_pares,
+                                    cantidad_individuales=cantidad_individuales
+                                )
+                                moños_agregados += 1
+                                total_moños_planificados += cantidad_pares + cantidad_individuales
+                    
+                    if moños_agregados == 0:
+                        raise ValueError("Debe agregar al menos un moño a la lista")
+                    
+                    # 3. Actualizar totales de la lista
+                    lista.total_moños_planificados = total_moños_planificados
+                    
+                    # 4. Calcular materiales necesarios
+                    calcular_materiales_necesarios(lista)
+                    
+                    # 5. Calcular costos estimados
+                    calcular_costos_estimados(lista)
+                    
+                    lista.save()
+                    
+                    messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.')
+                    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                    
+            except Exception as e:
+                messages.error(request, f'Error al crear la lista: {str(e)}')
+                print(f"Error creando lista de producción: {str(e)}")
+        
+        else:
+            # Mostrar errores del formulario
+            if not form.is_valid():
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f'Error en {field}: {error}')
+            
+            # Mostrar errores del formset
+            if not formset.is_valid():
+                for i, form_errors in enumerate(formset.errors):
+                    if form_errors:
+                        for field, errors in form_errors.items():
+                            for error in errors:
+                                messages.error(request, f'Error en moño #{i+1} - {field}: {error}')
+    
+    else:
+        form = ListaProduccionForm()
+        formset = DetalleListaMonosFormSet()
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'titulo': 'Crear Lista de Producción',
+        'moños_disponibles': Monos.objects.filter(activo=True).order_by('nombre')
+    }
+    
+    return render(request, 'inventario/crear_lista_produccion.html', context)
+
+
+def calcular_materiales_necesarios(lista_produccion):
+    """Calcula los materiales necesarios para una lista de producción"""
+    
+    # Eliminar resúmenes existentes
+    ResumenMateriales.objects.filter(lista_produccion=lista_produccion).delete()
+    
+    materiales_totales = {}
+    
+    # Recorrer todos los moños de la lista
+    for detalle in lista_produccion.detalles_monos.all():
+        monos = detalle.monos
+        cantidad_total = detalle.cantidad_total_planificada
+        
+        # Obtener receta del moño
+        recetas = monos.recetas.all()
+        
+        for receta in recetas:
+            material = receta.material
+            cantidad_por_mono = receta.cantidad_necesaria
+            cantidad_total_material = cantidad_por_mono * cantidad_total
+            
+            if material.id in materiales_totales:
+                materiales_totales[material.id]['cantidad_necesaria'] += cantidad_total_material
+            else:
+                materiales_totales[material.id] = {
+                    'material': material,
+                    'cantidad_necesaria': cantidad_total_material,
+                    'cantidad_disponible': material.cantidad_disponible,
+                    'cantidad_faltante': max(0, cantidad_total_material - material.cantidad_disponible)
+                }
+    
+    # Crear registros de ResumenMateriales
+    for material_data in materiales_totales.values():
+        ResumenMateriales.objects.create(
+            lista_produccion=lista_produccion,
+            material=material_data['material'],
+            cantidad_necesaria=material_data['cantidad_necesaria'],
+            cantidad_disponible=material_data['cantidad_disponible'],
+            cantidad_faltante=material_data['cantidad_faltante']
+        )
+
+
+def calcular_costos_estimados(lista_produccion):
+    """Calcula los costos y ganancias estimadas de la lista"""
+    
+    costo_total = Decimal('0')
+    ganancia_estimada = Decimal('0')
+    
+    # Calcular costo de materiales
+    for resumen in lista_produccion.resumen_materiales.all():
+        if resumen.material.precio_compra > 0:
+            # Calcular costo unitario del material
+            costo_unitario = resumen.material.precio_compra / resumen.material.factor_conversion
+            costo_material = costo_unitario * resumen.cantidad_necesaria
+            costo_total += costo_material
+    
+    # Calcular ganancia estimada por moños
+    for detalle in lista_produccion.detalles_monos.all():
+        precio_por_mono = detalle.monos.precio_venta
+        cantidad_total = detalle.cantidad_total_planificada
+        ingreso_por_mono = precio_por_mono * cantidad_total
+        ganancia_estimada += ingreso_por_mono
+    
+    # Actualizar la lista
+    lista_produccion.costo_total_estimado = costo_total
+    lista_produccion.ganancia_estimada = ganancia_estimada - costo_total
 
 
 def ejecutar_simulacion(data, usuario):
