@@ -229,7 +229,7 @@
 
 {% block extra_js %}
 <script>
-let formIdx = parseInt('{{ formset.total_form_count }}') || 0;
+let formIdx = {{ formset.total_form_count }};
 
 function addRecetaForm() {
     const emptyForm = document.getElementById('empty-receta-form').innerHTML;
@@ -244,8 +244,8 @@ function addRecetaForm() {
     
     formsetContainer.appendChild(newFormElement);
     
-    // Actualizar el management form - usar el nombre correcto del formset
-    const totalFormsField = document.querySelector('input[name$="TOTAL_FORMS"]');
+    // Actualizar el management form - usar el nombre exacto del formset inline
+    const totalFormsField = document.querySelector('input[name="recetamonos_set-TOTAL_FORMS"]');
     if (totalFormsField) {
         totalFormsField.value = parseInt(totalFormsField.value) + 1;
     }
@@ -258,21 +258,26 @@ function addRecetaForm() {
 
 function removeRecetaForm(button) {
     const formDiv = button.closest('.receta-form');
-    const deleteField = formDiv.querySelector('input[name$="-DELETE"]');
+    const deleteField = formDiv.querySelector('input[name*="-DELETE"]');
     
     if (deleteField) {
         deleteField.value = 'on';
         formDiv.classList.add('d-none');
     } else {
         formDiv.remove();
+        // Actualizar el total de forms si se elimina completamente
+        const totalFormsField = document.querySelector('input[name="recetamonos_set-TOTAL_FORMS"]');
+        if (totalFormsField) {
+            totalFormsField.value = Math.max(0, parseInt(totalFormsField.value) - 1);
+        }
     }
     
     updateCostoTotal();
 }
 
 function addFormEventListeners(formElement) {
-    const materialSelect = formElement.querySelector('select[name$="-material"]');
-    const cantidadInput = formElement.querySelector('input[name$="-cantidad_necesaria"]');
+    const materialSelect = formElement.querySelector('select[name*="-material"]');
+    const cantidadInput = formElement.querySelector('input[name*="-cantidad_necesaria"]');
     
     if (materialSelect) {
         materialSelect.addEventListener('change', updateMaterialInfo);
@@ -294,7 +299,7 @@ function updateMaterialInfo() {
         if (selectedOption && selectedOption.value) {
             // Por ahora usar unidades como predeterminado, se puede mejorar con AJAX
             unitSpan.textContent = 'unidades';
-            updateMaterialCost.call(formRow.querySelector('input[name$="-cantidad_necesaria"]'));
+            updateMaterialCost.call(formRow.querySelector('input[name*="-cantidad_necesaria"]'));
         }
     } else {
         unitSpan.textContent = '-';
@@ -307,7 +312,7 @@ function updateMaterialInfo() {
 function updateMaterialCost() {
     const cantidadInput = this;
     const formRow = cantidadInput.closest('.receta-form');
-    const materialSelect = formRow.querySelector('select[name$="-material"]');
+    const materialSelect = formRow.querySelector('select[name*="-material"]');
     const costSpan = formRow.querySelector('.material-cost');
     
     if (materialSelect.value && cantidadInput.value) {
