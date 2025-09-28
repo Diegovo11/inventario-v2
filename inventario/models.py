@@ -23,6 +23,7 @@ class Material(models.Model):
     tipo_material = models.CharField(max_length=10, choices=TIPO_MATERIAL_CHOICES)
     unidad_base = models.CharField(max_length=10, choices=UNIDAD_BASE_CHOICES)
     factor_conversion = models.PositiveIntegerField(
+        default=1,
         help_text="Cantidad que representa 1 paquete o 1 rollo en unidad base"
     )
     cantidad_disponible = models.DecimalField(
@@ -35,6 +36,7 @@ class Material(models.Model):
     precio_compra = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
+        default=0,
         help_text="Precio total de la compra"
     )
     categoria = models.CharField(max_length=50, help_text="Ej: listón, piedra, adorno")
@@ -50,14 +52,15 @@ class Material(models.Model):
     @property
     def costo_unitario(self):
         """Calcula el costo por unidad base"""
-        if self.factor_conversion > 0:
+        if self.factor_conversion and self.precio_compra and self.factor_conversion > 0:
             return self.precio_compra / self.factor_conversion
         return 0
     
     @property
     def valor_inventario(self):
         """Calcula el valor total del inventario disponible"""
-        return self.cantidad_disponible * self.costo_unitario
+        cantidad = self.cantidad_disponible or 0
+        return cantidad * self.costo_unitario
     
     @property
     def unidad(self):
