@@ -103,17 +103,61 @@ class RecetaMonosForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Solo mostrar materiales activos
         self.fields['material'].queryset = Material.objects.filter(activo=True).order_by('nombre')
+        # Hacer campos no requeridos por defecto - la validación se hará en el formset
+        self.fields['material'].required = False
+        self.fields['cantidad_necesaria'].required = False
+    
+    def clean(self):
+        """Validación personalizada: solo validar si hay datos en el formulario"""
+        cleaned_data = super().clean()
+        material = cleaned_data.get('material')
+        cantidad_necesaria = cleaned_data.get('cantidad_necesaria')
+        
+        # Si hay datos en algún campo, ambos deben estar completos
+        if material or cantidad_necesaria:
+            if not material:
+                self.add_error('material', 'Este campo es obligatorio cuando se especifica una cantidad.')
+            if not cantidad_necesaria:
+                self.add_error('cantidad_necesaria', 'Este campo es obligatorio cuando se especifica un material.')
+        
+        return cleaned_data
 
+
+class BaseRecetaMonosFormSet(forms.BaseInlineFormSet):
+    """Formset personalizado para manejar recetas de moños"""
+    
+    def clean(self):
+        """Validación del formset completo"""
+        super().clean()
+        
+        if any(self.errors):
+            return
+        
+        # Contar formularios válidos (que tienen datos)
+        formularios_validos = 0
+        for form in self.forms:
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                material = form.cleaned_data.get('material')
+                cantidad = form.cleaned_data.get('cantidad_necesaria')
+                if material and cantidad:
+                    formularios_validos += 1
+        
+        # Debe haber al menos un material en la receta
+        if formularios_validos < 1:
+            raise forms.ValidationError(
+                'Debe agregar al menos un material a la receta del moño.'
+            )
 
 # Crear formset para recetas
 RecetaMonosFormSet = inlineformset_factory(
     Monos, 
     RecetaMonos,
     form=RecetaMonosForm,
+    formset=BaseRecetaMonosFormSet,
     extra=1,
     can_delete=True,
-    min_num=1,
-    validate_min=True
+    min_num=0,  # Cambiado a 0 para manejar validación personalizada
+    validate_min=False  # Deshabilitado para usar validación personalizada
 )
 
 
