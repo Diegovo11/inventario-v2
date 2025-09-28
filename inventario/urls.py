@@ -28,6 +28,7 @@ urlpatterns = [
     
     # Sistema de Entrada y Salida
     path('entrada-material/', views.entrada_material, name='entrada_material'),
+    path('reabastecimiento/', views.entrada_material, name='reabastecimiento_list'),  # Redirect to entrada_material
     path('salida-material/', views.salida_material, name='salida_material'),
     path('historial-movimientos/', views.historial_movimientos, name='historial_movimientos'),
     
