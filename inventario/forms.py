@@ -618,9 +618,11 @@ class DetalleListaMonosForm(forms.Form):
     )
 
 
-# Crear formset para múltiples moños
-DetalleListaMonosFormSet = formset_factory(
-    DetalleListaMonosForm,
+# Crear formset para múltiples moños (inline formset para edición)
+DetalleListaMonosFormSet = inlineformset_factory(
+    ListaProduccion,
+    DetalleListaMonos,
+    form=DetalleListaMonosForm,
     extra=1,
     can_delete=True,
     min_num=1,
