@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, Simulacion, DetalleSimulacion, MovimientoEfectivo
+from .models import (Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, 
+                   Simulacion, DetalleSimulacion, MovimientoEfectivo, ListaProduccion, 
+                   DetalleListaMonos, ResumenMateriales)
 
 
 @admin.register(Material)
@@ -356,6 +358,87 @@ class MovimientoEfectivoAdmin(admin.ModelAdmin):
             return format_html('<span class="badge badge-info">Automático</span>')
         return format_html('<span class="badge badge-secondary">Manual</span>')
     automatico_badge.short_description = "Origen"
+
+
+class DetalleListaMonosInline(admin.TabularInline):
+    model = DetalleListaMonos
+    extra = 1
+    fields = ['monos', 'cantidad_pares', 'cantidad_individuales', 'pares_producidos', 'individuales_producidos']
+    readonly_fields = ['pares_producidos', 'individuales_producidos']
+
+
+class ResumenMaterialesInline(admin.TabularInline):
+    model = ResumenMateriales
+    extra = 0
+    fields = ['material', 'cantidad_necesaria', 'cantidad_disponible', 'cantidad_faltante', 
+              'cantidad_comprada', 'cantidad_utilizada']
+    readonly_fields = ['cantidad_necesaria', 'cantidad_disponible', 'cantidad_faltante']
+
+
+@admin.register(ListaProduccion)
+class ListaProduccionAdmin(admin.ModelAdmin):
+    list_display = [
+        'nombre', 
+        'estado', 
+        'total_moños_planificados',
+        'total_moños_producidos', 
+        'costo_total_estimado',
+        'ganancia_estimada',
+        'fecha_creacion',
+        'usuario_creador'
+    ]
+    list_filter = ['estado', 'fecha_creacion', 'usuario_creador']
+    search_fields = ['nombre', 'descripcion']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'total_moños_planificados', 
+                       'total_moños_producidos', 'costo_total_estimado', 'ganancia_estimada']
+    inlines = [DetalleListaMonosInline, ResumenMaterialesInline]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'descripcion', 'estado', 'usuario_creador')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        }),
+        ('Totales Calculados', {
+            'fields': ('total_moños_planificados', 'total_moños_producidos', 
+                      'costo_total_estimado', 'ganancia_estimada'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(DetalleListaMonos)
+class DetalleListaMonosAdmin(admin.ModelAdmin):
+    list_display = [
+        'lista_produccion',
+        'monos', 
+        'cantidad_pares',
+        'cantidad_individuales',
+        'cantidad_total_planificada',
+        'pares_producidos',
+        'individuales_producidos',
+        'cantidad_total_producida'
+    ]
+    list_filter = ['lista_produccion__estado', 'monos']
+    search_fields = ['lista_produccion__nombre', 'monos__nombre']
+
+
+@admin.register(ResumenMateriales)
+class ResumenMaterialesAdmin(admin.ModelAdmin):
+    list_display = [
+        'lista_produccion',
+        'material',
+        'cantidad_necesaria',
+        'cantidad_disponible', 
+        'cantidad_faltante',
+        'cantidad_comprada',
+        'cantidad_utilizada',
+        'precio_compra_real'
+    ]
+    list_filter = ['lista_produccion__estado', 'material__categoria']
+    search_fields = ['lista_produccion__nombre', 'material__nombre']
 
 
 # Personalización del admin site

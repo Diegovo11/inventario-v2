@@ -435,3 +435,169 @@ class MovimientoEfectivo(models.Model):
         )
         
         return movimiento
+
+
+class ListaProduccion(models.Model):
+    """Modelo principal para gestionar listas de producción de moños"""
+    
+    ESTADO_CHOICES = [
+        ('borrador', 'Borrador'),
+        ('pendiente_compra', 'Pendiente de Compra'),
+        ('comprado', 'Materiales Comprados'),
+        ('reabastecido', 'Inventario Reabastecido'),
+        ('en_produccion', 'En Producción'),
+        ('finalizado', 'Finalizado'),
+    ]
+    
+    nombre = models.CharField(
+        max_length=100, 
+        help_text="Nombre descriptivo de la lista de producción"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción opcional de la lista"
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default='borrador'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    usuario_creador = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='listas_produccion'
+    )
+    
+    # Totales calculados
+    total_moños_planificados = models.PositiveIntegerField(default=0)
+    total_moños_producidos = models.PositiveIntegerField(default=0)
+    costo_total_estimado = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    ganancia_estimada = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    
+    class Meta:
+        verbose_name = "Lista de Producción"
+        verbose_name_plural = "Listas de Producción"
+        ordering = ['-fecha_creacion']
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.get_estado_display()})"
+
+
+class DetalleListaMonos(models.Model):
+    """Detalles de moños incluidos en cada lista de producción"""
+    
+    lista_produccion = models.ForeignKey(
+        ListaProduccion,
+        on_delete=models.CASCADE,
+        related_name='detalles_monos'
+    )
+    monos = models.ForeignKey(
+        Monos,
+        on_delete=models.CASCADE,
+        related_name='detalles_lista'
+    )
+    cantidad_pares = models.PositiveIntegerField(
+        default=0,
+        help_text="Cantidad de pares a producir"
+    )
+    cantidad_individuales = models.PositiveIntegerField(
+        default=0,
+        help_text="Cantidad de moños individuales a producir"
+    )
+    
+    # Cantidades producidas realmente (se actualiza en "Posible Venta")
+    pares_producidos = models.PositiveIntegerField(default=0)
+    individuales_producidos = models.PositiveIntegerField(default=0)
+    
+    class Meta:
+        verbose_name = "Detalle de Moños en Lista"
+        verbose_name_plural = "Detalles de Moños en Listas"
+        unique_together = ['lista_produccion', 'monos']
+    
+    @property
+    def cantidad_total_planificada(self):
+        """Total de moños planificados (pares + individuales)"""
+        return self.cantidad_pares + self.cantidad_individuales
+    
+    @property
+    def cantidad_total_producida(self):
+        """Total de moños producidos realmente"""
+        return self.pares_producidos + self.individuales_producidos
+    
+    def __str__(self):
+        return f"{self.monos.nombre} - {self.cantidad_total_planificada} moños"
+
+
+class ResumenMateriales(models.Model):
+    """Resumen de materiales necesarios por lista de producción"""
+    
+    lista_produccion = models.ForeignKey(
+        ListaProduccion,
+        on_delete=models.CASCADE,
+        related_name='resumen_materiales'
+    )
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name='resumenes_lista'
+    )
+    
+    # Cantidades calculadas
+    cantidad_necesaria = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cantidad total necesaria para la producción"
+    )
+    cantidad_disponible = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cantidad disponible al momento de crear la lista"
+    )
+    cantidad_faltante = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cantidad que falta comprar"
+    )
+    
+    # Compras
+    cantidad_comprada = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cantidad realmente comprada"
+    )
+    precio_compra_real = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Precio real pagado por el material"
+    )
+    
+    # Uso real
+    cantidad_utilizada = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cantidad realmente utilizada en la producción"
+    )
+    
+    class Meta:
+        verbose_name = "Resumen de Material"
+        verbose_name_plural = "Resumen de Materiales"
+        unique_together = ['lista_produccion', 'material']
+    
+    def __str__(self):
+        return f"{self.material.nombre} - Lista: {self.lista_produccion.nombre}"
