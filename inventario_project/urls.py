@@ -17,13 +17,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
+from django.contrib.auth import views as auth_views
 
-def redirect_to_dashboard(request):
-    """Redirigir desde la raíz al dashboard"""
-    return redirect('dashboard')
+def redirect_to_inventario(request):
+    """Redirigir desde la raíz al inventario"""
+    return redirect('/inventario/')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('inventario/', include('inventario.urls')),
-    path('', redirect_to_dashboard),  # Página raíz redirige al dashboard
+    
+    # Authentication URLs
+    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    
+    path('', redirect_to_inventario),  # Página raíz redirige al inventario
 ]
