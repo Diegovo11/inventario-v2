@@ -233,21 +233,16 @@
 
                             <!-- Resumen Total -->
                             <div class="border-top pt-3 mt-3">
-                                {% with costo_total=materiales_consolidados|dictsort:"costo_total" %}
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="text-muted mb-1">Costo Total de Compras:</h6>
-                                        </div>
-                                        <div class="col-md-6 text-end">
-                                            <h4 class="costo-total mb-0">
-                                                ${% widthratio materiales_consolidados 1 1 as temp %}
-                                                {% for material in materiales_consolidados %}
-                                                    {% if forloop.first %}{{ material.costo_total|add:0|floatformat:2 }}{% else %}{% endif %}
-                                                {% endfor %}
-                                            </h4>
-                                        </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-1">Costo Total de Compras:</h6>
                                     </div>
-                                {% endwith %}
+                                    <div class="col-md-6 text-end">
+                                        <h4 class="costo-total mb-0">
+                                            ${{ costo_total|floatformat:2 }}
+                                        </h4>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Acción de Confirmar Compra -->

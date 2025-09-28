@@ -785,7 +785,7 @@ def lista_de_compras(request):
     
     # Obtener listas de producción disponibles para compra
     listas_disponibles = ListaProduccion.objects.filter(
-        usuario=request.user,
+        usuario_creador=request.user,
         estado__in=['borrador', 'pendiente_compra']
     ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material')
     
@@ -798,11 +798,14 @@ def lista_de_compras(request):
         if listas_ids:
             listas_seleccionadas = ListaProduccion.objects.filter(
                 id__in=listas_ids,
-                usuario=request.user
+                usuario_creador=request.user
             )
             
             # Consolidar materiales de las listas seleccionadas
             materiales_consolidados = consolidar_materiales_listas(listas_seleccionadas)
+            
+            # Calcular costo total
+            costo_total = sum(material['costo_total'] for material in materiales_consolidados)
             
             # Si se confirma la compra, actualizar estados
             if 'confirmar_compra' in request.POST:
@@ -817,6 +820,7 @@ def lista_de_compras(request):
         'listas_disponibles': listas_disponibles,
         'listas_seleccionadas': listas_seleccionadas,
         'materiales_consolidados': materiales_consolidados,
+        'costo_total': costo_total if 'costo_total' in locals() else 0,
         'titulo': 'Lista de Compras'
     }
     
@@ -859,6 +863,30 @@ def consolidar_materiales_listas(listas_produccion):
         materiales_consolidados.values(), 
         key=lambda x: x['material'].nombre
     )
+
+
+@login_required
+def detalle_lista_produccion(request, lista_id):
+    """Vista para mostrar detalles de una lista de producción específica"""
+    
+    lista = get_object_or_404(
+        ListaProduccion, 
+        id=lista_id, 
+        usuario_creador=request.user
+    )
+    
+    # Obtener detalles de moños y materiales
+    detalles_monos = lista.detalles_monos.select_related('monos').all()
+    resumen_materiales = lista.resumen_materiales.select_related('material').all()
+    
+    context = {
+        'lista': lista,
+        'detalles_monos': detalles_monos,
+        'resumen_materiales': resumen_materiales,
+        'titulo': f'Detalles - {lista.nombre}'
+    }
+    
+    return render(request, 'inventario/detalle_lista_produccion.html', context)
 
 
 def ejecutar_simulacion(data, usuario):
