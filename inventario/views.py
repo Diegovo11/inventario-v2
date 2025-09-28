@@ -385,33 +385,96 @@ def editar_monos(request, monos_id):
     
     if request.method == 'POST':
         form = MonosForm(request.POST, instance=monos)
-        formset = RecetaMonosFormSet(request.POST, instance=monos)
         
-        # Debug: mostrar errores si los hay
+        # Validar formulario principal
         if not form.is_valid():
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f'Error en {field}: {error}')
         
-        if not formset.is_valid():
-            for form_errors in formset.errors:
-                for field, errors in form_errors.items():
-                    for error in errors:
-                        messages.error(request, f'Error en receta - {field}: {error}')
-            
-            if formset.non_form_errors():
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Error general en recetas: {error}')
+        # Validación manual de recetas (misma lógica que en creación)
+        recetas_validas = []
+        recetas_con_errores = []
         
-        if form.is_valid() and formset.is_valid():
-            try:
-                form.save()
-                formset.save()
+        # Obtener número total de formularios
+        total_forms = int(request.POST.get('recetas-TOTAL_FORMS', 0))
+        
+        for i in range(total_forms):
+            material_id = request.POST.get(f'recetas-{i}-material')
+            cantidad = request.POST.get(f'recetas-{i}-cantidad_necesaria')
+            delete_flag = request.POST.get(f'recetas-{i}-DELETE')
+            receta_id = request.POST.get(f'recetas-{i}-id')
+            
+            # Si está marcado para eliminar, ignorar validación
+            if delete_flag:
+                continue
                 
-                messages.success(request, f'Moño {monos.codigo} actualizado exitosamente.')
-                return redirect('inventario:detalle_monos', monos_id=monos.id)
+            # Si hay datos en este formulario, validarlos
+            if material_id or cantidad:
+                errores_form = []
+                
+                if not material_id:
+                    errores_form.append(f'Receta #{i+1}: Debe seleccionar un material')
+                else:
+                    try:
+                        material = Material.objects.get(id=int(material_id), activo=True)
+                    except (ValueError, Material.DoesNotExist):
+                        errores_form.append(f'Receta #{i+1}: Material inválido')
+                        material = None
+                
+                if not cantidad:
+                    errores_form.append(f'Receta #{i+1}: Debe especificar la cantidad')
+                else:
+                    try:
+                        cantidad_decimal = Decimal(str(cantidad))
+                        if cantidad_decimal <= 0:
+                            errores_form.append(f'Receta #{i+1}: La cantidad debe ser mayor a 0')
+                    except:
+                        errores_form.append(f'Receta #{i+1}: Cantidad inválida')
+                        cantidad_decimal = None
+                
+                if errores_form:
+                    recetas_con_errores.extend(errores_form)
+                elif material and cantidad_decimal:
+                    recetas_validas.append({
+                        'material': material,
+                        'cantidad': cantidad_decimal,
+                        'id': receta_id  # Para saber si es nueva o existente
+                    })
+        
+        # Mostrar errores de recetas
+        for error in recetas_con_errores:
+            messages.error(request, error)
+        
+        # Verificar que hay al menos una receta válida
+        if len(recetas_validas) == 0:
+            messages.error(request, 'Debe tener al menos un material en la receta del moño.')
+        
+        if form.is_valid() and len(recetas_con_errores) == 0 and len(recetas_validas) > 0:
+            try:
+                # 1. Actualizar el moño
+                monos_actualizado = form.save()
+                
+                # 2. Eliminar todas las recetas existentes y crear nuevas
+                # (Más simple que manejar actualizaciones individuales)
+                RecetaMonos.objects.filter(monos=monos_actualizado).delete()
+                
+                # 3. Crear todas las recetas nuevamente
+                recetas_guardadas = 0
+                for receta_data in recetas_validas:
+                    RecetaMonos.objects.create(
+                        monos=monos_actualizado,
+                        material=receta_data['material'],
+                        cantidad_necesaria=receta_data['cantidad']
+                    )
+                    recetas_guardadas += 1
+                
+                messages.success(request, f'Moño {monos_actualizado.codigo} actualizado exitosamente con {recetas_guardadas} material(es).')
+                return redirect('inventario:detalle_monos', monos_id=monos_actualizado.id)
+                
             except Exception as e:
                 messages.error(request, f'Error al actualizar: {str(e)}')
+                print("Exception en edición:", str(e))
     else:
         form = MonosForm(instance=monos)
         formset = RecetaMonosFormSet(instance=monos)
