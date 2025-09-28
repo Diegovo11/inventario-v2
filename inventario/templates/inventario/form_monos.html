@@ -254,8 +254,8 @@ function addRecetaForm() {
     
     formsetContainer.appendChild(newFormElement);
     
-    // Actualizar el management form - usar el nombre exacto del formset inline
-    const totalFormsField = document.querySelector('input[name="recetamonos_set-TOTAL_FORMS"]');
+    // Actualizar el management form - usar el nombre correcto del formset
+    const totalFormsField = document.querySelector('input[name="recetas-TOTAL_FORMS"]');
     if (totalFormsField) {
         totalFormsField.value = parseInt(totalFormsField.value) + 1;
     }
@@ -276,7 +276,7 @@ function removeRecetaForm(button) {
     } else {
         formDiv.remove();
         // Actualizar el total de forms si se elimina completamente
-        const totalFormsField = document.querySelector('input[name="recetamonos_set-TOTAL_FORMS"]');
+        const totalFormsField = document.querySelector('input[name="recetas-TOTAL_FORMS"]');
         if (totalFormsField) {
             totalFormsField.value = Math.max(0, parseInt(totalFormsField.value) - 1);
         }

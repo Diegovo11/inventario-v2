@@ -253,8 +253,9 @@ def agregar_monos(request):
         # Debug: Imprimir los datos del POST para ver qué estamos recibiendo
         print("POST data:", dict(request.POST))
         
-        # Para un nuevo objeto, crear el formset sin instancia inicialmente
-        formset = RecetaMonosFormSet(request.POST, instance=None)
+        # Para un nuevo objeto, crear el formset con un moño temporal
+        temp_monos = Monos()  # Instancia temporal sin guardar
+        formset = RecetaMonosFormSet(request.POST, instance=temp_monos)
         
         # Debug: mostrar errores si los hay
         if not form.is_valid():
@@ -265,16 +266,35 @@ def agregar_monos(request):
         if not formset.is_valid():
             print("Formset errors:", formset.errors)
             print("Formset non form errors:", formset.non_form_errors())
-            for form_errors in formset.errors:
-                for field, errors in form_errors.items():
-                    for error in errors:
-                        messages.error(request, f'Error en receta - {field}: {error}')
+            print("Formset management form data:", formset.management_form.cleaned_data if formset.management_form.is_valid() else "Invalid management form")
             
-            if formset.non_form_errors():
-                for error in formset.non_form_errors():
-                    messages.error(request, f'Error general en recetas: {error}')
+            # Verificar si hay al menos un formulario con datos
+            has_data = any(
+                form.has_changed() for form in formset 
+                if not form.cleaned_data.get('DELETE', False)
+            )
+            
+            if not has_data:
+                messages.error(request, 'Debe agregar al menos un material a la receta del moño.')
+            else:
+                for i, form_errors in enumerate(formset.errors):
+                    for field, errors in form_errors.items():
+                        for error in errors:
+                            messages.error(request, f'Error en receta #{i+1} - {field}: {error}')
+                
+                if formset.non_form_errors():
+                    for error in formset.non_form_errors():
+                        messages.error(request, f'Error general en recetas: {error}')
         
-        if form.is_valid() and formset.is_valid():
+        # Validación adicional: verificar que hay al menos un material válido
+        valid_forms_count = 0
+        if formset.is_valid():
+            for form in formset:
+                if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
+                    if form.cleaned_data.get('material') and form.cleaned_data.get('cantidad_necesaria'):
+                        valid_forms_count += 1
+        
+        if form.is_valid() and formset.is_valid() and valid_forms_count > 0:
             try:
                 monos = form.save()
                 formset.instance = monos
@@ -285,9 +305,12 @@ def agregar_monos(request):
             except Exception as e:
                 messages.error(request, f'Error al guardar: {str(e)}')
                 print("Exception:", str(e))
+        elif valid_forms_count == 0 and formset.is_valid():
+            messages.error(request, 'Debe agregar al menos un material válido a la receta.')
     else:
         form = MonosForm()
-        formset = RecetaMonosFormSet(instance=None)
+        temp_monos = Monos()  # Instancia temporal sin guardar
+        formset = RecetaMonosFormSet(instance=temp_monos)
     
     context = {
         'form': form,
