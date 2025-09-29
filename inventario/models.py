@@ -680,6 +680,13 @@ class ResumenMateriales(models.Model):
         """Calcula el costo del material necesario para la producción"""
         return self.material.costo_unitario * self.cantidad_necesaria
     
+    @property
+    def cantidad_realmente_faltante(self):
+        """Calcula cuánto falta realmente si no hay suficiente inventario"""
+        if self.material.cantidad_disponible < self.cantidad_necesaria:
+            return self.cantidad_necesaria - self.material.cantidad_disponible
+        return 0
+    
     class Meta:
         verbose_name = "Resumen de Material"
         verbose_name_plural = "Resumen de Materiales"

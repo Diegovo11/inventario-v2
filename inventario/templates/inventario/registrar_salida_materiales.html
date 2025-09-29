@@ -146,7 +146,7 @@
                                 <div class="alert alert-danger mt-2 mb-0">
                                     <i class="fas fa-exclamation-triangle me-1"></i>
                                     <strong>Insuficiente inventario!</strong> 
-                                    Faltan: {{ resumen.cantidad_necesaria|sub:resumen.material.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                    Faltan: {{ resumen.cantidad_realmente_faltante|floatformat:2 }} {{ resumen.material.unidad_base }}
                                 </div>
                             {% endif %}
                         </div>
