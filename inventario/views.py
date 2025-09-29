@@ -1290,6 +1290,11 @@ def compra_productos(request):
     
     # Procesar formulario de compra
     if request.method == 'POST':
+        # Verificar que no sea un reenvío duplicado
+        if not request.POST.get('csrfmiddlewaretoken'):
+            messages.error(request, 'Error de seguridad. Intente nuevamente.')
+            return redirect('inventario:compra_productos')
+            
         materiales_actualizados = 0
         total_invertido = 0
         
@@ -1307,11 +1312,6 @@ def compra_productos(request):
             precio_real = request.POST.get(precio_key)
             proveedor = request.POST.get(proveedor_key, '')
             
-            # Debug temporal
-            print(f"DEBUG - Procesando material {resumen.id}:")
-            print(f"  paquetes_key: {paquetes_key} = {paquetes_comprados}")
-            print(f"  precio_key: {precio_key} = {precio_real}")
-            print(f"  POST keys: {list(request.POST.keys())}")
             
             if paquetes_comprados and precio_real:
                 try:
@@ -1343,7 +1343,7 @@ def compra_productos(request):
             for lista in listas_comprado:
                 compras_completas = True
                 for resumen in lista.resumen_materiales.filter(cantidad_faltante__gt=0):
-                    if resumen.cantidad_comprada == 0:
+                    if resumen.cantidad_comprada < resumen.cantidad_faltante:
                         compras_completas = False
                         break
                 
@@ -1357,7 +1357,11 @@ def compra_productos(request):
                 f'Se registraron {materiales_actualizados} compras por un total de ${total_invertido:.2f}. '
                 f'El inventario ha sido actualizado.'
             )
-            return redirect('inventario:compra_productos')
+            # Redirect a la lista específica o a listas generales para evitar loops
+            if listas_comprado:
+                return redirect('inventario:ver_listas')
+            else:
+                return redirect('inventario:compra_productos')
         else:
             messages.warning(request, 'No se registró ninguna compra. Verifique los datos ingresados.')
     
