@@ -1275,8 +1275,8 @@ def compra_productos(request):
     materiales_pendientes = []
     for lista in listas_comprado:
         for resumen in lista.resumen_materiales.filter(cantidad_faltante__gt=0):
-            # Solo materiales que aún no han sido comprados
-            if resumen.cantidad_comprada == 0:
+            # Solo materiales que aún faltan por comprar completamente
+            if resumen.cantidad_comprada < resumen.cantidad_faltante:
                 materiales_pendientes.append({
                     'resumen': resumen,
                     'lista': lista,
@@ -1320,8 +1320,8 @@ def compra_productos(request):
                     precio = float(precio_real)
                     
                     if paquetes > 0 and precio > 0:
-                        # Actualizar resumen de material
-                        resumen.cantidad_comprada = cantidad
+                        # Actualizar resumen de material (sumar a lo ya comprado)
+                        resumen.cantidad_comprada += cantidad
                         resumen.precio_compra_real = precio
                         resumen.proveedor = proveedor
                         resumen.fecha_compra = timezone.now()
