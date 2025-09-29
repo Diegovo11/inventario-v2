@@ -2665,3 +2665,209 @@ def reabastecer_automatico(request, simulacion_id):
     except Exception as e:
         return JsonResponse({'error': f'Error interno: {str(e)}'}, status=500)
 
+
+
+@login_required
+def enviar_a_salida(request, lista_id):
+    """Enviar lista de producción a fase de salida"""
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if lista.estado != "en_produccion":
+        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en producción para enviarla a salida.")
+        return redirect("inventario:reabastecimiento")
+    
+    # Cambiar estado a en_salida
+    lista.estado = "en_salida"
+    lista.save()
+    
+    messages.success(request, f"Lista \"{lista.nombre}\" enviada a salida. Ya puedes registrar las salidas de material y ventas.")
+    return redirect("inventario:lista_en_salida")
+
+
+@login_required
+def lista_en_salida(request):
+    """Vista para mostrar listas en fase de salida"""
+    listas_en_salida = ListaProduccion.objects.filter(
+        estado="en_salida",
+        usuario_creador=request.user
+    ).prefetch_related("detalles_monos__monos", "resumen_materiales__material").order_by("-fecha_creacion")
+    
+    context = {
+        "titulo": "Listas en Salida",
+        "listas_en_salida": listas_en_salida,
+    }
+    
+    return render(request, "inventario/lista_en_salida.html", context)
+
+
+@login_required
+def registrar_salida_materiales(request, lista_id):
+    """Registrar la salida de materiales del inventario para producción"""
+    from .models import MovimientoEfectivo
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if lista.estado != "en_salida":
+        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en salida para registrar salidas de materiales.")
+        return redirect("inventario:lista_en_salida")
+    
+    if request.method == "POST":
+        materiales_procesados = []
+        costo_total_materiales = 0
+        
+        # Procesar cada material de la lista
+        for resumen in lista.resumen_materiales.all():
+            cantidad_usar = resumen.cantidad_necesaria
+            material = resumen.material
+            
+            if material.cantidad_disponible >= cantidad_usar:
+                # Registrar movimiento de salida en inventario
+                cantidad_anterior = material.cantidad_disponible
+                material.cantidad_disponible -= cantidad_usar
+                material.save()
+                
+                # Crear movimiento de inventario
+                Movimiento.objects.create(
+                    material=material,
+                    tipo_movimiento="produccion",
+                    cantidad=-cantidad_usar,  # Negativo para salida
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=material.cantidad_disponible,
+                    precio_unitario=material.costo_unitario,
+                    costo_total_movimiento=material.costo_unitario * cantidad_usar,
+                    detalle=f"Salida por producción - Lista: {lista.nombre}",
+                    usuario=request.user,
+                    simulacion_relacionada=None
+                )
+                
+                # Calcular costo del material utilizado
+                costo_material = material.costo_unitario * cantidad_usar
+                costo_total_materiales += costo_material
+                
+                materiales_procesados.append({
+                    "material": material.nombre,
+                    "cantidad": cantidad_usar,
+                    "unidad": material.unidad_base,
+                    "costo": costo_material
+                })
+            else:
+                messages.error(request, f"No hay suficiente {material.nombre} en inventario. Disponible: {material.cantidad_disponible}, Necesario: {cantidad_usar}")
+                return redirect("inventario:lista_en_salida")
+        
+        # Registrar costo de materiales en contaduría
+        if costo_total_materiales > 0:
+            MovimientoEfectivo.registrar_movimiento(
+                concepto=f"Costo de materiales - Lista: {lista.nombre}",
+                tipo_movimiento="egreso",
+                categoria="materiales",
+                monto=costo_total_materiales,
+                usuario=request.user,
+                movimiento_inventario=None,
+                simulacion_relacionada=None
+            )
+        
+        # Actualizar lista: marcar materiales como utilizados
+        for resumen in lista.resumen_materiales.all():
+            resumen.cantidad_utilizada = resumen.cantidad_necesaria
+            resumen.save()
+        
+        messages.success(request, f"Salida de materiales registrada exitosamente. Total: ${costo_total_materiales:.2f}")
+        return redirect("inventario:registrar_ventas_contaduria", lista_id=lista.id)
+    
+    # GET request - mostrar confirmación
+    materiales_necesarios = lista.resumen_materiales.all()
+    
+    context = {
+        "titulo": f"Registrar Salida de Materiales - {lista.nombre}",
+        "lista": lista,
+        "materiales_necesarios": materiales_necesarios,
+    }
+    
+    return render(request, "inventario/registrar_salida_materiales.html", context)
+
+
+@login_required  
+def registrar_ventas_contaduria(request, lista_id):
+    """Registrar las ventas de los moños en contaduría"""
+    from .models import MovimientoEfectivo
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if lista.estado != "en_salida":
+        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en salida para registrar ventas.")
+        return redirect("inventario:lista_en_salida")
+    
+    if request.method == "POST":
+        ventas_procesadas = []
+        total_ventas = 0
+        
+        # Procesar cada tipo de moño
+        for detalle in lista.detalles_monos.all():
+            cantidad_vendida_input = request.POST.get(f"cantidad_vendida_{detalle.id}", 0)
+            precio_venta_input = request.POST.get(f"precio_venta_{detalle.id}", detalle.monos.precio_venta)
+            
+            try:
+                cantidad_vendida = int(cantidad_vendida_input) if cantidad_vendida_input else 0
+                precio_venta = float(precio_venta_input) if precio_venta_input else 0
+            except (ValueError, TypeError):
+                messages.error(request, f"Error en los datos del moño {detalle.monos.nombre}")
+                return redirect("inventario:registrar_ventas_contaduria", lista_id=lista.id)
+            
+            if cantidad_vendida > 0:
+                # Calcular venta total
+                venta_total = cantidad_vendida * precio_venta
+                total_ventas += venta_total
+                
+                # Actualizar cantidad producida en el detalle
+                detalle.cantidad_producida = cantidad_vendida
+                detalle.save()
+                
+                ventas_procesadas.append({
+                    "mono": detalle.monos.nombre,
+                    "cantidad": cantidad_vendida,
+                    "precio_unitario": precio_venta,
+                    "total": venta_total,
+                    "tipo_venta": detalle.monos.get_tipo_venta_display()
+                })
+        
+        if total_ventas > 0:
+            # Registrar ingreso por ventas en contaduría
+            MovimientoEfectivo.registrar_movimiento(
+                concepto=f"Venta de moños - Lista: {lista.nombre}",
+                tipo_movimiento="ingreso",
+                categoria="ventas",
+                monto=total_ventas,
+                usuario=request.user,
+                movimiento_inventario=None,
+                simulacion_relacionada=None
+            )
+            
+            # Finalizar la lista
+            lista.estado = "finalizado"
+            
+            # Actualizar totales de la lista
+            lista.total_moños_producidos = sum(detalle.cantidad_producida for detalle in lista.detalles_monos.all())
+            lista.save()
+            
+            mensaje_detalle = f"Ventas registradas exitosamente.\n\nVentas procesadas:\n"
+            for venta in ventas_procesadas:
+                mensaje_detalle += f"• {venta['mono']}: {venta['cantidad']} {venta['tipo_venta']} × ${venta['precio_unitario']:.2f} = ${venta['total']:.2f}\n"
+            
+            mensaje_detalle += f"\nTotal de ventas: ${total_ventas:.2f}"
+            
+            messages.success(request, mensaje_detalle)
+            return redirect("inventario:home")
+        else:
+            messages.warning(request, "No se registraron ventas. Verifica las cantidades.")
+    
+    # GET request - mostrar formulario
+    detalles_monos = lista.detalles_monos.all()
+    
+    context = {
+        "titulo": f"Registrar Ventas - {lista.nombre}",
+        "lista": lista,
+        "detalles_monos": detalles_monos,
+    }
+    
+    return render(request, "inventario/registrar_ventas_contaduria.html", context)
+

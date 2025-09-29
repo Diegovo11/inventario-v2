@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .card-header {
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .lista-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid #fd7e14;
+    }
+    
+    .lista-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .estado-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .sin-listas {
+        color: #6c757d;
+        font-style: italic;
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+    
+    .material-info {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .action-buttons .btn {
+        margin: 0.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-shipping-fast me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Registra salidas de materiales y ventas
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-boxes me-2"></i>
+                        Listas Preparadas para Salida
+                    </h5>
+                    {% if listas_en_salida %}
+                        <span class="badge bg-warning">{{ listas_en_salida|length }} lista{{ listas_en_salida|length|pluralize }}</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if listas_en_salida %}
+                        <div class="row">
+                            {% for lista in listas_en_salida %}
+                                <div class="col-lg-6 col-xl-4 mb-4">
+                                    <div class="card lista-card h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <div>
+                                                    <h6 class="card-title mb-1">{{ lista.nombre }}</h6>
+                                                    <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
+                                                </div>
+                                                <span class="badge bg-warning estado-badge">
+                                                    {{ lista.get_estado_display }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Información de moños -->
+                                            <div class="mb-3">
+                                                <h6 class="text-muted mb-2">Moños a Producir:</h6>
+                                                {% for detalle in lista.detalles_monos.all %}
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <small>{{ detalle.monos.nombre }}</small>
+                                                        <span class="badge bg-primary">{{ detalle.cantidad_total_planificada }} moños</span>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+
+                                            <!-- Resumen de materiales -->
+                                            <div class="mb-3">
+                                                <h6 class="text-muted mb-2">Materiales Necesarios:</h6>
+                                                {% for resumen in lista.resumen_materiales.all %}
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <small class="material-info">{{ resumen.material.nombre }}</small>
+                                                        <small>{{ resumen.cantidad_necesaria|floatformat:2 }} {{ resumen.material.unidad_base }}</small>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+
+                                            <!-- Información adicional -->
+                                            <div class="d-flex justify-content-between align-items-center text-muted mb-3">
+                                                <small>{{ lista.fecha_creacion|date:"d/m/Y" }}</small>
+                                                <small>
+                                                    {% if lista.ganancia_estimada %}
+                                                        Ganancia Est: ${{ lista.ganancia_estimada|floatformat:2 }}
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+
+                                            <!-- Botones de acción -->
+                                            <div class="action-buttons">
+                                                <div class="row g-2">
+                                                    <div class="col-12">
+                                                        <a href="{% url 'inventario:registrar_salida_materiales' lista.id %}" 
+                                                           class="btn btn-danger btn-sm w-100">
+                                                            <i class="fas fa-box-open me-1"></i>
+                                                            Registrar Salida de Materiales
+                                                        </a>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
+                                                           class="btn btn-outline-info btn-sm w-100" title="Ver Detalle">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
+                                                           class="btn btn-outline-primary btn-sm w-100" title="Editar Lista">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="sin-listas">
+                            <i class="fas fa-shipping-fast fa-3x mb-3 d-block"></i>
+                            <h5>No hay listas en salida</h5>
+                            <p class="mb-0">Las listas aparecerán aquí después de completar la producción.</p>
+                            <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-primary mt-3">
+                                <i class="fas fa-arrow-left me-1"></i>
+                                Ir a Producción
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

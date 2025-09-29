@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .mono-row {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        transition: background-color 0.2s;
+    }
+    
+    .mono-row:hover {
+        background-color: #e9ecef;
+    }
+    
+    .precio-input {
+        border: 2px solid #28a745;
+        border-radius: 0.375rem;
+    }
+    
+    .cantidad-input {
+        border: 2px solid #007bff;
+        border-radius: 0.375rem;
+    }
+    
+    .total-calculado {
+        background-color: #28a745;
+        color: white;
+        border-radius: 0.375rem;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border: 1px solid #17a2b8;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-cash-register me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div>
+                    <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver a Salida
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message|linebreaksbr }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Información de la lista -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5 class="mb-2">{{ lista.nombre }}</h5>
+                            <p class="text-muted mb-1">{{ lista.descripcion|default:"Sin descripción" }}</p>
+                            <small class="text-muted">
+                                Estado: {{ lista.get_estado_display }} | 
+                                Materiales ya descontados del inventario ✅
+                            </small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="mb-2">
+                                <span class="badge bg-success fs-6">
+                                    <i class="fas fa-check me-1"></i>
+                                    Materiales Utilizados
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de ventas -->
+    <form method="post" id="ventasForm">
+        {% csrf_token %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-money-bill-wave me-2"></i>
+                            Registrar Ventas de Moños
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-box p-4 mb-4">
+                            <h6 class="mb-3">💰 Registra las ventas realizadas:</h6>
+                            <ul class="mb-0">
+                                <li>Ingresa la cantidad de moños realmente vendidos</li>
+                                <li>Ajusta el precio de venta si es necesario</li>
+                                <li>Las ventas se registrarán automáticamente en contaduría como ingresos</li>
+                                <li>Al finalizar, la lista será marcada como "Finalizada"</li>
+                            </ul>
+                        </div>
+
+                        <!-- Lista de moños para vender -->
+                        {% for detalle in detalles_monos %}
+                            <div class="mono-row p-4 mb-4">
+                                <div class="row align-items-center">
+                                    <div class="col-md-4">
+                                        <h6 class="mb-1">{{ detalle.monos.nombre }}</h6>
+                                        <p class="text-muted mb-2">{{ detalle.monos.descripcion|default:"Sin descripción" }}</p>
+                                        <small class="text-info">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Planificados: {{ detalle.cantidad_total_planificada }} moños
+                                            ({{ detalle.tipo_venta_display }})
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-bold">Cantidad Vendida:</label>
+                                        <input type="number" 
+                                               name="cantidad_vendida_{{ detalle.id }}" 
+                                               class="form-control cantidad-input"
+                                               min="0" 
+                                               max="{{ detalle.cantidad_total_planificada }}"
+                                               value="{{ detalle.cantidad_total_planificada }}"
+                                               data-detalle-id="{{ detalle.id }}"
+                                               class="cantidad-change-input">
+                                        <small class="text-muted">
+                                            Máximo: {{ detalle.cantidad_total_planificada }}
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="col-md-2">
+                                        <label class="form-label small fw-bold">Precio c/u:</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" 
+                                                   name="precio_venta_{{ detalle.id }}" 
+                                                   class="form-control precio-input"
+                                                   min="0" 
+                                                   step="0.01"
+                                                   value="{{ detalle.monos.precio_venta }}"
+                                                   data-detalle-id="{{ detalle.id }}"
+                                                   class="precio-change-input">
+                                        </div>
+                                        <small class="text-muted">
+                                            Por {{ detalle.monos.get_tipo_venta_display|lower }}
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="col-md-3 text-center">
+                                        <label class="form-label small fw-bold">Total:</label>
+                                        <div class="total-calculado" id="total_{{ detalle.id }}">
+                                            ${{ detalle.monos.precio_venta|mul:detalle.cantidad_total_planificada|floatformat:2 }}
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            Ganancia est: ${{ detalle.monos.ganancia_unitaria|mul:detalle.cantidad_total_planificada|floatformat:2 }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+
+                        <!-- Resumen total -->
+                        <div class="border-top pt-4 mt-4">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5>Total de Ventas:</h5>
+                                    <p class="text-muted mb-0">Este monto se registrará como ingreso en contaduría</p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <h3 class="text-success mb-0" id="totalGeneral">
+                                        $0.00
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="d-flex justify-content-end gap-3 mt-4">
+                            <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-cash-register me-2"></i>
+                                Registrar Ventas y Finalizar Lista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function calcularTotal(detalleId) {
+    const cantidadInput = document.querySelector(`input[name="cantidad_vendida_${detalleId}"]`);
+    const precioInput = document.querySelector(`input[name="precio_venta_${detalleId}"]`);
+    const totalDiv = document.getElementById(`total_${detalleId}`);
+    
+    const cantidad = parseFloat(cantidadInput.value) || 0;
+    const precio = parseFloat(precioInput.value) || 0;
+    const total = cantidad * precio;
+    
+    totalDiv.textContent = `$${total.toFixed(2)}`;
+    
+    // Actualizar total general
+    actualizarTotalGeneral();
+}
+
+function actualizarTotalGeneral() {
+    let totalGeneral = 0;
+    
+    // Sumar todos los totales individuales
+    const totalDivs = document.querySelectorAll('[id^="total_"]');
+    totalDivs.forEach(div => {
+        const valor = parseFloat(div.textContent.replace('$', '')) || 0;
+        totalGeneral += valor;
+    });
+    
+    document.getElementById('totalGeneral').textContent = `$${totalGeneral.toFixed(2)}`;
+}
+
+// Inicializar cálculos al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar event listeners para cambios
+    document.querySelectorAll('.cantidad-change-input').forEach(input => {
+        const detalleId = input.getAttribute('data-detalle-id');
+        input.addEventListener('input', () => calcularTotal(detalleId));
+    });
+    
+    document.querySelectorAll('.precio-change-input').forEach(input => {
+        const detalleId = input.getAttribute('data-detalle-id');
+        input.addEventListener('input', () => calcularTotal(detalleId));
+    });
+    
+    // Calcular totales iniciales para cada detalle
+    document.querySelectorAll('[data-detalle-id]').forEach(input => {
+        const detalleId = input.getAttribute('data-detalle-id');
+        if (detalleId) {
+            calcularTotal(detalleId);
+        }
+    });
+});
+</script>
+{% endblock %}

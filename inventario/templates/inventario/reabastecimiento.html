@@ -320,10 +320,15 @@
                                                 {% endwith %}
                                             {% endwith %}
                                         </div>
-                                        <button type="submit" class="btn btn-primary">
+                                        <button type="submit" class="btn btn-primary me-2">
                                             <i class="fas fa-save me-1"></i>
                                             Actualizar Producción
                                         </button>
+                                        <a href="{% url 'inventario:enviar_a_salida' lista.id %}" 
+                                           class="btn btn-success">
+                                            <i class="fas fa-shipping-fast me-1"></i>
+                                            Enviar a Salida
+                                        </a>
                                     </div>
                                 </form>
                             </div>

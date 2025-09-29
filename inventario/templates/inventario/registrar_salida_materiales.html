@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .material-row {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        transition: background-color 0.2s;
+    }
+    
+    .material-row:hover {
+        background-color: #e9ecef;
+    }
+    
+    .costo-badge {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .confirmacion-box {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border: 1px solid #ffc107;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-box-open me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div>
+                    <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver a Salida
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Información de la lista -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5 class="mb-2">{{ lista.nombre }}</h5>
+                            <p class="text-muted mb-1">{{ lista.descripcion|default:"Sin descripción" }}</p>
+                            <small class="text-muted">
+                                Creado: {{ lista.fecha_creacion|date:"d/m/Y H:i" }} | 
+                                Estado: {{ lista.get_estado_display }}
+                            </small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="mb-2">
+                                <span class="badge bg-primary fs-6">
+                                    {{ lista.total_moños_planificados }} moños planificados
+                                </span>
+                            </div>
+                            {% if lista.ganancia_estimada %}
+                                <div>
+                                    <span class="badge bg-success fs-6">
+                                        Ganancia Est: ${{ lista.ganancia_estimada|floatformat:2 }}
+                                    </span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmación de salida de materiales -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Confirmar Salida de Materiales
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="confirmacion-box p-4 mb-4">
+                        <h6 class="mb-3">⚠️ Esta acción realizará las siguientes operaciones:</h6>
+                        <ul class="mb-0">
+                            <li>Se descontará del inventario la cantidad necesaria de cada material</li>
+                            <li>Se registrará el costo de materiales en contaduría como egreso</li>
+                            <li>Se crearán movimientos de inventario por cada material utilizado</li>
+                            <li>Una vez confirmado, podrás proceder a registrar las ventas</li>
+                        </ul>
+                    </div>
+
+                    <!-- Lista de materiales a descontar -->
+                    <h6 class="mb-3">Materiales que se descontarán del inventario:</h6>
+                    {% for resumen in materiales_necesarios %}
+                        <div class="material-row p-3 mb-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h6 class="mb-1">{{ resumen.material.nombre }}</h6>
+                                    <small class="text-muted">
+                                        {{ resumen.material.codigo }} - {{ resumen.material.categoria }}
+                                    </small>
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <div class="mb-1">
+                                        <span class="badge bg-danger costo-badge">
+                                            Usar: {{ resumen.cantidad_necesaria|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">
+                                        Disponible: {{ resumen.material.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                    </small>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <div class="mb-1">
+                                        <strong>${{ resumen.material.costo_unitario|mul:resumen.cantidad_necesaria|floatformat:2 }}</strong>
+                                    </div>
+                                    <small class="text-muted">
+                                        ${{ resumen.material.costo_unitario|floatformat:2 }}/{{ resumen.material.unidad_base }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% if resumen.material.cantidad_disponible < resumen.cantidad_necesaria %}
+                                <div class="alert alert-danger mt-2 mb-0">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    <strong>Insuficiente inventario!</strong> 
+                                    Faltan: {{ resumen.cantidad_necesaria|sub:resumen.material.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <!-- Resumen total -->
+                    <div class="border-top pt-3 mt-4">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Costo Total de Materiales:</h6>
+                                <p class="text-muted mb-0">Este monto se registrará como egreso en contaduría</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                {% with total_costo=0 %}
+                                    {% for resumen in materiales_necesarios %}
+                                        {% with costo_material=resumen.material.costo_unitario|mul:resumen.cantidad_necesaria %}
+                                            {% with total_costo=total_costo|add:costo_material %}
+                                            {% endwith %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                    <h4 class="text-danger mb-0">
+                                        ${% for resumen in materiales_necesarios %}{{ resumen.material.costo_unitario|mul:resumen.cantidad_necesaria|add:0 }}{% empty %}0{% endfor %}.00
+                                    </h4>
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="d-flex justify-content-end gap-3 mt-4">
+                        <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>
+                            Cancelar
+                        </a>
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-box-open me-2"></i>
+                                Confirmar Salida de Materiales
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

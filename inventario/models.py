@@ -468,6 +468,7 @@ class ListaProduccion(models.Model):
         ('comprado', 'Materiales Comprados'),
         ('reabastecido', 'Inventario Reabastecido'),
         ('en_produccion', 'En Producción'),
+        ('en_salida', 'Lista en Salida'),
         ('finalizado', 'Finalizado'),
     ]
     
