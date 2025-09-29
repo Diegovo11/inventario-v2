@@ -1,0 +1,197 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-box me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div>
+                    <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list-alt me-2"></i>
+                        Lista: {{ lista.nombre }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <p><strong>Descripción:</strong> {{ lista.descripcion|default:"Sin descripción" }}</p>
+                            <p><strong>Estado:</strong> 
+                                <span class="badge bg-{% if lista.estado == 'comprado' %}info{% else %}success{% endif %}">
+                                    {{ lista.get_estado_display }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Moños planificados:</strong> {{ lista.total_moños_planificados }}</p>
+                            <p><strong>Fecha de creación:</strong> {{ lista.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if materiales_pendientes %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Materiales Pendientes de Entrada
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-4">Registra la entrada de los materiales que ya compraste:</p>
+                            
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Material</th>
+                                            <th>Necesario</th>
+                                            <th>Disponible</th>
+                                            <th>Faltante</th>
+                                            <th>Cantidad a Ingresar</th>
+                                            <th>Precio por Unidad</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for resumen in materiales_pendientes %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ resumen.material.nombre }}</strong>
+                                                    <br><small class="text-muted">{{ resumen.material.codigo }}</small>
+                                                </td>
+                                                <td>{{ resumen.cantidad_necesaria }} {{ resumen.material.unidad_base }}</td>
+                                                <td>{{ resumen.cantidad_disponible }} {{ resumen.material.unidad_base }}</td>
+                                                <td>
+                                                    <span class="text-danger fw-bold">
+                                                        {{ resumen.cantidad_faltante }} {{ resumen.material.unidad_base }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <input type="number" 
+                                                           name="cantidad_{{ resumen.id }}" 
+                                                           class="form-control" 
+                                                           min="0" 
+                                                           max="{{ resumen.cantidad_faltante }}"
+                                                           step="0.01"
+                                                           placeholder="0">
+                                                </td>
+                                                <td>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">$</span>
+                                                        <input type="number" 
+                                                               name="precio_{{ resumen.id }}" 
+                                                               class="form-control" 
+                                                               min="0" 
+                                                               step="0.01"
+                                                               placeholder="0.00">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="alert alert-info mt-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Instrucciones:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Ingresa solo las cantidades de materiales que realmente compraste</li>
+                                    <li>Puedes ingresar cantidades parciales y completar el resto más tarde</li>
+                                    <li>El precio por unidad es opcional pero ayuda a llevar control de costos</li>
+                                    <li>Al guardar, se actualizará automáticamente el inventario</li>
+                                </ul>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-3">
+                                <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-2"></i>
+                                    Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>
+                                    Registrar Entradas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    {% else %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                        <h4 class="text-success">¡Todos los materiales están completos!</h4>
+                        <p class="text-muted mb-3">Esta lista ya tiene todos los materiales necesarios y está lista para producción.</p>
+                        
+                        <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-success">
+                            <i class="fas fa-arrow-right me-2"></i>
+                            Ir a Reabastecimiento
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validación de cantidades máximas
+    const cantidadInputs = document.querySelectorAll('input[name^="cantidad_"]');
+    
+    cantidadInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            const maxValue = parseFloat(this.getAttribute('max'));
+            const currentValue = parseFloat(this.value);
+            
+            if (currentValue > maxValue) {
+                this.value = maxValue;
+                alert(`La cantidad máxima permitida es ${maxValue}`);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

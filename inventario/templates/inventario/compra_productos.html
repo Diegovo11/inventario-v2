@@ -211,6 +211,10 @@
                                                class="btn btn-outline-primary btn-sm me-1" title="Editar Lista">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" 
+                                               class="btn btn-outline-success btn-sm me-1" title="Generar Lista de Compras">
+                                                <i class="fas fa-download"></i>
+                                            </a>
                                             <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
                                                class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
                                                 <i class="fas fa-trash-alt"></i>
@@ -258,6 +262,40 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Sección para enviar listas completas a reabastecimiento -->
+    {% if listas_comprado %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-arrow-right me-2"></i>
+                            ¿Compras Completadas?
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">¿Ya compraste todos los materiales necesarios? Envía las listas completadas a reabastecimiento:</p>
+                        {% for lista in listas_comprado %}
+                            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                                <div>
+                                    <span class="fw-bold">{{ lista.nombre }}</span>
+                                    <small class="text-muted d-block">{{ lista.descripcion|default:"Sin descripción" }}</small>
+                                </div>
+                                <form method="post" action="{% url 'inventario:enviar_a_reabastecimiento' lista.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-arrow-right me-1"></i>
+                                        Enviar a Reabastecimiento
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>

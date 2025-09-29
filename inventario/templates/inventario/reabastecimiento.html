@@ -124,6 +124,12 @@
                                                class="btn btn-outline-primary btn-sm me-1" title="Editar Lista">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            {% if lista.estado == 'comprado' %}
+                                                <a href="{% url 'inventario:registrar_entrada_reabastecimiento' lista.id %}" 
+                                                   class="btn btn-outline-warning btn-sm me-1" title="Registrar Entrada de Materiales">
+                                                    <i class="fas fa-box"></i>
+                                                </a>
+                                            {% endif %}
                                             <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
                                                class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
                                                 <i class="fas fa-trash-alt"></i>

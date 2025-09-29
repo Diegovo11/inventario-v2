@@ -672,9 +672,21 @@ def crear_lista_produccion(request):
                     # 5. Calcular costos estimados
                     calcular_costos_estimados(lista)
                     
+                    # 6. Verificar si hay materiales faltantes y ajustar estado automáticamente
+                    materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+                    
+                    if materiales_faltantes == 0:
+                        # No falta nada, saltar directamente a reabastecido
+                        lista.estado = 'reabastecido'
+                        mensaje_estado = " La lista está lista para producción (todos los materiales disponibles)."
+                    else:
+                        # Faltan materiales, estado normal
+                        lista.estado = 'pendiente_compra'
+                        mensaje_estado = f" Se requiere comprar {materiales_faltantes} material(es)."
+                    
                     lista.save()
                     
-                    messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.')
+                    messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.{mensaje_estado}')
                     return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
                     
             except Exception as e:
@@ -892,6 +904,204 @@ def eliminar_lista_produccion(request, lista_id):
     }
     
     return render(request, 'inventario/eliminar_lista_produccion.html', context)
+
+
+@login_required  
+def generar_archivo_compras(request, lista_id):
+    """Generar archivo de texto plano con lista de compras"""
+    from django.http import HttpResponse
+    from datetime import datetime
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    # Obtener materiales faltantes
+    materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
+    
+    if not materiales_faltantes.exists():
+        messages.info(request, f'La lista "{lista.nombre}" no tiene materiales faltantes.')
+        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    
+    # Generar contenido del archivo
+    contenido = f"""LISTA DE COMPRAS - {lista.nombre}
+Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}
+Usuario: {request.user.get_full_name() or request.user.username}
+
+========================================
+MATERIALES NECESARIOS PARA COMPRAR
+========================================
+
+"""
+    
+    total_estimado = 0
+    
+    for i, resumen in enumerate(materiales_faltantes, 1):
+        material = resumen.material
+        costo_estimado = 0
+        
+        if material.precio_compra > 0:
+            costo_unitario = material.precio_compra / material.factor_conversion
+            costo_estimado = costo_unitario * resumen.cantidad_faltante
+            total_estimado += costo_estimado
+        
+        contenido += f"""{i}. {material.nombre}
+   Código: {material.codigo}
+   Cantidad necesaria: {resumen.cantidad_faltante} {material.unidad_base}
+   Disponible: {resumen.cantidad_disponible} {material.unidad_base}
+   Precio estimado: ${costo_estimado:.2f}
+   Categoría: {material.categoria or 'Sin categoría'}
+   
+"""
+    
+    contenido += f"""
+========================================
+RESUMEN
+========================================
+Total de materiales a comprar: {materiales_faltantes.count()}
+Costo total estimado: ${total_estimado:.2f}
+
+========================================
+DETALLES DE LA LISTA DE PRODUCCIÓN
+========================================
+Lista: {lista.nombre}
+Descripción: {lista.descripcion or 'Sin descripción'}
+Estado: {lista.get_estado_display()}
+Moños planificados: {lista.total_moños_planificados}
+
+MOÑOS INCLUIDOS:
+"""
+    
+    for detalle in lista.detalles_monos.all():
+        contenido += f"- {detalle.monos.nombre}: {detalle.cantidad} ({detalle.cantidad_total_planificada} moños)\n"
+    
+    contenido += f"""
+========================================
+NOTAS
+========================================
+- Verificar disponibilidad de materiales antes de comprar
+- Confirmar precios actuales con proveedores  
+- Este archivo se generó automáticamente desde el sistema de inventario
+- Fecha límite sugerida: {(datetime.now()).strftime('%d/%m/%Y')}
+
+"""
+    
+    # Crear respuesta HTTP con archivo
+    response = HttpResponse(contenido, content_type='text/plain; charset=utf-8')
+    filename = f"lista_compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
+@login_required
+def enviar_a_reabastecimiento(request, lista_id):
+    """Enviar lista de estado 'comprado' a 'reabastecido'"""
+    
+    if request.method == 'POST':
+        try:
+            lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+            
+            # Verificar que esté en estado correcto
+            if lista.estado != 'comprado':
+                messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Comprado" para enviar a reabastecimiento.')
+                return redirect('inventario:compra_productos')
+            
+            # Verificar si aún faltan materiales
+            materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+            
+            if materiales_faltantes > 0:
+                messages.warning(request, f'La lista "{lista.nombre}" aún tiene {materiales_faltantes} material(es) faltante(s). Complete las compras primero.')
+                return redirect('inventario:compra_productos')
+            
+            # Cambiar estado a reabastecido
+            lista.estado = 'reabastecido'
+            lista.save()
+            
+            messages.success(request, f'Lista "{lista.nombre}" enviada a reabastecimiento. Ya está lista para producción.')
+            return redirect('inventario:reabastecimiento')
+            
+        except Exception as e:
+            messages.error(request, f'Error al enviar a reabastecimiento: {str(e)}')
+            return redirect('inventario:compra_productos')
+    
+    return redirect('inventario:compra_productos')
+
+
+@login_required
+def registrar_entrada_reabastecimiento(request, lista_id):
+    """Registrar entrada de materiales comprados desde reabastecimiento"""
+    from decimal import Decimal
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    # Verificar que esté en estado correcto
+    if lista.estado not in ['comprado', 'reabastecido']:
+        messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Comprado" o "Reabastecido" para registrar entradas.')
+        return redirect('inventario:reabastecimiento')
+    
+    # Obtener materiales que aún necesitan entrada
+    materiales_pendientes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
+    
+    if request.method == 'POST':
+        materiales_ingresados = 0
+        
+        for resumen in materiales_pendientes:
+            cantidad_key = f'cantidad_{resumen.id}'
+            precio_key = f'precio_{resumen.id}'
+            
+            if cantidad_key in request.POST:
+                try:
+                    cantidad_entrada = Decimal(request.POST[cantidad_key])
+                    precio_compra = Decimal(request.POST.get(precio_key, '0'))
+                    
+                    if cantidad_entrada > 0:
+                        # Actualizar inventario del material
+                        resumen.material.cantidad_disponible += cantidad_entrada
+                        resumen.material.save()
+                        
+                        # Crear movimiento de entrada
+                        from .models import Movimiento
+                        Movimiento.objects.create(
+                            material=resumen.material,
+                            tipo_movimiento='entrada',
+                            cantidad=cantidad_entrada,
+                            precio_unitario=precio_compra,
+                            observaciones=f'Entrada desde lista de producción: {lista.nombre}',
+                            usuario=request.user
+                        )
+                        
+                        # Actualizar resumen de materiales
+                        nueva_cantidad_disponible = resumen.material.cantidad_disponible
+                        resumen.cantidad_disponible = nueva_cantidad_disponible
+                        resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - nueva_cantidad_disponible)
+                        resumen.save()
+                        
+                        materiales_ingresados += 1
+                        
+                except (ValueError, TypeError):
+                    continue
+        
+        if materiales_ingresados > 0:
+            messages.success(request, f'Se registraron {materiales_ingresados} entrada(s) de materiales.')
+            
+            # Verificar si ya no faltan materiales y cambiar estado automáticamente
+            materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+            if materiales_aun_faltantes == 0 and lista.estado == 'comprado':
+                lista.estado = 'reabastecido'
+                lista.save()
+                messages.info(request, f'Lista "{lista.nombre}" movida automáticamente a estado "Reabastecido" - ¡Lista para producción!')
+        else:
+            messages.warning(request, 'No se registró ninguna entrada. Verifique las cantidades ingresadas.')
+        
+        return redirect('inventario:reabastecimiento')
+    
+    # GET request - mostrar formulario
+    context = {
+        'lista': lista,
+        'materiales_pendientes': materiales_pendientes,
+        'titulo': f'Registrar Entradas - {lista.nombre}'
+    }
+    
+    return render(request, 'inventario/registrar_entrada_reabastecimiento.html', context)
 
 
 @login_required
