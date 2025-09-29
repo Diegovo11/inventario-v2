@@ -599,23 +599,26 @@ class ListaProduccionForm(forms.ModelForm):
         }
 
 
-class DetalleListaMonosForm(forms.Form):
+class DetalleListaMonosForm(forms.ModelForm):
     """Formulario para especificar cantidades de moños en la lista"""
     
-    monos = forms.ModelChoiceField(
-        queryset=Monos.objects.filter(activo=True),
-        widget=forms.Select(attrs={'class': 'form-control moños-select'}),
-        empty_label="Seleccionar moño"
-    )
-    cantidad = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': '1'
-        }),
-        help_text="Cantidad a producir (pares o individuales según el tipo del moño)"
-    )
+    class Meta:
+        model = DetalleListaMonos
+        fields = ['monos', 'cantidad']
+        widgets = {
+            'monos': forms.Select(attrs={'class': 'form-control moños-select'}),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '1',
+                'min': '1'
+            })
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['monos'].queryset = Monos.objects.filter(activo=True)
+        self.fields['monos'].empty_label = "Seleccionar moño"
+        self.fields['cantidad'].help_text = "Cantidad a producir (pares o individuales según el tipo del moño)"
 
 
 # Crear formset para múltiples moños (inline formset para edición)
@@ -623,7 +626,6 @@ DetalleListaMonosFormSet = inlineformset_factory(
     ListaProduccion,
     DetalleListaMonos,
     form=DetalleListaMonosForm,
-    fields=('monos', 'cantidad'),
     extra=1,
     can_delete=True,
     min_num=1,
