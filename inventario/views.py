@@ -672,16 +672,17 @@ def crear_lista_produccion(request):
                     # 5. Calcular costos estimados
                     calcular_costos_estimados(lista)
                     
-                    # 6. Verificar si hay materiales faltantes y ajustar estado automáticamente
-                    materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+                    # 6. Verificar si hay materiales suficientes y ajustar estado automáticamente
+                    materiales_suficientes, mensaje_verificacion = verificar_materiales_suficientes(lista)
                     
-                    if materiales_faltantes == 0:
-                        # No falta nada, saltar directamente a reabastecido
+                    if materiales_suficientes:
+                        # Hay suficientes materiales, saltar directamente a reabastecido
                         lista.estado = 'reabastecido'
                         mensaje_estado = " La lista está lista para producción (todos los materiales disponibles)."
                     else:
                         # Faltan materiales, estado normal
                         lista.estado = 'pendiente_compra'
+                        materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
                         mensaje_estado = f" Se requiere comprar {materiales_faltantes} material(es)."
                     
                     lista.save()
@@ -788,6 +789,24 @@ def calcular_costos_estimados(lista_produccion):
     # Actualizar la lista
     lista_produccion.costo_total_estimado = costo_total
     lista_produccion.ganancia_estimada = ganancia_estimada - costo_total
+
+
+def verificar_materiales_suficientes(lista_produccion):
+    """Verifica si hay suficientes materiales en inventario para la lista de producción"""
+    
+    # Recalcular materiales necesarios para estar seguro
+    calcular_materiales_necesarios(lista_produccion)
+    
+    # Verificar cada material
+    for resumen in lista_produccion.resumen_materiales.all():
+        # Obtener la cantidad disponible actual del material
+        cantidad_actual_disponible = resumen.material.cantidad_disponible
+        
+        # Verificar si hay suficiente material disponible
+        if resumen.cantidad_necesaria > cantidad_actual_disponible:
+            return False, f"Material {resumen.material.nombre}: se necesita {resumen.cantidad_necesaria} {resumen.material.unidad_base}, pero solo hay {cantidad_actual_disponible} disponible"
+    
+    return True, "Todos los materiales están disponibles"
 
 
 @login_required
@@ -1358,6 +1377,16 @@ def reabastecimiento(request):
             lista = ListaProduccion.objects.get(id=lista_id, usuario_creador=request.user)
             
             if accion == 'iniciar_produccion':
+                # Verificar que hay suficientes materiales antes de iniciar producción
+                materiales_suficientes, mensaje_verificacion = verificar_materiales_suficientes(lista)
+                
+                if not materiales_suficientes:
+                    messages.error(
+                        request, 
+                        f'No se puede iniciar la producción de "{lista.nombre}". {mensaje_verificacion}'
+                    )
+                    return redirect('inventario:reabastecimiento')
+                
                 # Cambiar estado a 'en_produccion'
                 lista.estado = 'en_produccion'
                 lista.save()
@@ -2687,6 +2716,25 @@ def enviar_a_salida(request, lista_id):
 @login_required
 def lista_en_salida(request):
     """Vista para mostrar listas en fase de salida"""
+    
+    # Manejar eliminación de lista
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+        lista_id = request.POST.get('lista_id')
+        
+        if accion == 'eliminar_lista' and lista_id:
+            try:
+                lista = ListaProduccion.objects.get(id=lista_id, usuario_creador=request.user, estado='en_salida')
+                nombre_lista = lista.nombre
+                lista.delete()
+                messages.success(request, f'Lista "{nombre_lista}" eliminada exitosamente.')
+            except ListaProduccion.DoesNotExist:
+                messages.error(request, 'Lista no encontrada o no tiene permisos para eliminarla.')
+            except Exception as e:
+                messages.error(request, f'Error al eliminar la lista: {str(e)}')
+            
+            return redirect('inventario:lista_en_salida')
+    
     listas_en_salida = ListaProduccion.objects.filter(
         estado="en_salida",
         usuario_creador=request.user
