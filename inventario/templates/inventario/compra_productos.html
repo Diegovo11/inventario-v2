@@ -125,6 +125,7 @@
                                                            step="0.01" 
                                                            min="0" 
                                                            max="{{ material_info.cantidad_faltante }}"
+                                                           value="{{ material_info.cantidad_faltante|floatformat:2 }}"
                                                            placeholder="0.00"
                                                            data-material-id="{{ material_info.resumen.id }}">
                                                     <small class="text-muted">Máx: {{ material_info.cantidad_faltante|floatformat:2 }}</small>
@@ -141,10 +142,11 @@
                                                                class="form-control compra-input precio-input" 
                                                                step="0.01" 
                                                                min="0"
+                                                               value="{% if material_info.material.precio_compra > 0 %}{{ material_info.material.precio_compra|floatformat:2 }}{% endif %}"
                                                                placeholder="0.00"
                                                                data-material-id="{{ material_info.resumen.id }}">
                                                     </div>
-                                                    <small class="text-muted">Por {{ material_info.material.unidad_medida }}</small>
+                                                    <small class="text-muted">Por {{ material_info.material.unidad_base }}</small>
                                                 </div>
                                                 
                                                 <div class="col-md-4">
@@ -385,6 +387,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 calcularResumenTotal();
             }
         });
+    });
+    
+    // Calcular totales iniciales para valores predeterminados
+    cantidadInputs.forEach(function(input) {
+        const materialId = input.getAttribute('data-material-id');
+        calcularTotalMaterial(materialId);
     });
     
     // Inicializar cálculos
