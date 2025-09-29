@@ -92,6 +92,10 @@
                                                        class="btn btn-outline-primary btn-sm" title="Editar Lista">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
+                                                    <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
+                                                       class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
                                                 </div>
                                             </td>
                                         </tr>

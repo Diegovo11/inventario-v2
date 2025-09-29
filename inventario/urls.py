@@ -33,6 +33,7 @@ urlpatterns = [
     path('listas-produccion/', views.listado_listas_produccion, name='listas_produccion'),
     path('lista-produccion/crear/', views.crear_lista_produccion, name='crear_lista_produccion'),
     path('lista-produccion/<int:lista_id>/editar/', views.editar_lista_produccion, name='editar_lista_produccion'),
+    path('lista-produccion/<int:lista_id>/eliminar/', views.eliminar_lista_produccion, name='eliminar_lista_produccion'),
     path('lista-compras/', views.lista_de_compras, name='lista_de_compras'),
     path('compra-productos/', views.compra_productos, name='compra_productos'),
     path('reabastecimiento/', views.reabastecimiento, name='reabastecimiento'),

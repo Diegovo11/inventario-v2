@@ -861,6 +861,40 @@ def editar_lista_produccion(request, lista_id):
 
 
 @login_required
+def eliminar_lista_produccion(request, lista_id):
+    """Vista para eliminar una lista de producción"""
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if request.method == 'POST':
+        nombre_lista = lista.nombre
+        
+        # Verificar si se puede eliminar según el estado
+        estados_no_eliminables = ['en_produccion']
+        if lista.estado in estados_no_eliminables:
+            messages.error(request, f'No se puede eliminar la lista "{nombre_lista}" porque está en producción.')
+            return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+        
+        try:
+            # Eliminar la lista y todos sus datos relacionados
+            lista.delete()
+            messages.success(request, f'Lista de producción "{nombre_lista}" eliminada exitosamente.')
+            return redirect('inventario:listas_produccion')
+            
+        except Exception as e:
+            messages.error(request, f'Error al eliminar la lista: {str(e)}')
+            return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    
+    # Si es GET, mostrar página de confirmación
+    context = {
+        'lista': lista,
+        'titulo': f'Eliminar Lista: {lista.nombre}'
+    }
+    
+    return render(request, 'inventario/eliminar_lista_produccion.html', context)
+
+
+@login_required
 def listado_listas_produccion(request):
     """Vista para mostrar todas las listas de producción"""
     
