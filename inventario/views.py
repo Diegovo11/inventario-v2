@@ -1307,6 +1307,12 @@ def compra_productos(request):
             precio_real = request.POST.get(precio_key)
             proveedor = request.POST.get(proveedor_key, '')
             
+            # Debug temporal
+            print(f"DEBUG - Procesando material {resumen.id}:")
+            print(f"  paquetes_key: {paquetes_key} = {paquetes_comprados}")
+            print(f"  precio_key: {precio_key} = {precio_real}")
+            print(f"  POST keys: {list(request.POST.keys())}")
+            
             if paquetes_comprados and precio_real:
                 try:
                     paquetes = float(paquetes_comprados)
@@ -1316,7 +1322,6 @@ def compra_productos(request):
                     if paquetes > 0 and precio > 0:
                         # Actualizar resumen de material
                         resumen.cantidad_comprada = cantidad
-                        resumen.paquetes_comprados = paquetes
                         resumen.precio_compra_real = precio
                         resumen.proveedor = proveedor
                         resumen.fecha_compra = timezone.now()
