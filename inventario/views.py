@@ -1282,7 +1282,10 @@ def compra_productos(request):
                     'lista': lista,
                     'material': resumen.material,
                     'cantidad_faltante': resumen.cantidad_faltante,
-                    'costo_estimado': resumen.cantidad_faltante * (resumen.material.precio_compra / resumen.material.factor_conversion) if resumen.material.precio_compra > 0 else 0
+                    'paquetes_rollos_necesarios': resumen.paquetes_rollos_necesarios,
+                    'unidad_compra_display': resumen.unidad_compra_display,
+                    'cantidad_total_compra': resumen.paquetes_rollos_necesarios * resumen.material.factor_conversion,
+                    'costo_estimado': resumen.paquetes_rollos_necesarios * resumen.material.precio_compra if resumen.material.precio_compra > 0 else 0
                 })
     
     # Procesar formulario de compra
@@ -1294,22 +1297,26 @@ def compra_productos(request):
             resumen = material_info['resumen']
             
             # Obtener datos del formulario para cada material
+            paquetes_key = f'paquetes_{resumen.id}'
             cantidad_key = f'cantidad_{resumen.id}'
             precio_key = f'precio_{resumen.id}'
             proveedor_key = f'proveedor_{resumen.id}'
             
+            paquetes_comprados = request.POST.get(paquetes_key)
             cantidad_comprada = request.POST.get(cantidad_key)
             precio_real = request.POST.get(precio_key)
             proveedor = request.POST.get(proveedor_key, '')
             
-            if cantidad_comprada and precio_real:
+            if paquetes_comprados and precio_real:
                 try:
-                    cantidad = float(cantidad_comprada)
+                    paquetes = float(paquetes_comprados)
+                    cantidad = float(cantidad_comprada) if cantidad_comprada else paquetes * resumen.material.factor_conversion
                     precio = float(precio_real)
                     
-                    if cantidad > 0 and precio > 0:
+                    if paquetes > 0 and precio > 0:
                         # Actualizar resumen de material
                         resumen.cantidad_comprada = cantidad
+                        resumen.paquetes_comprados = paquetes
                         resumen.precio_compra_real = precio
                         resumen.proveedor = proveedor
                         resumen.fecha_compra = timezone.now()
@@ -1321,7 +1328,7 @@ def compra_productos(request):
                         material.save()
                         
                         materiales_actualizados += 1
-                        total_invertido += cantidad * precio
+                        total_invertido += paquetes * precio
                         
                 except (ValueError, TypeError):
                     continue

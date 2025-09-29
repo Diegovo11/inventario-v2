@@ -107,7 +107,9 @@
                                                 <span class="badge bg-info lista-badge">{{ material_info.lista.nombre }}</span>
                                             </div>
                                             <div class="mb-2">
-                                                <strong>Necesario:</strong> {{ material_info.cantidad_faltante|floatformat:2 }} {{ material_info.material.unidad_medida }}
+                                                <strong>Necesario:</strong> {{ material_info.paquetes_rollos_necesarios }} {{ material_info.unidad_compra_display }}{{ material_info.paquetes_rollos_necesarios|pluralize:"s" }}
+                                                <br>
+                                                <small class="text-muted">{{ material_info.cantidad_faltante|floatformat:2 }} {{ material_info.material.unidad_base }} total</small>
                                                 <br>
                                                 <small class="costo-estimado">Estimado: ${{ material_info.costo_estimado|floatformat:2 }}</small>
                                             </div>
@@ -117,21 +119,34 @@
                                             <div class="row">
                                                 <div class="col-md-3">
                                                     <label class="form-label">
-                                                        <strong>Cantidad Comprada</strong>
+                                                        <strong>{{ material_info.unidad_compra_display }}s Comprados</strong>
+                                                    </label>
+                                                    <input type="number" 
+                                                           name="paquetes_{{ material_info.resumen.id }}" 
+                                                           class="form-control compra-input paquetes-input" 
+                                                           step="1" 
+                                                           min="0" 
+                                                           value="{{ material_info.paquetes_rollos_necesarios }}"
+                                                           placeholder="0"
+                                                           data-factor="{{ material_info.material.factor_conversion }}"
+                                                           data-material-id="{{ material_info.resumen.id }}">
+                                                    <small class="text-muted">Mín: {{ material_info.paquetes_rollos_necesarios }}</small>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">
+                                                        <strong>Total {{ material_info.material.unidad_base }}</strong>
                                                     </label>
                                                     <input type="number" 
                                                            name="cantidad_{{ material_info.resumen.id }}" 
-                                                           class="form-control compra-input cantidad-input" 
+                                                           id="cantidad_{{ material_info.resumen.id }}"
+                                                           class="form-control" 
                                                            step="0.01" 
-                                                           min="0" 
-                                                           max="{{ material_info.cantidad_faltante }}"
-                                                           value="{{ material_info.cantidad_faltante|floatformat:2 }}"
-                                                           placeholder="0.00"
-                                                           data-material-id="{{ material_info.resumen.id }}">
-                                                    <small class="text-muted">Máx: {{ material_info.cantidad_faltante|floatformat:2 }}</small>
+                                                           value="{{ material_info.cantidad_total_compra|floatformat:2 }}"
+                                                           readonly>
+                                                    <small class="text-muted">Calculado automáticamente</small>
                                                 </div>
                                                 
-                                                <div class="col-md-3">
+                                                <div class="col-md-2">
                                                     <label class="form-label">
                                                         <strong>Precio Real</strong>
                                                     </label>
@@ -149,7 +164,7 @@
                                                     <small class="text-muted">Por {{ material_info.material.unidad_base }}</small>
                                                 </div>
                                                 
-                                                <div class="col-md-4">
+                                                <div class="col-md-2">
                                                     <label class="form-label">
                                                         <strong>Proveedor</strong>
                                                     </label>
@@ -309,20 +324,33 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const cantidadInputs = document.querySelectorAll('.cantidad-input');
+    const paquetesInputs = document.querySelectorAll('.paquetes-input');
     const precioInputs = document.querySelectorAll('.precio-input');
     const btnRegistrar = document.getElementById('btn-registrar-compras');
     
+    // Función para calcular la cantidad total basada en paquetes/rollos
+    function calcularCantidadTotal(input) {
+        const factorConversion = parseFloat(input.getAttribute('data-factor')) || 1;
+        const materialId = input.getAttribute('data-material-id');
+        const cantidadPaquetes = parseFloat(input.value) || 0;
+        const cantidadTotal = cantidadPaquetes * factorConversion;
+        
+        const inputCantidadTotal = document.getElementById('cantidad_' + materialId);
+        if (inputCantidadTotal) {
+            inputCantidadTotal.value = cantidadTotal.toFixed(2);
+        }
+    }
+    
     // Función para calcular el total de un material
     function calcularTotalMaterial(materialId) {
-        const cantidadInput = document.querySelector(`[name="cantidad_${materialId}"]`);
+        const paquetesInput = document.querySelector(`[name="paquetes_${materialId}"]`);
         const precioInput = document.querySelector(`[name="precio_${materialId}"]`);
         const totalElement = document.querySelector(`[data-material-id="${materialId}"].total-material`);
         
-        if (cantidadInput && precioInput && totalElement) {
-            const cantidad = parseFloat(cantidadInput.value) || 0;
+        if (paquetesInput && precioInput && totalElement) {
+            const paquetes = parseFloat(paquetesInput.value) || 0;
             const precio = parseFloat(precioInput.value) || 0;
-            const total = cantidad * precio;
+            const total = paquetes * precio;
             
             totalElement.textContent = '$' + total.toFixed(2);
         }
@@ -333,17 +361,17 @@ document.addEventListener('DOMContentLoaded', function() {
         let materialesConCompra = 0;
         let inversionTotal = 0;
         
-        cantidadInputs.forEach(function(cantidadInput) {
-            const materialId = cantidadInput.getAttribute('data-material-id');
+        paquetesInputs.forEach(function(paquetesInput) {
+            const materialId = paquetesInput.getAttribute('data-material-id');
             const precioInput = document.querySelector(`[name="precio_${materialId}"]`);
             
-            if (cantidadInput && precioInput) {
-                const cantidad = parseFloat(cantidadInput.value) || 0;
+            if (paquetesInput && precioInput) {
+                const paquetes = parseFloat(paquetesInput.value) || 0;
                 const precio = parseFloat(precioInput.value) || 0;
                 
-                if (cantidad > 0 && precio > 0) {
+                if (paquetes > 0 && precio > 0) {
                     materialesConCompra++;
-                    inversionTotal += cantidad * precio;
+                    inversionTotal += paquetes * precio;
                 }
             }
         });
@@ -366,8 +394,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Event listeners para inputs de cantidad y precio
-    [...cantidadInputs, ...precioInputs].forEach(function(input) {
+    // Event listeners para inputs de paquetes
+    paquetesInputs.forEach(function(input) {
+        input.addEventListener('input', function() {
+            calcularCantidadTotal(this);
+            const materialId = this.getAttribute('data-material-id');
+            calcularTotalMaterial(materialId);
+            calcularResumenTotal();
+        });
+    });
+    
+    // Event listeners para inputs de precio
+    precioInputs.forEach(function(input) {
         input.addEventListener('input', function() {
             const materialId = this.getAttribute('data-material-id');
             calcularTotalMaterial(materialId);
@@ -375,22 +413,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Validación de cantidad máxima
-    cantidadInputs.forEach(function(input) {
-        input.addEventListener('change', function() {
-            const maxValue = parseFloat(this.getAttribute('max'));
-            const currentValue = parseFloat(this.value);
-            
-            if (currentValue > maxValue) {
-                this.value = maxValue;
-                calcularTotalMaterial(this.getAttribute('data-material-id'));
-                calcularResumenTotal();
-            }
-        });
-    });
-    
     // Calcular totales iniciales para valores predeterminados
-    cantidadInputs.forEach(function(input) {
+    paquetesInputs.forEach(function(input) {
+        calcularCantidadTotal(input);
         const materialId = input.getAttribute('data-material-id');
         calcularTotalMaterial(materialId);
     });
