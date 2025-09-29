@@ -83,11 +83,10 @@
                                     <thead>
                                         <tr>
                                             <th>Material</th>
-                                            <th>Necesario</th>
-                                            <th>Disponible</th>
-                                            <th>Faltante</th>
+                                            <th>Estado Actual</th>
+                                            <th>Recomendación de Compra</th>
                                             <th>Cantidad a Ingresar</th>
-                                            <th>Precio por Unidad</th>
+                                            <th>Precio por {{ 'Paquete' if materiales_pendientes.0.material.tipo_material == 'paquete' else 'Rollo' }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -95,23 +94,66 @@
                                             <tr>
                                                 <td>
                                                     <strong>{{ resumen.material.nombre }}</strong>
-                                                    <br><small class="text-muted">{{ resumen.material.codigo }}</small>
-                                                </td>
-                                                <td>{{ resumen.cantidad_necesaria }} {{ resumen.material.unidad_base }}</td>
-                                                <td>{{ resumen.cantidad_disponible }} {{ resumen.material.unidad_base }}</td>
-                                                <td>
-                                                    <span class="text-danger fw-bold">
-                                                        {{ resumen.cantidad_faltante }} {{ resumen.material.unidad_base }}
-                                                    </span>
+                                                    <br><small class="text-muted">{{ resumen.material.codigo }} - {{ resumen.material.categoria }}</small>
                                                 </td>
                                                 <td>
-                                                    <input type="number" 
-                                                           name="cantidad_{{ resumen.id }}" 
-                                                           class="form-control" 
-                                                           min="0" 
-                                                           max="{{ resumen.cantidad_faltante }}"
-                                                           step="0.01"
-                                                           placeholder="0">
+                                                    <div class="mb-1">
+                                                        <span class="badge bg-success">
+                                                            Disponible: {{ resumen.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="mb-1">
+                                                        <span class="badge bg-primary">
+                                                            Necesario: {{ resumen.cantidad_necesaria|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span class="badge bg-danger">
+                                                            Falta: {{ resumen.cantidad_faltante|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="alert alert-warning mb-0 p-2">
+                                                        <i class="fas fa-shopping-cart me-1"></i>
+                                                        <strong>Comprar: {{ resumen.paquetes_rollos_necesarios }} {{ resumen.unidad_compra_display }}{{ resumen.paquetes_rollos_necesarios|pluralize }}</strong>
+                                                        <br>
+                                                        <small class="text-muted">
+                                                            = {{ resumen.cantidad_total_compra|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                            ({{ resumen.material.factor_conversion }} {{ resumen.material.unidad_base }}/{{ resumen.unidad_compra_display }})
+                                                        </small>
+                                                        {% if resumen.cantidad_sobrante > 0 %}
+                                                            <br><small class="text-info">
+                                                                ⚠️ Sobrarán: {{ resumen.cantidad_sobrante|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                            </small>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small">{{ resumen.unidad_compra_display }}s comprados:</label>
+                                                        <input type="number" 
+                                                               name="paquetes_{{ resumen.id }}" 
+                                                               class="form-control" 
+                                                               min="0" 
+                                                               step="1"
+                                                               value="{{ resumen.paquetes_rollos_necesarios }}"
+                                                               placeholder="0"
+                                                               data-factor="{{ resumen.material.factor_conversion }}" 
+                                                               data-resumen-id="{{ resumen.id }}"
+                                                               class="paquetes-input"
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label small">Total {{ resumen.material.unidad_base }}:</label>
+                                                        <input type="number" 
+                                                               name="cantidad_{{ resumen.id }}" 
+                                                               id="cantidad_{{ resumen.id }}"
+                                                               class="form-control" 
+                                                               min="0" 
+                                                               step="0.01"
+                                                               value="{{ resumen.cantidad_total_compra|floatformat:2 }}"
+                                                               readonly>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div class="input-group">
@@ -121,8 +163,10 @@
                                                                class="form-control" 
                                                                min="0" 
                                                                step="0.01"
+                                                               value="{{ resumen.material.precio_compra|default:'' }}"
                                                                placeholder="0.00">
                                                     </div>
+                                                    <small class="text-muted">Por {{ resumen.unidad_compra_display }}</small>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -141,7 +185,7 @@
                                 </ul>
                             </div>
 
-                            <div class="d-flex justify-content-end gap-3">
+                                                        <div class="d-flex justify-content-end gap-3">
                                 <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-secondary">
                                     <i class="fas fa-times me-2"></i>
                                     Cancelar
@@ -151,6 +195,59 @@
                                     Registrar Entradas
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    {% else %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                        <h5>¡Todo el inventario está completo!</h5>
+                        <p class="text-muted">Todos los materiales necesarios están disponibles en el inventario.</p>
+                        <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Volver a Reabastecimiento
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function calcularCantidadTotal(input) {
+    const factorConversion = parseFloat(input.getAttribute('data-factor')) || 1;
+    const resumenId = input.getAttribute('data-resumen-id');
+    const cantidadPaquetes = parseFloat(input.value) || 0;
+    const cantidadTotal = cantidadPaquetes * factorConversion;
+    
+    const inputCantidadTotal = document.getElementById('cantidad_' + resumenId);
+    if (inputCantidadTotal) {
+        inputCantidadTotal.value = cantidadTotal.toFixed(2);
+    }
+}
+
+// Inicializar cálculos al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calcular para cada material cuando cambie el número de paquetes/rollos
+    const inputsPaquetes = document.querySelectorAll('.paquetes-input');
+    inputsPaquetes.forEach(function(input) {
+        // Agregar event listener para el cambio
+        input.addEventListener('input', function() {
+            calcularCantidadTotal(this);
+        });
+        
+        // Calcular valores iniciales
+        calcularCantidadTotal(input);
+    });
+});
+</script>
+{% endblock %}
                         </div>
                     </div>
                 </div>

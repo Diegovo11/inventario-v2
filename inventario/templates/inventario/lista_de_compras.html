@@ -209,29 +209,43 @@
                                             <div class="col-md-3 text-center">
                                                 <div class="mb-1">
                                                     <span class="badge bg-primary cantidad-badge">
-                                                        Necesario: {{ material_data.cantidad_necesaria|floatformat:2 }}
+                                                        Necesario: {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
                                                     </span>
                                                 </div>
                                                 <div class="mb-1">
                                                     <span class="badge bg-success cantidad-badge">
-                                                        Disponible: {{ material_data.cantidad_disponible|floatformat:2 }}
+                                                        Disponible: {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
                                                     </span>
                                                 </div>
                                                 {% if material_data.cantidad_faltante > 0 %}
-                                                    <div>
+                                                    <div class="mb-1">
                                                         <span class="badge bg-warning cantidad-badge">
-                                                            Comprar: {{ material_data.cantidad_faltante|floatformat:2 }}
+                                                            Faltan: {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
                                                         </span>
                                                     </div>
+                                                    <div>
+                                                        <span class="badge bg-danger cantidad-badge fw-bold">
+                                                            <i class="fas fa-shopping-cart me-1"></i>
+                                                            Comprar: {{ material_data.paquetes_rollos_necesarios }} {{ material_data.unidad_compra_display }}{{ material_data.paquetes_rollos_necesarios|pluralize }}
+                                                        </span>
+                                                    </div>
+                                                    {% if material_data.cantidad_total_compra != material_data.cantidad_faltante %}
+                                                        <small class="text-info d-block mt-1">
+                                                            (= {{ material_data.cantidad_total_compra|floatformat:2 }} {{ material_data.material.unidad_base }})
+                                                        </small>
+                                                    {% endif %}
                                                 {% endif %}
                                             </div>
                                             <div class="col-md-3 text-end">
                                                 {% if material_data.cantidad_faltante > 0 %}
-                                                    <div class="costo-total">
-                                                        ${{ material_data.costo_total|floatformat:2 }}
+                                                    <div class="costo-total mb-1">
+                                                        <strong>${{ material_data.costo_estimado_compra|floatformat:2 }}</strong>
                                                     </div>
-                                                    <small class="text-muted">
-                                                        ${{ material_data.precio_unitario|floatformat:2 }}/{{ material_data.material.unidad_medida }}
+                                                    <small class="text-muted d-block">
+                                                        ${{ material_data.material.precio_compra|floatformat:2 }}/{{ material_data.unidad_compra_display }}
+                                                    </small>
+                                                    <small class="text-info">
+                                                        {{ material_data.paquetes_rollos_necesarios }} × ${{ material_data.material.precio_compra|floatformat:2 }}
                                                     </small>
                                                 {% else %}
                                                     <span class="text-success fw-bold">

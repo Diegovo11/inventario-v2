@@ -161,11 +161,30 @@
                                 <div class="mb-3">
                                     <h6 class="text-muted mb-2">Materiales Disponibles:</h6>
                                     {% for resumen in lista.resumen_materiales.all %}
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="material-info">{{ resumen.material.nombre }}</small>
-                                            <small class="{% if resumen.material.cantidad_disponible >= resumen.cantidad_necesaria %}text-success{% else %}text-warning{% endif %}">
-                                                {{ resumen.material.cantidad_disponible|floatformat:2 }}/{{ resumen.cantidad_necesaria|floatformat:2 }}
-                                            </small>
+                                        <div class="material-row mb-2 p-2 border rounded">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <small class="material-info fw-bold">{{ resumen.material.nombre }}</small>
+                                                    <br>
+                                                    <span class="badge bg-{% if resumen.material.cantidad_disponible >= resumen.cantidad_necesaria %}success{% else %}warning{% endif %} me-1">
+                                                        {{ resumen.material.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }} disponible
+                                                    </span>
+                                                </div>
+                                                <div class="text-end">
+                                                    <small class="text-muted d-block">
+                                                        Necesario: {{ resumen.cantidad_necesaria|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                    </small>
+                                                    {% if resumen.material.cantidad_disponible < resumen.cantidad_necesaria %}
+                                                        <small class="text-danger fw-bold">
+                                                            Faltan: {{ resumen.cantidad_faltante|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                        </small>
+                                                        <br>
+                                                        <small class="text-info">
+                                                            → {{ resumen.paquetes_rollos_necesarios }} {{ resumen.unidad_compra_display }}{{ resumen.paquetes_rollos_necesarios|pluralize }}
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
                                         </div>
                                     {% endfor %}
                                 </div>

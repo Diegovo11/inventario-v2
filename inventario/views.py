@@ -936,18 +936,30 @@ MATERIALES NECESARIOS PARA COMPRAR
     
     for i, resumen in enumerate(materiales_faltantes, 1):
         material = resumen.material
-        costo_estimado = 0
+        paquetes_necesarios = resumen.paquetes_rollos_necesarios
+        cantidad_total_compra = resumen.cantidad_total_compra
+        costo_estimado = resumen.costo_estimado_compra
+        total_estimado += costo_estimado
         
-        if material.precio_compra > 0:
-            costo_unitario = material.precio_compra / material.factor_conversion
-            costo_estimado = costo_unitario * resumen.cantidad_faltante
-            total_estimado += costo_estimado
+        # Información adicional si comprar paquetes/rollos da más cantidad
+        info_extra = ""
+        if cantidad_total_compra > resumen.cantidad_faltante:
+            sobrante = cantidad_total_compra - resumen.cantidad_faltante
+            info_extra = f"\n   ⚠️  Al comprar {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}, sobrarán {sobrante} {material.unidad_base}"
         
         contenido += f"""{i}. {material.nombre}
    Código: {material.codigo}
-   Cantidad necesaria: {resumen.cantidad_faltante} {material.unidad_base}
-   Disponible: {resumen.cantidad_disponible} {material.unidad_base}
-   Precio estimado: ${costo_estimado:.2f}
+   ✅ COMPRAR: {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}
+   📦 Contenido: {cantidad_total_compra} {material.unidad_base} ({material.factor_conversion} {material.unidad_base}/{resumen.unidad_compra_display})
+   
+   Detalle de necesidad:
+   • Necesario: {resumen.cantidad_faltante} {material.unidad_base}
+   • Disponible: {resumen.cantidad_disponible} {material.unidad_base}
+   
+   Costo estimado:
+   • ${material.precio_compra:.2f} por {resumen.unidad_compra_display}
+   • Total: {paquetes_necesarios} × ${material.precio_compra:.2f} = ${costo_estimado:.2f}{info_extra}
+   
    Categoría: {material.categoria or 'Sin categoría'}
    
 """

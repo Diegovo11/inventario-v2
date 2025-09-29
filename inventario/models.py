@@ -67,6 +67,28 @@ class Material(models.Model):
         """Alias para unidad_base para mantener consistencia en templates"""
         return self.unidad_base
     
+    def calcular_paquetes_rollos_necesarios(self, cantidad_requerida):
+        """
+        Calcula cuántos paquetes o rollos completos se necesitan comprar
+        para obtener la cantidad requerida en unidad base
+        """
+        import math
+        if self.factor_conversion and self.factor_conversion > 0:
+            paquetes_necesarios = math.ceil(cantidad_requerida / self.factor_conversion)
+            return paquetes_necesarios
+        return 0
+    
+    def cantidad_total_en_paquetes_rollos(self, cantidad_requerida):
+        """
+        Calcula cuántas unidades base se obtendrán al comprar los paquetes/rollos necesarios
+        """
+        paquetes_necesarios = self.calcular_paquetes_rollos_necesarios(cantidad_requerida)
+        return paquetes_necesarios * self.factor_conversion
+    
+    def obtener_unidad_compra_display(self):
+        """Retorna el nombre de la unidad de compra (paquete/rollo)"""
+        return self.get_tipo_material_display()
+    
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
 
@@ -617,6 +639,35 @@ class ResumenMateriales(models.Model):
         default=0,
         help_text="Cantidad realmente utilizada en la producción"
     )
+    
+    @property
+    def paquetes_rollos_necesarios(self):
+        """Calcula cuántos paquetes o rollos se necesitan comprar"""
+        return self.material.calcular_paquetes_rollos_necesarios(self.cantidad_faltante)
+    
+    @property
+    def cantidad_total_compra(self):
+        """Cantidad total que se obtendrá al comprar paquetes/rollos completos"""
+        return self.material.cantidad_total_en_paquetes_rollos(self.cantidad_faltante)
+    
+    @property
+    def unidad_compra_display(self):
+        """Retorna el texto de la unidad de compra"""
+        return self.material.obtener_unidad_compra_display()
+    
+    @property
+    def costo_estimado_compra(self):
+        """Estima el costo basado en el precio histórico del material"""
+        if self.paquetes_rollos_necesarios > 0 and self.material.precio_compra > 0:
+            return self.paquetes_rollos_necesarios * self.material.precio_compra
+        return 0
+    
+    @property
+    def cantidad_sobrante(self):
+        """Calcula cuánto material sobrará al comprar paquetes/rollos completos"""
+        if self.cantidad_total_compra > self.cantidad_faltante:
+            return self.cantidad_total_compra - self.cantidad_faltante
+        return 0
     
     class Meta:
         verbose_name = "Resumen de Material"
