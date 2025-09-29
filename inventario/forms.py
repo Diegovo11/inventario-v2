@@ -623,6 +623,7 @@ DetalleListaMonosFormSet = inlineformset_factory(
     ListaProduccion,
     DetalleListaMonos,
     form=DetalleListaMonosForm,
+    fields=('monos', 'cantidad'),
     extra=1,
     can_delete=True,
     min_num=1,
