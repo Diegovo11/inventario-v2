@@ -571,6 +571,11 @@ class DetalleListaMonos(models.Model):
         """Calcula el total estimado en dinero"""
         return self.monos.precio_venta * self.cantidad_total_planificada
     
+    @property
+    def ganancia_total_estimada(self):
+        """Calcula la ganancia total estimada"""
+        return self.monos.ganancia_unitaria * self.cantidad_total_planificada
+    
     def __str__(self):
         return f"{self.monos.nombre} - {self.tipo_venta_display}"
 
@@ -669,6 +674,11 @@ class ResumenMateriales(models.Model):
         if self.cantidad_total_compra > self.cantidad_faltante:
             return self.cantidad_total_compra - self.cantidad_faltante
         return 0
+    
+    @property
+    def costo_material_necesario(self):
+        """Calcula el costo del material necesario para la producción"""
+        return self.material.costo_unitario * self.cantidad_necesaria
     
     class Meta:
         verbose_name = "Resumen de Material"

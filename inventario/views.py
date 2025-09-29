@@ -2777,10 +2777,14 @@ def registrar_salida_materiales(request, lista_id):
     # GET request - mostrar confirmación
     materiales_necesarios = lista.resumen_materiales.all()
     
+    # Calcular costo total
+    costo_total_estimado = sum(resumen.costo_material_necesario for resumen in materiales_necesarios)
+    
     context = {
         "titulo": f"Registrar Salida de Materiales - {lista.nombre}",
         "lista": lista,
         "materiales_necesarios": materiales_necesarios,
+        "costo_total_estimado": costo_total_estimado,
     }
     
     return render(request, "inventario/registrar_salida_materiales.html", context)

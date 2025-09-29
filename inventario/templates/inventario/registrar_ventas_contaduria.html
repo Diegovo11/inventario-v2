@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'inventario/base.html' %}
 
 {% block extra_css %}
 <style>
@@ -171,10 +171,10 @@
                                     <div class="col-md-3 text-center">
                                         <label class="form-label small fw-bold">Total:</label>
                                         <div class="total-calculado" id="total_{{ detalle.id }}">
-                                            ${{ detalle.monos.precio_venta|mul:detalle.cantidad_total_planificada|floatformat:2 }}
+                                            ${{ detalle.total_estimado|floatformat:2 }}
                                         </div>
                                         <small class="text-muted d-block mt-1">
-                                            Ganancia est: ${{ detalle.monos.ganancia_unitaria|mul:detalle.cantidad_total_planificada|floatformat:2 }}
+                                            Ganancia est: ${{ detalle.ganancia_total_estimada|floatformat:2 }}
                                         </small>
                                     </div>
                                 </div>
