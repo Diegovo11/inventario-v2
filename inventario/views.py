@@ -1141,7 +1141,7 @@ def listado_listas_produccion(request):
     
     listas = ListaProduccion.objects.filter(
         usuario_creador=request.user
-    ).prefetch_related('detalles_monos__monos').order_by('-fecha_creacion')
+    ).exclude(estado='finalizado').prefetch_related('detalles_monos__monos').order_by('-fecha_creacion')
     
     context = {
         'listas': listas,
@@ -1437,10 +1437,32 @@ def reabastecimiento(request):
                         lista.total_moños_producidos = total_producidos
                         lista.save()
                         
+                        # Registrar venta automática en contabilidad
+                        from .models import MovimientoEfectivo
+                        
+                        # Calcular ingreso total de la venta
+                        ingreso_total_venta = Decimal('0')
+                        for detalle in lista.detalles_monos.all():
+                            precio_venta = detalle.monos.precio_venta
+                            cantidad_producida = detalle.cantidad_producida
+                            ingreso_detalle = precio_venta * cantidad_producida
+                            ingreso_total_venta += ingreso_detalle
+                        
+                        # Crear movimiento de efectivo por la venta
+                        if ingreso_total_venta > 0:
+                            MovimientoEfectivo.registrar_movimiento(
+                                concepto=f'Venta de producción - Lista: {lista.nombre}',
+                                tipo_movimiento='ingreso',
+                                categoria='venta',
+                                monto=ingreso_total_venta,
+                                usuario=request.user
+                            )
+                        
                         messages.success(
                             request, 
                             f'¡Producción de "{lista.nombre}" completada! '
-                            f'Se produjeron {total_producidos} moños en total.'
+                            f'Se produjeron {total_producidos} moños en total. '
+                            f'Venta registrada automáticamente: ${ingreso_total_venta:,.2f}'
                         )
                     else:
                         messages.info(
