@@ -1391,6 +1391,18 @@ def reabastecimiento(request):
                 lista.estado = 'en_produccion'
                 lista.save()
                 
+                # Verificar nuevamente justo antes del descuento (por seguridad)
+                materiales_suficientes_final, _ = verificar_materiales_suficientes(lista)
+                if not materiales_suficientes_final:
+                    # Revertir estado si ya no hay suficientes materiales
+                    lista.estado = 'reabastecido'
+                    lista.save()
+                    messages.error(
+                        request, 
+                        f'Error: Los materiales cambiaron durante el proceso. No se pudo iniciar la producción de "{lista.nombre}".'
+                    )
+                    return redirect('inventario:reabastecimiento')
+                
                 # Descontar materiales del inventario
                 materiales_descontados = descontar_materiales_produccion(lista)
                 
@@ -1510,8 +1522,9 @@ def descontar_materiales_produccion(lista_produccion):
             cantidad_por_mono = receta.cantidad_necesaria
             cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
             
-            # Descontar del inventario
+            # Verificar si hay suficiente material antes de descontar
             if material.cantidad_disponible >= cantidad_total_necesaria:
+                # Descontar del inventario solo si hay suficiente
                 material.cantidad_disponible -= cantidad_total_necesaria
                 material.save()
                 
@@ -1528,23 +1541,12 @@ def descontar_materiales_produccion(lista_produccion):
                 
                 materiales_descontados += 1
             else:
-                # Si no hay suficiente material, usar lo que hay disponible
-                cantidad_usada = material.cantidad_disponible
-                material.cantidad_disponible = 0
-                material.save()
-                
-                # Actualizar cantidad utilizada
-                try:
-                    resumen = ResumenMateriales.objects.get(
-                        lista_produccion=lista_produccion,
-                        material=material
-                    )
-                    resumen.cantidad_utilizada += cantidad_usada
-                    resumen.save()
-                except ResumenMateriales.DoesNotExist:
-                    pass
-                
-                materiales_descontados += 1
+                # ERROR: No hay suficiente material - esto no debería pasar
+                # si la validación funcionó correctamente
+                print(f"ERROR: Material {material.nombre} insuficiente. "
+                      f"Necesario: {cantidad_total_necesaria}, "
+                      f"Disponible: {material.cantidad_disponible}")
+                # NO descontar nada si no hay suficiente material
     
     return materiales_descontados
 
