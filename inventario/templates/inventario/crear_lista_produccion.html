@@ -277,45 +277,68 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para agregar nuevo formulario
     function addForm() {
-        if (formCount < maxForms) {
-            const template = document.getElementById('empty-form-template');
-            const container = document.getElementById('formset-forms');
-            
-            if (!template || !container) {
-                console.error('No se encontraron los elementos necesarios para agregar formulario');
-                return;
-            }
-            
-            const newForm = template.innerHTML.replace(/__prefix__/g, formCount);
-            container.insertAdjacentHTML('beforeend', newForm);
+        console.log('🔵 addForm() llamada - formCount:', formCount, 'maxForms:', maxForms);
         
-            // Crear y configurar el select de moños
-            const newFormDiv = container.lastElementChild;
-            const selectContainer = newFormDiv.querySelector('.col-md-4 label').nextElementSibling;
-            
-            const select = document.createElement('select');
-            select.name = `form-${formCount}-monos`;
-            select.className = 'form-control moños-select';
-            select.innerHTML = '<option value="">Seleccionar moño</option>';
-            
-            moñosDisponibles.forEach(mono => {
-                const option = document.createElement('option');
-                option.value = mono.id;
-                option.textContent = `${mono.codigo} - ${mono.nombre}`;
-                option.setAttribute('data-precio', mono.precio);
-                select.appendChild(option);
-            });
-            
-            selectContainer.replaceWith(select);
-            
-            // Configurar eventos para el nuevo formulario
-            configurarEventosFormulario(newFormDiv, formCount);
-            
-            formCount++;
-            totalFormsInput.value = formCount;
-            
-            actualizarResumen();
+        if (formCount >= maxForms) {
+            console.warn('⚠️ Se alcanzó el máximo de formularios');
+            alert('Se ha alcanzado el número máximo de moños permitidos.');
+            return;
         }
+        
+        const template = document.getElementById('empty-form-template');
+        const container = document.getElementById('formset-forms');
+        
+        if (!template) {
+            console.error('❌ No se encontró el template empty-form-template');
+            return;
+        }
+        
+        if (!container) {
+            console.error('❌ No se encontró el contenedor formset-forms');
+            return;
+        }
+        
+        console.log('✅ Template y contenedor encontrados');
+        
+        const newForm = template.innerHTML.replace(/__prefix__/g, formCount);
+        container.insertAdjacentHTML('beforeend', newForm);
+        console.log('✅ Formulario insertado en el DOM');
+        
+        // Crear y configurar el select de moños
+        const newFormDiv = container.lastElementChild;
+        const selectContainer = newFormDiv.querySelector('.col-md-4 label').nextElementSibling;
+        
+        if (!selectContainer) {
+            console.error('❌ No se encontró el contenedor del select');
+            return;
+        }
+        
+        const select = document.createElement('select');
+        select.name = `form-${formCount}-monos`;
+        select.className = 'form-control moños-select';
+        select.innerHTML = '<option value="">Seleccionar moño</option>';
+        
+        moñosDisponibles.forEach(mono => {
+            const option = document.createElement('option');
+            option.value = mono.id;
+            option.textContent = `${mono.codigo} - ${mono.nombre}`;
+            option.setAttribute('data-precio', mono.precio);
+            option.setAttribute('data-tipo-venta', mono.tipo_venta);
+            select.appendChild(option);
+        });
+        
+        selectContainer.replaceWith(select);
+        console.log('✅ Select de moños creado y agregado');
+        
+        // Configurar eventos para el nuevo formulario
+        configurarEventosFormulario(newFormDiv, formCount);
+        
+        formCount++;
+        totalFormsInput.value = formCount;
+        console.log('✅ FormCount actualizado a:', formCount);
+        
+        actualizarResumen();
+        console.log('✅ Moño agregado exitosamente');
     }
     
     // Configurar eventos para formularios existentes
@@ -447,9 +470,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Event listeners para el botón de agregar
-    const addButton = document.getElementById('add-form');
+    const addButton = document.getElementById('add-mono');
     if (addButton) {
         addButton.addEventListener('click', addForm);
+    } else {
+        console.error('No se encontró el botón de agregar moño');
     }
     
     // Event listeners para campos de cantidad
