@@ -1420,13 +1420,28 @@ def reabastecimiento(request):
                     return redirect('inventario:reabastecimiento')
                 
                 # Descontar materiales del inventario
-                materiales_descontados = descontar_materiales_produccion(lista, request.user)
-                
-                messages.success(
-                    request, 
-                    f'Se inició la producción de "{lista.nombre}". '
-                    f'Se descontaron {materiales_descontados} materiales del inventario.'
-                )
+                try:
+                    materiales_descontados = descontar_materiales_produccion(lista, request.user)
+                    
+                    messages.success(
+                        request, 
+                        f'Se inició la producción de "{lista.nombre}". '
+                        f'Se descontaron {materiales_descontados} materiales del inventario.'
+                    )
+                except Exception as e:
+                    # Revertir estado si hay error
+                    lista.estado = 'reabastecido'
+                    lista.save()
+                    
+                    import traceback
+                    error_detalle = traceback.format_exc()
+                    print(f"\n❌ ERROR AL DESCONTAR MATERIALES:\n{error_detalle}")
+                    
+                    messages.error(
+                        request,
+                        f'Error al descontar materiales de "{lista.nombre}": {str(e)}'
+                    )
+                    return redirect('inventario:reabastecimiento')
                 
             elif accion == 'finalizar_produccion':
                 # Obtener cantidades producidas del formulario
@@ -1553,100 +1568,124 @@ def reabastecimiento(request):
 def descontar_materiales_produccion(lista_produccion, usuario=None):
     """Descuenta materiales del inventario según las recetas de los moños"""
     
+    from django.db import transaction
+    import traceback
+    
     materiales_descontados = 0
+    errores = []
     
     print(f"\n{'='*60}")
     print(f"🏭 INICIANDO DESCUENTO DE MATERIALES - Lista #{lista_produccion.id}")
     print(f"{'='*60}")
     
-    for detalle in lista_produccion.detalles_monos.all():
-        monos = detalle.monos
-        cantidad_total_planificada = detalle.cantidad_total_planificada
-        
-        print(f"\n🎀 Moño: {monos.codigo} - {monos.nombre}")
-        print(f"   Cantidad planificada: {cantidad_total_planificada}")
-        
-        # Obtener recetas del moño
-        recetas = monos.recetas.all()
-        print(f"   Recetas encontradas: {recetas.count()}")
-        
-        if recetas.count() == 0:
-            print(f"   ⚠️  NO HAY RECETAS para este moño!")
-            continue
-        
-        for receta in recetas:
-            # Recargar el material desde la BD para asegurar datos frescos
-            material = receta.material
-            material.refresh_from_db()
+    try:
+        with transaction.atomic():
+            for detalle in lista_produccion.detalles_monos.all():
+                monos = detalle.monos
+                cantidad_total_planificada = detalle.cantidad_total_planificada
+                
+                print(f"\n🎀 Moño: {monos.codigo} - {monos.nombre}")
+                print(f"   Cantidad planificada: {cantidad_total_planificada}")
+                
+                # Obtener recetas del moño
+                recetas = monos.recetas.all()
+                print(f"   Recetas encontradas: {recetas.count()}")
+                
+                if recetas.count() == 0:
+                    print(f"   ⚠️  NO HAY RECETAS para este moño!")
+                    continue
+                
+                for receta in recetas:
+                    try:
+                        # Recargar el material desde la BD para asegurar datos frescos
+                        material = receta.material
+                        material.refresh_from_db()
+                        
+                        cantidad_por_mono = receta.cantidad_necesaria
+                        cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
+                        
+                        print(f"\n   📦 Material: {material.nombre} (ID: {material.id})")
+                        print(f"      Código: {material.codigo}")
+                        print(f"      Unidad: {material.unidad_base}")
+                        print(f"      Cantidad por moño: {cantidad_por_mono} {material.unidad_base}")
+                        print(f"      Cantidad total necesaria: {cantidad_total_necesaria} {material.unidad_base}")
+                        print(f"      Disponible en inventario: {material.cantidad_disponible} {material.unidad_base}")
+                        
+                        # Verificar si hay suficiente material antes de descontar
+                        if material.cantidad_disponible >= cantidad_total_necesaria:
+                            # Guardar cantidad anterior para el registro de movimiento
+                            cantidad_anterior = material.cantidad_disponible
+                            
+                            print(f"\n📦 Material: {material.nombre}")
+                            print(f"   Cantidad anterior: {cantidad_anterior} {material.unidad_base}")
+                            print(f"   Cantidad a descontar: {cantidad_total_necesaria} {material.unidad_base}")
+                            
+                            # Descontar del inventario solo si hay suficiente
+                            material.cantidad_disponible -= cantidad_total_necesaria
+                            material.save()
+                            
+                            # Recargar para confirmar que se guardó
+                            material.refresh_from_db()
+                            
+                            print(f"   Cantidad nueva: {material.cantidad_disponible} {material.unidad_base}")
+                            print(f"   ✅ Material guardado en BD correctamente")
+                            
+                            # Registrar movimiento de salida por producción
+                            movimiento = Movimiento.objects.create(
+                                material=material,
+                                tipo_movimiento='produccion',
+                                cantidad=-cantidad_total_necesaria,  # Negativo porque es salida
+                                cantidad_anterior=cantidad_anterior,
+                                cantidad_nueva=material.cantidad_disponible,
+                                precio_unitario=material.precio_unitario,
+                                costo_total_movimiento=material.precio_unitario * cantidad_total_necesaria if material.precio_unitario else None,
+                                detalle=f"Producción - Lista #{lista_produccion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
+                                usuario=usuario
+                            )
+                            print(f"   ✅ Movimiento registrado: ID={movimiento.id}")
+                            print(f"   💰 Costo: ${movimiento.costo_total_movimiento or 0:.2f}")
+                            
+                            # Actualizar cantidad utilizada en el resumen
+                            try:
+                                resumen = ResumenMateriales.objects.get(
+                                    lista_produccion=lista_produccion,
+                                    material=material
+                                )
+                                resumen.cantidad_utilizada += cantidad_total_necesaria
+                                resumen.save()
+                                print(f"   ✅ Resumen actualizado")
+                            except ResumenMateriales.DoesNotExist:
+                                print(f"   ⚠️  No existe ResumenMateriales para este material")
+                            
+                            materiales_descontados += 1
+                        else:
+                            # ERROR: No hay suficiente material - esto no debería pasar
+                            # si la validación funcionó correctamente
+                            error_msg = f"Material {material.nombre} insuficiente! Necesario: {cantidad_total_necesaria}, Disponible: {material.cantidad_disponible}"
+                            print(f"\n      ❌ ERROR: {error_msg}")
+                            errores.append(error_msg)
+                            
+                    except Exception as e:
+                        error_msg = f"Error procesando material {material.nombre}: {str(e)}"
+                        print(f"\n      ❌ EXCEPCIÓN: {error_msg}")
+                        print(f"      Traceback: {traceback.format_exc()}")
+                        errores.append(error_msg)
+                        # NO hacer raise aquí para seguir procesando otros materiales
             
-            cantidad_por_mono = receta.cantidad_necesaria
-            cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
+            print(f"\n{'='*60}")
+            print(f"✅ DESCUENTO COMPLETADO: {materiales_descontados} materiales procesados")
+            if errores:
+                print(f"⚠️  ERRORES ENCONTRADOS: {len(errores)}")
+                for error in errores:
+                    print(f"   - {error}")
+            print(f"{'='*60}\n")
             
-            print(f"\n   📦 Material: {material.nombre} (ID: {material.id})")
-            print(f"      Código: {material.codigo}")
-            print(f"      Unidad: {material.unidad_base}")
-            print(f"      Cantidad por moño: {cantidad_por_mono} {material.unidad_base}")
-            print(f"      Cantidad total necesaria: {cantidad_total_necesaria} {material.unidad_base}")
-            print(f"      Disponible en inventario: {material.cantidad_disponible} {material.unidad_base}")
-            
-            # Verificar si hay suficiente material antes de descontar
-            if material.cantidad_disponible >= cantidad_total_necesaria:
-                # Guardar cantidad anterior para el registro de movimiento
-                cantidad_anterior = material.cantidad_disponible
-                
-                print(f"\n📦 Material: {material.nombre}")
-                print(f"   Cantidad anterior: {cantidad_anterior} {material.unidad_base}")
-                print(f"   Cantidad a descontar: {cantidad_total_necesaria} {material.unidad_base}")
-                
-                # Descontar del inventario solo si hay suficiente
-                material.cantidad_disponible -= cantidad_total_necesaria
-                material.save()
-                
-                # Recargar para confirmar que se guardó
-                material.refresh_from_db()
-                
-                print(f"   Cantidad nueva: {material.cantidad_disponible} {material.unidad_base}")
-                print(f"   ✅ Material guardado en BD correctamente")
-                
-                # Registrar movimiento de salida por producción
-                movimiento = Movimiento.objects.create(
-                    material=material,
-                    tipo_movimiento='produccion',
-                    cantidad=-cantidad_total_necesaria,  # Negativo porque es salida
-                    cantidad_anterior=cantidad_anterior,
-                    cantidad_nueva=material.cantidad_disponible,
-                    precio_unitario=material.precio_unitario,
-                    costo_total_movimiento=material.precio_unitario * cantidad_total_necesaria if material.precio_unitario else None,
-                    detalle=f"Producción - Lista #{lista_produccion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
-                    usuario=usuario
-                )
-                print(f"   ✅ Movimiento registrado: ID={movimiento.id}")
-                print(f"   💰 Costo: ${movimiento.costo_total_movimiento or 0:.2f}")
-                
-                # Actualizar cantidad utilizada en el resumen
-                try:
-                    resumen = ResumenMateriales.objects.get(
-                        lista_produccion=lista_produccion,
-                        material=material
-                    )
-                    resumen.cantidad_utilizada += cantidad_total_necesaria
-                    resumen.save()
-                except ResumenMateriales.DoesNotExist:
-                    pass
-                
-                materiales_descontados += 1
-            else:
-                # ERROR: No hay suficiente material - esto no debería pasar
-                # si la validación funcionó correctamente
-                print(f"\n      ❌ ERROR: Material {material.nombre} insuficiente!")
-                print(f"         Necesario: {cantidad_total_necesaria} {material.unidad_base}")
-                print(f"         Disponible: {material.cantidad_disponible} {material.unidad_base}")
-                print(f"         Faltante: {cantidad_total_necesaria - material.cantidad_disponible} {material.unidad_base}")
-                # NO descontar nada si no hay suficiente material
-    
-    print(f"\n{'='*60}")
-    print(f"✅ DESCUENTO COMPLETADO: {materiales_descontados} materiales procesados")
-    print(f"{'='*60}\n")
+    except Exception as e:
+        error_msg = f"Error crítico en descuento de materiales: {str(e)}"
+        print(f"\n❌ ERROR CRÍTICO: {error_msg}")
+        print(f"Traceback completo:\n{traceback.format_exc()}")
+        errores.append(error_msg)
+        raise  # Re-lanzar para que se revierta la transacción
     
     return materiales_descontados
 
