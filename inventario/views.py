@@ -1575,11 +1575,16 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
             continue
         
         for receta in recetas:
+            # Recargar el material desde la BD para asegurar datos frescos
             material = receta.material
+            material.refresh_from_db()
+            
             cantidad_por_mono = receta.cantidad_necesaria
             cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
             
-            print(f"\n   📦 Material: {material.nombre}")
+            print(f"\n   📦 Material: {material.nombre} (ID: {material.id})")
+            print(f"      Código: {material.codigo}")
+            print(f"      Unidad: {material.unidad_base}")
             print(f"      Cantidad por moño: {cantidad_por_mono} {material.unidad_base}")
             print(f"      Cantidad total necesaria: {cantidad_total_necesaria} {material.unidad_base}")
             print(f"      Disponible en inventario: {material.cantidad_disponible} {material.unidad_base}")
@@ -1597,7 +1602,11 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
                 material.cantidad_disponible -= cantidad_total_necesaria
                 material.save()
                 
+                # Recargar para confirmar que se guardó
+                material.refresh_from_db()
+                
                 print(f"   Cantidad nueva: {material.cantidad_disponible} {material.unidad_base}")
+                print(f"   ✅ Material guardado en BD correctamente")
                 
                 # Registrar movimiento de salida por producción
                 movimiento = Movimiento.objects.create(
