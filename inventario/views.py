@@ -1420,7 +1420,7 @@ def reabastecimiento(request):
                     return redirect('inventario:reabastecimiento')
                 
                 # Descontar materiales del inventario
-                materiales_descontados = descontar_materiales_produccion(lista)
+                materiales_descontados = descontar_materiales_produccion(lista, request.user)
                 
                 messages.success(
                     request, 
@@ -1523,7 +1523,7 @@ def reabastecimiento(request):
     return render(request, 'inventario/reabastecimiento.html', context)
 
 
-def descontar_materiales_produccion(lista_produccion):
+def descontar_materiales_produccion(lista_produccion, usuario=None):
     """Descuenta materiales del inventario según las recetas de los moños"""
     
     materiales_descontados = 0
@@ -1540,9 +1540,25 @@ def descontar_materiales_produccion(lista_produccion):
             
             # Verificar si hay suficiente material antes de descontar
             if material.cantidad_disponible >= cantidad_total_necesaria:
+                # Guardar cantidad anterior para el registro de movimiento
+                cantidad_anterior = material.cantidad_disponible
+                
                 # Descontar del inventario solo si hay suficiente
                 material.cantidad_disponible -= cantidad_total_necesaria
                 material.save()
+                
+                # Registrar movimiento de salida por producción
+                Movimiento.objects.create(
+                    material=material,
+                    tipo_movimiento='produccion',
+                    cantidad=-cantidad_total_necesaria,  # Negativo porque es salida
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=material.cantidad_disponible,
+                    precio_unitario=material.precio_unitario,
+                    costo_total_movimiento=material.precio_unitario * cantidad_total_necesaria if material.precio_unitario else None,
+                    detalle=f"Producción - Lista #{lista_produccion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
+                    usuario=usuario
+                )
                 
                 # Actualizar cantidad utilizada en el resumen
                 try:
