@@ -1631,19 +1631,23 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
                             print(f"   ✅ Material guardado en BD correctamente")
                             
                             # Registrar movimiento de salida por producción
+                            costo_unitario = material.costo_unitario
+                            costo_total = costo_unitario * cantidad_total_necesaria if costo_unitario else None
+                            
                             movimiento = Movimiento.objects.create(
                                 material=material,
                                 tipo_movimiento='produccion',
                                 cantidad=-cantidad_total_necesaria,  # Negativo porque es salida
                                 cantidad_anterior=cantidad_anterior,
                                 cantidad_nueva=material.cantidad_disponible,
-                                precio_unitario=material.precio_unitario,
-                                costo_total_movimiento=material.precio_unitario * cantidad_total_necesaria if material.precio_unitario else None,
+                                precio_unitario=costo_unitario,
+                                costo_total_movimiento=costo_total,
                                 detalle=f"Producción - Lista #{lista_produccion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
                                 usuario=usuario
                             )
                             print(f"   ✅ Movimiento registrado: ID={movimiento.id}")
-                            print(f"   💰 Costo: ${movimiento.costo_total_movimiento or 0:.2f}")
+                            print(f"   💰 Costo unitario: ${costo_unitario or 0:.2f}")
+                            print(f"   💰 Costo total: ${costo_total or 0:.2f}")
                             
                             # Actualizar cantidad utilizada en el resumen
                             try:
