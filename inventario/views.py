@@ -1528,6 +1528,10 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
     
     materiales_descontados = 0
     
+    print(f"\n{'='*60}")
+    print(f"🏭 INICIANDO DESCUENTO DE MATERIALES - Lista #{lista_produccion.id}")
+    print(f"{'='*60}")
+    
     for detalle in lista_produccion.detalles_monos.all():
         monos = detalle.monos
         cantidad_total_planificada = detalle.cantidad_total_planificada
@@ -1543,12 +1547,18 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
                 # Guardar cantidad anterior para el registro de movimiento
                 cantidad_anterior = material.cantidad_disponible
                 
+                print(f"\n📦 Material: {material.nombre}")
+                print(f"   Cantidad anterior: {cantidad_anterior} {material.unidad_base}")
+                print(f"   Cantidad a descontar: {cantidad_total_necesaria} {material.unidad_base}")
+                
                 # Descontar del inventario solo si hay suficiente
                 material.cantidad_disponible -= cantidad_total_necesaria
                 material.save()
                 
+                print(f"   Cantidad nueva: {material.cantidad_disponible} {material.unidad_base}")
+                
                 # Registrar movimiento de salida por producción
-                Movimiento.objects.create(
+                movimiento = Movimiento.objects.create(
                     material=material,
                     tipo_movimiento='produccion',
                     cantidad=-cantidad_total_necesaria,  # Negativo porque es salida
@@ -1559,6 +1569,8 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
                     detalle=f"Producción - Lista #{lista_produccion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
                     usuario=usuario
                 )
+                print(f"   ✅ Movimiento registrado: ID={movimiento.id}")
+                print(f"   💰 Costo: ${movimiento.costo_total_movimiento or 0:.2f}")
                 
                 # Actualizar cantidad utilizada en el resumen
                 try:
@@ -1575,10 +1587,14 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
             else:
                 # ERROR: No hay suficiente material - esto no debería pasar
                 # si la validación funcionó correctamente
-                print(f"ERROR: Material {material.nombre} insuficiente. "
-                      f"Necesario: {cantidad_total_necesaria}, "
-                      f"Disponible: {material.cantidad_disponible}")
+                print(f"\n❌ ERROR: Material {material.nombre} insuficiente!")
+                print(f"   Necesario: {cantidad_total_necesaria} {material.unidad_base}")
+                print(f"   Disponible: {material.cantidad_disponible} {material.unidad_base}")
                 # NO descontar nada si no hay suficiente material
+    
+    print(f"\n{'='*60}")
+    print(f"✅ DESCUENTO COMPLETADO: {materiales_descontados} materiales procesados")
+    print(f"{'='*60}\n")
     
     return materiales_descontados
 

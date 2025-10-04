@@ -233,17 +233,27 @@
                                             <span class="badge bg-danger">
                                                 <i class="fas fa-arrow-down me-1"></i>Salida
                                             </span>
-                                        {% else %}
+                                        {% elif movimiento.tipo_movimiento == 'produccion' %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-industry me-1"></i>Producción
+                                            </span>
+                                        {% elif movimiento.tipo_movimiento == 'ajuste' %}
                                             <span class="badge bg-info">
                                                 <i class="fas fa-edit me-1"></i>Ajuste
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="fas fa-question me-1"></i>{{ movimiento.get_tipo_movimiento_display }}
                                             </span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if movimiento.tipo_movimiento == 'entrada' %}
-                                            +{{ movimiento.cantidad }}
+                                            <span class="text-success">+{{ movimiento.cantidad }}</span>
+                                        {% elif movimiento.tipo_movimiento == 'produccion' %}
+                                            <span class="text-warning">{{ movimiento.cantidad }}</span>
                                         {% else %}
-                                            -{{ movimiento.cantidad }}
+                                            <span class="text-danger">{{ movimiento.cantidad }}</span>
                                         {% endif %}
                                         {{ material.unidad_base }}
                                     </td>
