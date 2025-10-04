@@ -245,7 +245,6 @@
                 <label class="form-label">
                     <strong>Moño</strong>
                 </label>
-                <!-- Aquí se insertará el select dinámicamente -->
             </div>
             <div class="col-md-4">
                 <label class="form-label">
@@ -306,9 +305,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cargar datos de Django desde el script JSON
     const djangoData = JSON.parse(document.getElementById('django-data').textContent);
     
+    console.log('📊 Datos cargados:', djangoData);
+    console.log('📋 Moños disponibles:', djangoData.monos ? djangoData.monos.length : 0);
+    
     let formCount = djangoData.formset.totalForms || 0;
     const maxForms = djangoData.formset.maxForms || 1000;
     const moñosDisponibles = djangoData.monos || [];
+    
+    if (moñosDisponibles.length === 0) {
+        console.warn('⚠️ No hay moños disponibles para agregar');
+    }
     
     const totalFormsInput = document.querySelector('[name$="-TOTAL_FORMS"]');
     
@@ -349,16 +355,21 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Crear y configurar el select de moños
         const newFormDiv = container.lastElementChild;
-        const selectContainer = newFormDiv.querySelector('.col-md-4 label').nextElementSibling;
         
-        if (!selectContainer) {
-            console.error('❌ No se encontró el contenedor del select');
+        // Buscar el div que contiene el label de "Moño" para insertar el select ahí
+        const labelDiv = newFormDiv.querySelector('.col-md-4');
+        
+        if (!labelDiv) {
+            console.error('❌ No se encontró el contenedor del label');
             return;
         }
+        
+        console.log('✅ Contenedor del label encontrado');
         
         const select = document.createElement('select');
         select.name = `form-${formCount}-monos`;
         select.className = 'form-control moños-select';
+        select.required = true;
         select.innerHTML = '<option value="">Seleccionar moño</option>';
         
         moñosDisponibles.forEach(mono => {
@@ -370,7 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
             select.appendChild(option);
         });
         
-        selectContainer.replaceWith(select);
+        // Agregar el select después del label
+        labelDiv.appendChild(select);
         console.log('✅ Select de moños creado y agregado');
         
         // Configurar eventos para el nuevo formulario
