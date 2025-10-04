@@ -1,6 +1,6 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
-from .models import Material, Monos, RecetaMonos
+from .models import Material, Monos, RecetaMonos, ListaProduccion
 
 @staff_member_required
 def verificar_unidades_web(request):
@@ -113,3 +113,56 @@ def verificar_unidades_web(request):
     """
     
     return HttpResponse(html)
+
+
+@staff_member_required
+def simular_descuento_lista(request, lista_id):
+    """Simula el descuento de materiales sin ejecutarlo realmente"""
+    
+    try:
+        lista = ListaProduccion.objects.get(id=lista_id)
+    except ListaProduccion.DoesNotExist:
+        return JsonResponse({'error': 'Lista no encontrada'}, status=404)
+    
+    resultado = {
+        'lista_id': lista.id,
+        'estado': lista.estado,
+        'detalles': []
+    }
+    
+    for detalle in lista.detalles_monos.all():
+        monos = detalle.monos
+        cantidad_total_planificada = detalle.cantidad_total_planificada
+        
+        detalle_info = {
+            'monos': f"{monos.codigo} - {monos.nombre}",
+            'cantidad_planificada': float(cantidad_total_planificada),
+            'recetas': []
+        }
+        
+        recetas = monos.recetas.all()
+        
+        if recetas.count() == 0:
+            detalle_info['warning'] = 'NO HAY RECETAS PARA ESTE MOÑO'
+        
+        for receta in recetas:
+            material = receta.material
+            cantidad_por_mono = receta.cantidad_necesaria
+            cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
+            
+            receta_info = {
+                'material': material.nombre,
+                'material_codigo': material.codigo,
+                'unidad_base': material.unidad_base,
+                'cantidad_por_mono': float(cantidad_por_mono),
+                'cantidad_total_necesaria': float(cantidad_total_necesaria),
+                'disponible': float(material.cantidad_disponible),
+                'suficiente': material.cantidad_disponible >= cantidad_total_necesaria,
+                'nuevo_inventario': float(material.cantidad_disponible - cantidad_total_necesaria)
+            }
+            
+            detalle_info['recetas'].append(receta_info)
+        
+        resultado['detalles'].append(detalle_info)
+    
+    return JsonResponse(resultado, json_dumps_params={'indent': 2})
