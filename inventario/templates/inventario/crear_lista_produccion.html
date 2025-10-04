@@ -14,26 +14,9 @@
         transition: all 0.3s ease;
     }
     
+    /* Estilo para formularios que serán eliminados (ocultos) */
     .delete-row {
-        background-color: #ffe6e6 !important;
-        opacity: 0.6;
-        text-decoration: line-through;
-        position: relative;
-    }
-    
-    .delete-row::before {
-        content: '🗑️ SERÁ ELIMINADO';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: rgba(220, 53, 69, 0.9);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        font-weight: bold;
-        z-index: 10;
-        pointer-events: none;
+        display: none !important;
     }
     
     .btn-add-mono {
@@ -444,34 +427,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Marcar como eliminado visualmente
-            formDiv.classList.add('delete-row');
+            console.log('🗑️ Eliminando moño...');
             
             const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
             if (deleteInput) {
-                // Es un formulario existente - solo marcarlo como DELETE
+                // Es un formulario existente - marcarlo como DELETE y ocultarlo
                 deleteInput.checked = true;
-                console.log('✅ Formulario marcado para eliminación (será eliminado al guardar)');
-                
-                // Deshabilitar campos para que no se vean activos
-                const inputs = formDiv.querySelectorAll('input, select');
-                inputs.forEach(input => {
-                    if (!input.name.includes('-DELETE')) {
-                        input.disabled = true;
-                    }
-                });
+                console.log('✅ Formulario existente marcado para eliminación');
             } else {
-                // Es un formulario nuevo - eliminarlo directamente del DOM
-                formDiv.remove();
-                console.log('✅ Formulario nuevo eliminado del DOM');
-                
-                // Recalcular formCount
+                // Es un formulario nuevo - recalcular formCount
                 formCount--;
                 totalFormsInput.value = formCount;
+                console.log('✅ Formulario nuevo eliminado');
             }
             
-            actualizarResumen();
-            console.log('✅ Moño eliminado exitosamente');
+            // Animación de eliminación para todos los casos
+            formDiv.style.transition = 'all 0.3s ease-out';
+            formDiv.style.opacity = '0';
+            formDiv.style.transform = 'translateX(-20px)';
+            
+            setTimeout(() => {
+                formDiv.style.display = 'none'; // Ocultarlo completamente
+                actualizarResumen();
+                console.log('✅ Moño eliminado exitosamente');
+            }, 300);
         }
     });
     
@@ -541,7 +520,13 @@ document.addEventListener('DOMContentLoaded', function() {
         let tiposMonos = 0;
         let gananciaTotal = 0;
         
-        document.querySelectorAll('.formset-row:not(.delete-row)').forEach(formDiv => {
+        // Filtrar solo formularios visibles y no marcados para eliminar
+        document.querySelectorAll('.formset-row').forEach(formDiv => {
+            // Saltar si está oculto o marcado para eliminar
+            if (formDiv.style.display === 'none' || formDiv.classList.contains('delete-row')) {
+                return;
+            }
+            
             const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
             if (deleteInput && deleteInput.checked) return;
             
@@ -618,9 +603,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const listaForm = document.getElementById('lista-form');
     if (listaForm) {
         listaForm.addEventListener('submit', function(e) {
-            // Contar moños activos (no marcados para eliminar)
+            // Contar moños activos (visibles y no marcados para eliminar)
             let monosActivos = 0;
-            document.querySelectorAll('.formset-row:not(.delete-row)').forEach(formDiv => {
+            document.querySelectorAll('.formset-row').forEach(formDiv => {
+                // Saltar si está oculto
+                if (formDiv.style.display === 'none' || formDiv.classList.contains('delete-row')) {
+                    return;
+                }
+                
                 const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
                 if (deleteInput && deleteInput.checked) return;
                 
