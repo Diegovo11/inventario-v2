@@ -11,11 +11,29 @@
         padding: 15px;
         margin-bottom: 15px;
         background-color: #f8f9fa;
+        transition: all 0.3s ease;
     }
     
     .delete-row {
         background-color: #ffe6e6 !important;
         opacity: 0.6;
+        text-decoration: line-through;
+        position: relative;
+    }
+    
+    .delete-row::before {
+        content: '🗑️ SERÁ ELIMINADO';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(220, 53, 69, 0.9);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        z-index: 10;
+        pointer-events: none;
     }
     
     .btn-add-mono {
@@ -25,6 +43,13 @@
         padding: 8px 15px;
         border-radius: 5px;
         font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-add-mono:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
     .btn-remove-mono {
@@ -34,6 +59,13 @@
         padding: 5px 10px;
         border-radius: 3px;
         font-size: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-remove-mono:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     
     .mono-info {
@@ -48,6 +80,16 @@
     .cantidad-input {
         text-align: center;
         font-weight: bold;
+    }
+    
+    /* Animación para llamar atención */
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    
+    .btn-pulse {
+        animation: pulse 0.5s ease-in-out 3;
     }
 </style>
 {% endblock %}
@@ -92,6 +134,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">
                                 <i class="fas fa-ribbon me-2"></i>Moños a Producir
+                                <span class="badge bg-primary ms-2" id="contador-monos">0</span>
                             </h5>
                             <button type="button" class="btn btn-add-mono" id="add-mono">
                                 <i class="fas fa-plus me-1"></i>Agregar Moño
@@ -339,6 +382,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         actualizarResumen();
         console.log('✅ Moño agregado exitosamente');
+        
+        // Scroll suave al nuevo formulario
+        setTimeout(() => {
+            newFormDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight temporal del nuevo formulario
+            newFormDiv.style.transition = 'all 0.3s';
+            newFormDiv.style.backgroundColor = '#d4edda';
+            setTimeout(() => {
+                newFormDiv.style.backgroundColor = '#f8f9fa';
+            }, 1000);
+        }, 100);
     }
     
     // Configurar eventos para formularios existentes
@@ -346,20 +400,66 @@ document.addEventListener('DOMContentLoaded', function() {
         configurarEventosFormulario(formDiv, index);
     });
     
-    // Eliminar formulario
+    // Eliminar formulario - Mejorado con confirmación y logs
     document.addEventListener('click', function(e) {
         if (e.target.closest('.delete-form')) {
-            const formDiv = e.target.closest('.formset-row');
+            e.preventDefault();
+            
+            const button = e.target.closest('.delete-form');
+            const formDiv = button.closest('.formset-row');
+            
+            if (!formDiv) {
+                console.error('❌ No se encontró el formulario a eliminar');
+                return;
+            }
+            
+            console.log('🗑️ Intentando eliminar moño...');
+            
+            // Confirmar eliminación si el formulario tiene datos
+            const monosSelect = formDiv.querySelector('[name$="-monos"]');
+            const cantidadInput = formDiv.querySelector('[name$="-cantidad"]');
+            
+            let tienedatos = false;
+            if (monosSelect && monosSelect.value) {
+                tienedatos = true;
+            }
+            
+            // Si tiene datos, pedir confirmación
+            if (tienedatos) {
+                if (!confirm('¿Estás seguro de eliminar este moño de la lista?')) {
+                    console.log('⚠️ Eliminación cancelada por el usuario');
+                    return;
+                }
+            }
+            
+            // Marcar como eliminado visualmente
             formDiv.classList.add('delete-row');
             
             const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
             if (deleteInput) {
+                // Es un formulario existente - solo marcarlo como DELETE
                 deleteInput.checked = true;
+                console.log('✅ Formulario marcado para eliminación (será eliminado al guardar)');
+                
+                // Deshabilitar campos para que no se vean activos
+                const inputs = formDiv.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    if (!input.name.includes('-DELETE')) {
+                        input.disabled = true;
+                    }
+                });
             } else {
+                // Es un formulario nuevo - eliminarlo directamente del DOM
                 formDiv.remove();
+                console.log('✅ Formulario nuevo eliminado del DOM');
+                
+                // Recalcular formCount
+                formCount--;
+                totalFormsInput.value = formCount;
             }
             
             actualizarResumen();
+            console.log('✅ Moño eliminado exitosamente');
         }
     });
     
@@ -463,10 +563,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalMonosEl = document.getElementById('total-monos');
         const tiposMonosEl = document.getElementById('tipos-monos');
         const gananciaEl = document.getElementById('ganancia-estimada');
+        const contadorMonos = document.getElementById('contador-monos');
         
         if (totalMonosEl) totalMonosEl.textContent = totalMonos;
         if (tiposMonosEl) tiposMonosEl.textContent = tiposMonos;
         if (gananciaEl) gananciaEl.textContent = '$' + gananciaTotal.toFixed(2);
+        
+        // Actualizar contador visual de moños activos
+        if (contadorMonos) {
+            contadorMonos.textContent = tiposMonos;
+            // Cambiar color según cantidad
+            if (tiposMonos === 0) {
+                contadorMonos.className = 'badge bg-secondary ms-2';
+            } else if (tiposMonos < 5) {
+                contadorMonos.className = 'badge bg-primary ms-2';
+            } else {
+                contadorMonos.className = 'badge bg-success ms-2';
+            }
+        }
     }
     
     // Event listeners para el botón de agregar
@@ -487,6 +601,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // Validación del formulario al enviar
+    const listaForm = document.getElementById('lista-form');
+    if (listaForm) {
+        listaForm.addEventListener('submit', function(e) {
+            // Contar moños activos (no marcados para eliminar)
+            let monosActivos = 0;
+            document.querySelectorAll('.formset-row:not(.delete-row)').forEach(formDiv => {
+                const deleteInput = formDiv.querySelector('[name$="-DELETE"]');
+                if (deleteInput && deleteInput.checked) return;
+                
+                const monosSelect = formDiv.querySelector('[name$="-monos"]');
+                if (monosSelect && monosSelect.value) {
+                    monosActivos++;
+                }
+            });
+            
+            if (monosActivos === 0) {
+                e.preventDefault();
+                alert('⚠️ Debes agregar al menos un moño a la lista de producción.');
+                console.error('❌ Intento de envío sin moños');
+                
+                // Resaltar el botón de agregar
+                const addButton = document.getElementById('add-mono');
+                if (addButton) {
+                    addButton.style.animation = 'pulse 0.5s ease-in-out 3';
+                    addButton.classList.add('btn-pulse');
+                }
+                
+                return false;
+            }
+            
+            console.log('✅ Formulario válido, enviando...');
+        });
+    }
     
     // Inicializar resumen después de que el DOM esté listo
     setTimeout(function() {
