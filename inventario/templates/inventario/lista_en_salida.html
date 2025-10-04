@@ -134,11 +134,16 @@
                                             <div class="action-buttons">
                                                 <div class="row g-2">
                                                     <div class="col-12">
-                                                        <a href="{% url 'inventario:registrar_salida_materiales' lista.id %}" 
-                                                           class="btn btn-danger btn-sm w-100">
-                                                            <i class="fas fa-box-open me-1"></i>
-                                                            Registrar Salida de Materiales
-                                                        </a>
+                                                        <form method="post" action="{% url 'inventario:reabastecimiento' %}" class="d-inline">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="accion" value="marcar_salida">
+                                                            <input type="hidden" name="lista_id" value="{{ lista.id }}">
+                                                            <button type="submit" class="btn btn-success btn-sm w-100"
+                                                                    onclick="return confirm('¿Confirmar la salida y registrar la venta de esta lista?')">
+                                                                <i class="fas fa-check-circle me-1"></i>
+                                                                Marcar Salida y Registrar Venta
+                                                            </button>
+                                                        </form>
                                                     </div>
                                                     <div class="col-6">
                                                         <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 

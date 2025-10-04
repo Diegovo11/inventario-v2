@@ -1454,7 +1454,8 @@ def reabastecimiento(request):
                     )
                     
                     if produccion_completa:
-                        lista.estado = 'finalizado'
+                        # Cambiar a estado EN_SALIDA (no finalizado todavía)
+                        lista.estado = 'en_salida'
                         lista.save()
                         
                         # Actualizar total de moños producidos
@@ -1465,32 +1466,11 @@ def reabastecimiento(request):
                         lista.total_moños_producidos = total_producidos
                         lista.save()
                         
-                        # Registrar venta automática en contabilidad
-                        from .models import MovimientoEfectivo
-                        
-                        # Calcular ingreso total de la venta
-                        ingreso_total_venta = Decimal('0')
-                        for detalle in lista.detalles_monos.all():
-                            precio_venta = detalle.monos.precio_venta
-                            cantidad_producida = detalle.cantidad_producida
-                            ingreso_detalle = precio_venta * cantidad_producida
-                            ingreso_total_venta += ingreso_detalle
-                        
-                        # Crear movimiento de efectivo por la venta
-                        if ingreso_total_venta > 0:
-                            MovimientoEfectivo.registrar_movimiento(
-                                concepto=f'Venta de producción - Lista: {lista.nombre}',
-                                tipo_movimiento='ingreso',
-                                categoria='venta',
-                                monto=ingreso_total_venta,
-                                usuario=request.user
-                            )
-                        
                         messages.success(
                             request, 
                             f'¡Producción de "{lista.nombre}" completada! '
                             f'Se produjeron {total_producidos} moños en total. '
-                            f'Venta registrada automáticamente: ${ingreso_total_venta:,.2f}'
+                            f'La lista está lista para marcar SALIDA y registrar la venta.'
                         )
                     else:
                         messages.info(
@@ -1500,6 +1480,46 @@ def reabastecimiento(request):
                         )
                 else:
                     messages.warning(request, 'No se actualizó ninguna cantidad.')
+            
+            elif accion == 'marcar_salida':
+                # Esta acción finaliza la lista y registra la venta
+                if lista.estado != 'en_salida':
+                    messages.error(
+                        request,
+                        f'La lista "{lista.nombre}" debe estar en estado "En Salida" para marcar la salida.'
+                    )
+                    return redirect('inventario:reabastecimiento')
+                
+                # Cambiar a estado FINALIZADO
+                lista.estado = 'finalizado'
+                lista.save()
+                
+                # Registrar venta automática en contabilidad
+                from .models import MovimientoEfectivo
+                
+                # Calcular ingreso total de la venta
+                ingreso_total_venta = Decimal('0')
+                for detalle in lista.detalles_monos.all():
+                    precio_venta = detalle.monos.precio_venta
+                    cantidad_producida = detalle.cantidad_producida
+                    ingreso_detalle = precio_venta * cantidad_producida
+                    ingreso_total_venta += ingreso_detalle
+                
+                # Crear movimiento de efectivo por la venta
+                if ingreso_total_venta > 0:
+                    MovimientoEfectivo.registrar_movimiento(
+                        concepto=f'Venta de producción - Lista: {lista.nombre}',
+                        tipo_movimiento='ingreso',
+                        categoria='venta',
+                        monto=ingreso_total_venta,
+                        usuario=request.user
+                    )
+                
+                messages.success(
+                    request, 
+                    f'¡Salida de "{lista.nombre}" registrada exitosamente! '
+                    f'Venta registrada en contaduría: ${ingreso_total_venta:,.2f}'
+                )
                     
         except ListaProduccion.DoesNotExist:
             messages.error(request, 'Lista de producción no encontrada.')
@@ -1514,9 +1534,16 @@ def reabastecimiento(request):
         estado='en_produccion'
     ).prefetch_related('detalles_monos__monos')
     
+    # Obtener listas en salida (producción completada, esperando salida)
+    listas_en_salida = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='en_salida'
+    ).prefetch_related('detalles_monos__monos')
+    
     context = {
         'listas_reabastecidas': listas_reabastecidas,
         'listas_en_produccion': listas_en_produccion,
+        'listas_en_salida': listas_en_salida,
         'titulo': 'Reabastecimiento y Producción'
     }
     
