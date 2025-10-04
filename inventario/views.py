@@ -936,9 +936,8 @@ def generar_archivo_compras(request, lista_id):
     # Obtener materiales faltantes
     materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
     
-    if not materiales_faltantes.exists():
-        messages.info(request, f'La lista "{lista.nombre}" no tiene materiales faltantes.')
-        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    # Generar archivo incluso si no hay materiales faltantes (para referencia)
+    tiene_faltantes = materiales_faltantes.exists()
     
     # Generar contenido del archivo
     contenido = f"""LISTA DE COMPRAS - {lista.nombre}
@@ -951,22 +950,29 @@ MATERIALES NECESARIOS PARA COMPRAR
 
 """
     
+    if not tiene_faltantes:
+        contenido += """✅ ¡EXCELENTE! No hay materiales faltantes.
+Todos los materiales necesarios están disponibles en inventario.
+
+"""
+    
     total_estimado = 0
     
-    for i, resumen in enumerate(materiales_faltantes, 1):
-        material = resumen.material
-        paquetes_necesarios = resumen.paquetes_rollos_necesarios
-        cantidad_total_compra = resumen.cantidad_total_compra
-        costo_estimado = resumen.costo_estimado_compra
-        total_estimado += costo_estimado
-        
-        # Información adicional si comprar paquetes/rollos da más cantidad
-        info_extra = ""
-        if cantidad_total_compra > resumen.cantidad_faltante:
-            sobrante = cantidad_total_compra - resumen.cantidad_faltante
-            info_extra = f"\n   ⚠️  Al comprar {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}, sobrarán {sobrante} {material.unidad_base}"
-        
-        contenido += f"""{i}. {material.nombre}
+    if tiene_faltantes:
+        for i, resumen in enumerate(materiales_faltantes, 1):
+            material = resumen.material
+            paquetes_necesarios = resumen.paquetes_rollos_necesarios
+            cantidad_total_compra = resumen.cantidad_total_compra
+            costo_estimado = resumen.costo_estimado_compra
+            total_estimado += costo_estimado
+            
+            # Información adicional si comprar paquetes/rollos da más cantidad
+            info_extra = ""
+            if cantidad_total_compra > resumen.cantidad_faltante:
+                sobrante = cantidad_total_compra - resumen.cantidad_faltante
+                info_extra = f"\n   ⚠️  Al comprar {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}, sobrarán {sobrante} {material.unidad_base}"
+            
+            contenido += f"""{i}. {material.nombre}
    Código: {material.codigo}
    ✅ COMPRAR: {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}
    📦 Contenido: {cantidad_total_compra} {material.unidad_base} ({material.factor_conversion} {material.unidad_base}/{resumen.unidad_compra_display})
@@ -987,8 +993,9 @@ MATERIALES NECESARIOS PARA COMPRAR
 ========================================
 RESUMEN
 ========================================
-Total de materiales a comprar: {materiales_faltantes.count()}
+Total de materiales a comprar: {materiales_faltantes.count() if tiene_faltantes else 0}
 Costo total estimado: ${total_estimado:.2f}
+{'' if tiene_faltantes else '✅ No se requieren compras - Materiales suficientes'}
 
 ========================================
 DETALLES DE LA LISTA DE PRODUCCIÓN
@@ -1061,6 +1068,7 @@ def enviar_a_reabastecimiento(request, lista_id):
 def registrar_entrada_reabastecimiento(request, lista_id):
     """Registrar entrada de materiales comprados desde reabastecimiento"""
     from decimal import Decimal
+    from django.db import transaction
     
     lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
     
@@ -1074,54 +1082,82 @@ def registrar_entrada_reabastecimiento(request, lista_id):
     
     if request.method == 'POST':
         materiales_ingresados = 0
+        errores = []
         
-        for resumen in materiales_pendientes:
-            cantidad_key = f'cantidad_{resumen.id}'
-            precio_key = f'precio_{resumen.id}'
-            
-            if cantidad_key in request.POST:
-                try:
-                    cantidad_entrada = Decimal(request.POST[cantidad_key])
-                    precio_compra = Decimal(request.POST.get(precio_key, '0'))
+        try:
+            with transaction.atomic():
+                for resumen in materiales_pendientes:
+                    cantidad_key = f'cantidad_{resumen.id}'
+                    precio_key = f'precio_{resumen.id}'
                     
-                    if cantidad_entrada > 0:
-                        # Actualizar inventario del material
-                        resumen.material.cantidad_disponible += cantidad_entrada
-                        resumen.material.save()
-                        
-                        # Crear movimiento de entrada
-                        from .models import Movimiento
-                        Movimiento.objects.create(
-                            material=resumen.material,
-                            tipo_movimiento='entrada',
-                            cantidad=cantidad_entrada,
-                            precio_unitario=precio_compra,
-                            observaciones=f'Entrada desde lista de producción: {lista.nombre}',
-                            usuario=request.user
-                        )
-                        
-                        # Actualizar resumen de materiales
-                        nueva_cantidad_disponible = resumen.material.cantidad_disponible
-                        resumen.cantidad_disponible = nueva_cantidad_disponible
-                        resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - nueva_cantidad_disponible)
-                        resumen.save()
-                        
-                        materiales_ingresados += 1
-                        
-                except (ValueError, TypeError):
-                    continue
-        
-        if materiales_ingresados > 0:
-            messages.success(request, f'Se registraron {materiales_ingresados} entrada(s) de materiales.')
-            
-            # Verificar si ya no faltan materiales y cambiar estado automáticamente
-            materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
-            if materiales_aun_faltantes == 0 and lista.estado == 'comprado':
-                lista.estado = 'reabastecido'
-                lista.save()
-                messages.info(request, f'Lista "{lista.nombre}" movida automáticamente a estado "Reabastecido" - ¡Lista para producción!')
-        else:
-            messages.warning(request, 'No se registró ninguna entrada. Verifique las cantidades ingresadas.')
+                    if cantidad_key in request.POST:
+                        try:
+                            cantidad_entrada = Decimal(request.POST[cantidad_key])
+                            precio_compra = Decimal(request.POST.get(precio_key, '0'))
+                            
+                            if cantidad_entrada > 0:
+                                # Guardar cantidad anterior
+                                cantidad_anterior = resumen.material.cantidad_disponible
+                                
+                                # Actualizar inventario del material
+                                resumen.material.cantidad_disponible += cantidad_entrada
+                                resumen.material.save()
+                                
+                                # Recargar para confirmar
+                                resumen.material.refresh_from_db()
+                                
+                                # Crear movimiento de entrada con todos los detalles
+                                from .models import Movimiento
+                                movimiento = Movimiento.objects.create(
+                                    material=resumen.material,
+                                    tipo_movimiento='entrada',
+                                    cantidad=cantidad_entrada,  # Positivo porque es entrada
+                                    cantidad_anterior=cantidad_anterior,
+                                    cantidad_nueva=resumen.material.cantidad_disponible,
+                                    precio_unitario=precio_compra if precio_compra > 0 else None,
+                                    costo_total_movimiento=precio_compra * cantidad_entrada if precio_compra > 0 else None,
+                                    detalle=f'Reabastecimiento - Lista #{lista.id}: {lista.nombre}',
+                                    usuario=request.user
+                                )
+                                
+                                print(f"✅ Entrada registrada: {resumen.material.nombre}")
+                                print(f"   Cantidad: {cantidad_anterior} → {resumen.material.cantidad_disponible} (+{cantidad_entrada})")
+                                print(f"   Movimiento ID: {movimiento.id}")
+                                
+                                # Actualizar resumen de materiales
+                                nueva_cantidad_disponible = resumen.material.cantidad_disponible
+                                resumen.cantidad_disponible = nueva_cantidad_disponible
+                                resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - nueva_cantidad_disponible)
+                                resumen.save()
+                                
+                                materiales_ingresados += 1
+                                
+                        except (ValueError, TypeError) as e:
+                            error_msg = f"Error procesando {resumen.material.nombre}: {str(e)}"
+                            print(f"❌ {error_msg}")
+                            errores.append(error_msg)
+                            continue
+                
+                if materiales_ingresados > 0:
+                    messages.success(request, f'✅ Se registraron {materiales_ingresados} entrada(s) de materiales correctamente.')
+                    
+                    # Verificar si ya no faltan materiales y cambiar estado automáticamente
+                    materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+                    if materiales_aun_faltantes == 0 and lista.estado == 'comprado':
+                        lista.estado = 'reabastecido'
+                        lista.save()
+                        messages.info(request, f'🎉 Lista "{lista.nombre}" movida automáticamente a estado "Reabastecido" - ¡Lista para producción!')
+                elif errores:
+                    for error in errores:
+                        messages.error(request, error)
+                else:
+                    messages.warning(request, 'No se registró ninguna entrada. Verifique las cantidades ingresadas.')
+                    
+        except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            print(f"❌ ERROR AL REGISTRAR ENTRADAS:\n{error_detail}")
+            messages.error(request, f'Error al registrar entradas: {str(e)}')
         
         return redirect('inventario:reabastecimiento')
     
