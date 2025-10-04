@@ -1563,11 +1563,26 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
         monos = detalle.monos
         cantidad_total_planificada = detalle.cantidad_total_planificada
         
+        print(f"\n🎀 Moño: {monos.codigo} - {monos.nombre}")
+        print(f"   Cantidad planificada: {cantidad_total_planificada}")
+        
         # Obtener recetas del moño
-        for receta in monos.recetas.all():
+        recetas = monos.recetas.all()
+        print(f"   Recetas encontradas: {recetas.count()}")
+        
+        if recetas.count() == 0:
+            print(f"   ⚠️  NO HAY RECETAS para este moño!")
+            continue
+        
+        for receta in recetas:
             material = receta.material
             cantidad_por_mono = receta.cantidad_necesaria
             cantidad_total_necesaria = cantidad_por_mono * cantidad_total_planificada
+            
+            print(f"\n   📦 Material: {material.nombre}")
+            print(f"      Cantidad por moño: {cantidad_por_mono} {material.unidad_base}")
+            print(f"      Cantidad total necesaria: {cantidad_total_necesaria} {material.unidad_base}")
+            print(f"      Disponible en inventario: {material.cantidad_disponible} {material.unidad_base}")
             
             # Verificar si hay suficiente material antes de descontar
             if material.cantidad_disponible >= cantidad_total_necesaria:
@@ -1614,9 +1629,10 @@ def descontar_materiales_produccion(lista_produccion, usuario=None):
             else:
                 # ERROR: No hay suficiente material - esto no debería pasar
                 # si la validación funcionó correctamente
-                print(f"\n❌ ERROR: Material {material.nombre} insuficiente!")
-                print(f"   Necesario: {cantidad_total_necesaria} {material.unidad_base}")
-                print(f"   Disponible: {material.cantidad_disponible} {material.unidad_base}")
+                print(f"\n      ❌ ERROR: Material {material.nombre} insuficiente!")
+                print(f"         Necesario: {cantidad_total_necesaria} {material.unidad_base}")
+                print(f"         Disponible: {material.cantidad_disponible} {material.unidad_base}")
+                print(f"         Faltante: {cantidad_total_necesaria - material.cantidad_disponible} {material.unidad_base}")
                 # NO descontar nada si no hay suficiente material
     
     print(f"\n{'='*60}")
