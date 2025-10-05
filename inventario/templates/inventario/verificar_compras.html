@@ -8,12 +8,12 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
-                    <i class="fas fa-shopping-cart me-2"></i>
+                    <i class="fas fa-clipboard-check me-2"></i>
                     {{ titulo }}
                 </h1>
-                <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" class="btn btn-outline-secondary">
+                <a href="{% url 'inventario:listado_compras_paso3' %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>
-                    Volver
+                    Volver al Paso 3
                 </a>
             </div>
         </div>
@@ -35,21 +35,21 @@
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-info text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-clipboard-check me-2"></i>
-                        ¿Cuántos paquetes/rollos compraste?
+                        <i class="fas fa-shopping-cart me-2"></i>
+                        Cuantos paquetes o rollos compraste
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Instrucciones:</strong> Ingresa la cantidad de paquetes o rollos que compraste de cada material. 
-                        Si no compraste algún material, déjalo en 0.
+                        El sistema actualizara automaticamente tu inventario. Si no compraste algun material, dejalo en 0.
                     </div>
 
                     {% if materiales_necesarios %}
-                        <form method="post" action="">
+                        <form method="post">
                             {% csrf_token %}
                             
                             <div class="table-responsive">
@@ -58,7 +58,7 @@
                                         <tr>
                                             <th style="width: 40%;">Material</th>
                                             <th style="width: 20%;" class="text-center">Necesitas</th>
-                                            <th style="width: 40%;" class="text-center">¿Cuántos compraste?</th>
+                                            <th style="width: 40%;" class="text-center">Cuantos compraste</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -102,10 +102,14 @@
                             </div>
 
                             <div class="d-grid gap-2 mt-4">
-                                <button type="submit" class="btn btn-success btn-lg">
+                                <button type="submit" class="btn btn-info btn-lg">
                                     <i class="fas fa-check-circle me-2"></i>
                                     Registrar Compras
                                 </button>
+                                <a href="{% url 'inventario:listado_compras_paso3' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>
+                                    Cancelar
+                                </a>
                             </div>
                         </form>
                     {% else %}
@@ -113,23 +117,29 @@
                             <i class="fas fa-check-circle me-2"></i>
                             No hay materiales faltantes para comprar.
                         </div>
+                        <div class="d-grid">
+                            <a href="{% url 'inventario:listado_compras_paso3' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>
+                                Volver al Paso 3
+                            </a>
+                        </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Tarjeta informativa -->
             <div class="card mt-3">
                 <div class="card-header">
                     <h6 class="mb-0">
                         <i class="fas fa-lightbulb me-2"></i>
-                        Información de la Lista
+                        Informacion de la Lista
                     </h6>
                 </div>
                 <div class="card-body">
                     <p><strong>Lista:</strong> {{ lista.nombre }}</p>
-                    <p><strong>Estado:</strong> <span class="badge bg-warning">{{ lista.get_estado_display }}</span></p>
+                    <p><strong>Estado:</strong> <span class="badge bg-info">{{ lista.get_estado_display }}</span></p>
                     <p class="mb-0">
-                        <strong>Nota:</strong> Las cantidades se registrarán automáticamente en el inventario al guardar.
+                        <strong>Nota:</strong> Las cantidades se registraran automaticamente en el inventario.
+                        Si completas todas las compras necesarias, la lista pasara automaticamente al Paso 4.
                     </p>
                 </div>
             </div>
@@ -139,7 +149,7 @@
 
 <style>
     .table-hover tbody tr:hover {
-        background-color: rgba(0, 123, 255, 0.05);
+        background-color: rgba(23, 162, 184, 0.05);
     }
     
     input[type="number"]::-webkit-inner-spin-button,
@@ -147,104 +157,5 @@
         opacity: 1;
         height: 40px;
     }
-</style>
-{% endblock %}
-                                                    <div class="card-body">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" 
-                                                                   type="checkbox" 
-                                                                   name="materiales_comprados" 
-                                                                   value="{{ resumen.id }}" 
-                                                                   id="material_{{ resumen.id }}"
-                                                                   checked>
-                                                            <label class="form-check-label w-100" for="material_{{ resumen.id }}">
-                                                                <div class="d-flex justify-content-between align-items-start">
-                                                                    <div>
-                                                                        <h6 class="mb-1">{{ resumen.material.nombre }}</h6>
-                                                                        <small class="text-muted d-block">
-                                                                            Código: {{ resumen.material.codigo }}
-                                                                        </small>
-                                                                    </div>
-                                                                    <span class="badge bg-warning text-dark">
-                                                                        Falta
-                                                                    </span>
-                                                                </div>
-                                                                
-                                                                <hr class="my-2">
-                                                                
-                                                                <div class="row g-2 small">
-                                                                    <div class="col-6">
-                                                                        <strong>Necesario:</strong><br>
-                                                                        {{ resumen.cantidad_faltante|floatformat:2 }} {{ resumen.material.unidad_base }}
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <strong>Comprar:</strong><br>
-                                                                        {{ resumen.paquetes_rollos_necesarios }} {{ resumen.unidad_compra_display }}{{ resumen.paquetes_rollos_necesarios|pluralize }}
-                                                                    </div>
-                                                                    <div class="col-12 mt-2">
-                                                                        <strong>Costo estimado:</strong> 
-                                                                        <span class="text-success">${{ resumen.costo_estimado_compra|floatformat:2 }}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <div class="alert alert-success">
-                                        <i class="fas fa-check-circle me-2"></i>
-                                        No hay materiales faltantes. Todos los materiales están disponibles en inventario.
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        {% if materiales_necesarios %}
-                            <div class="d-flex justify-content-between align-items-center mt-4">
-                                <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left me-1"></i> Cancelar
-                                </a>
-                                
-                                <button type="submit" class="btn btn-warning btn-lg">
-                                    <i class="fas fa-check me-2"></i>
-                                    Confirmar Materiales Comprados
-                                </button>
-                            </div>
-                            
-                            <div class="alert alert-light mt-3 text-center">
-                                <small>
-                                    <i class="fas fa-lightbulb me-1"></i>
-                                    <strong>Tip:</strong> Después de confirmar, podrás registrar las cantidades exactas que compraste en "Compra de Productos"
-                                </small>
-                            </div>
-                        {% endif %}
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-.form-check-input:checked ~ .form-check-label {
-    background-color: #e7f9e7;
-    padding: 10px;
-    border-radius: 5px;
-    transition: all 0.3s;
-}
-
-.form-check-input {
-    width: 1.5em;
-    height: 1.5em;
-    margin-top: 0.1em;
-}
-
-.card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transition: all 0.3s;
-}
 </style>
 {% endblock %}
