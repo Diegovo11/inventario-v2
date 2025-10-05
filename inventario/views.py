@@ -1274,6 +1274,8 @@ def listado_listas_produccion(request):
     return render(request, 'inventario/listado_listas_produccion.html', context)
 
 
+# Buscar la función lista_de_compras (línea ~1239)
+
 @login_required
 def lista_de_compras(request):
     """Vista para generar lista consolidada de compras y registrar compras directamente"""
@@ -1293,22 +1295,30 @@ def lista_de_compras(request):
         # Si se está registrando una compra directa
         if 'registrar_compra' in request.POST:
             material_id = request.POST.get('material_id')
-            paquetes = request.POST.get('paquetes')
-            precio = request.POST.get('precio')
+            paquetes_rollos = request.POST.get('paquetes_rollos')  # CAMBIO: ahora es paquetes/rollos
+            precio_por_paquete = request.POST.get('precio_por_paquete')  # CAMBIO: precio por paquete/rollo
             proveedor = request.POST.get('proveedor', '')
             
             try:
                 material = Material.objects.get(id=material_id)
-                paquetes_decimal = Decimal(str(paquetes))
-                precio_decimal = Decimal(str(precio))
+                paquetes = Decimal(str(paquetes_rollos))
+                precio_unitario = Decimal(str(precio_por_paquete))
                 
-                if paquetes_decimal > 0 and precio_decimal > 0:
-                    # Calcular cantidad total
-                    cantidad_total = paquetes_decimal * material.factor_conversion
+                if paquetes > 0 and precio_unitario > 0:
+                    # Calcular cantidad total en unidad base
+                    cantidad_total = paquetes * material.factor_conversion
+                    precio_total = paquetes * precio_unitario
+                    
+                    # Guardar cantidad anterior
+                    cantidad_anterior = material.cantidad_disponible
                     
                     # Actualizar inventario
                     material.cantidad_disponible += cantidad_total
+                    material.precio_compra = precio_unitario  # Guardar precio por paquete/rollo
                     material.save()
+                    
+                    # Recargar para confirmar
+                    material.refresh_from_db()
                     
                     # Actualizar resúmenes de listas que necesitan este material
                     listas_ids = request.POST.getlist('listas_seleccionadas')
@@ -1323,7 +1333,7 @@ def lista_de_compras(request):
                             try:
                                 resumen = lista.resumen_materiales.get(material=material)
                                 resumen.cantidad_comprada += cantidad_total
-                                resumen.precio_compra_real = precio_decimal
+                                resumen.precio_compra_real = precio_unitario
                                 resumen.proveedor = proveedor
                                 resumen.fecha_compra = timezone.now()
                                 resumen.save()
@@ -1335,15 +1345,18 @@ def lista_de_compras(request):
                         material=material,
                         tipo_movimiento='entrada',
                         cantidad=cantidad_total,
-                        precio_unitario=precio_decimal / paquetes_decimal if paquetes_decimal > 0 else precio_decimal,
-                        descripcion=f'Compra desde Lista Consolidada - {paquetes_decimal} {material.tipo_material}(s)',
+                        cantidad_anterior=cantidad_anterior,
+                        cantidad_nueva=material.cantidad_disponible,
+                        precio_unitario=precio_unitario,
+                        costo_total_movimiento=precio_total,
+                        detalle=f'Compra desde Lista Consolidada - {paquetes} {material.tipo_material}(s) - Proveedor: {proveedor or "N/A"}',
                         usuario=request.user
                     )
                     
                     messages.success(
                         request, 
-                        f'✅ Compra registrada: {paquetes_decimal} {material.tipo_material}(s) de {material.nombre} '
-                        f'(+{cantidad_total} {material.unidad_base})'
+                        f'✅ Compra registrada: {paquetes} {material.tipo_material}(s) de {material.nombre} '
+                        f'(+{cantidad_total} {material.unidad_base}) por ${precio_total:.2f}'
                     )
                     
                     # Verificar si alguna lista ahora está completa
@@ -1360,7 +1373,7 @@ def lista_de_compras(request):
                                 lista.save()
                                 messages.success(request, f'🎉 Lista "{lista.nombre}" ahora está REABASTECIDA y lista para producción!')
                 else:
-                    messages.error(request, 'Cantidad y precio deben ser mayores a 0')
+                    messages.error(request, 'Cantidad de paquetes/rollos y precio deben ser mayores a 0')
             except Exception as e:
                 messages.error(request, f'Error al registrar compra: {str(e)}')
             
