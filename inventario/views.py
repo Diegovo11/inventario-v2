@@ -1013,12 +1013,24 @@ MOÑOS INCLUIDOS:
     
     contenido += f"""
 ========================================
-NOTAS
+NOTAS E INSTRUCCIONES
 ========================================
+📋 PROCESO DE COMPRA:
+1. Utiliza esta lista como guía para realizar tus compras
+2. Al regresar con los materiales, ve a "Compra de Productos" en el sistema
+3. Registra las cantidades y precios reales de compra
+4. El sistema actualizará automáticamente el inventario
+
+⚠️  IMPORTANTE:
 - Verificar disponibilidad de materiales antes de comprar
 - Confirmar precios actuales con proveedores  
-- Este archivo se generó automáticamente desde el sistema de inventario
-- Fecha límite sugerida: {(datetime.now()).strftime('%d/%m/%Y')}
+- Este archivo es solo una guía de referencia
+- Los materiales deben registrarse manualmente en el sistema después de comprar
+
+📅 Información de generación:
+- Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}
+- Lista de producción: {lista.nombre}
+- Estado actual: {lista.get_estado_display()}
 
 """
     

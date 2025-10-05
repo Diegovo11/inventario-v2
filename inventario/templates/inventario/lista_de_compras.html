@@ -324,7 +324,7 @@
                                                                 <div class="row g-2">
                                                                     <div class="col-md-6">
                                                                         <label class="form-label small mb-1">
-                                                                            <strong>{{ material_data.unidad_compra_display }}s</strong>
+                                                                            <strong>{{ material_data.unidad_compra_display }}{% if material_data.paquetes_rollos_necesarios > 1 %}s{% endif %}</strong>
                                                                             <small class="text-muted">(sugerido: {{ material_data.paquetes_rollos_necesarios }})</small>
                                                                         </label>
                                                                         <input type="number" 
@@ -333,7 +333,7 @@
                                                                                min="0" 
                                                                                step="1"
                                                                                value="{{ material_data.paquetes_rollos_necesarios }}"
-                                                                               data-unidad-compra="{{ material_data.material.cantidad_por_paquete }}"
+                                                                               data-factor-conversion="{{ material_data.material.factor_conversion }}"
                                                                                data-material-id="{{ material_data.material.id }}"
                                                                                onchange="actualizarCantidadTotal(this)"
                                                                                placeholder="0">
@@ -490,8 +490,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function actualizarCantidadTotal(input) {
     const materialId = input.dataset.materialId;
     const paquetes = parseFloat(input.value) || 0;
-    const unidadCompra = parseFloat(input.dataset.unidadCompra) || 1;
-    const cantidadTotal = paquetes * unidadCompra;
+    const factorConversion = parseFloat(input.dataset.factorConversion) || 1;
+    const cantidadTotal = paquetes * factorConversion;
     
     const cantidadDisplay = document.getElementById('cantidad-' + materialId);
     if (cantidadDisplay) {
