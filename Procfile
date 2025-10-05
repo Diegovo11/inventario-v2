@@ -1,1 +1,1 @@
-web: gunicorn inventario_project.wsgi --log-file -
+web: gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120 --log-file -

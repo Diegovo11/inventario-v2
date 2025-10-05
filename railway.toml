@@ -3,8 +3,11 @@ builder = "nixpacks"
 
 [deploy]
 # Ejecuta migraciones automáticamente y configura datos en cada deploy
-startCommand = "python manage.py migrate && python manage.py create_admin && python manage.py verificar_db && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi"
-healthcheckPath = "/admin/"
+startCommand = "python manage.py migrate && python manage.py create_admin && python manage.py verificar_db && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
+healthcheckPath = "/health/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
 
 [env]
 NIXPACKS_PYTHON_VERSION = "3.12"

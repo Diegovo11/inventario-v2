@@ -18,14 +18,22 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
 from django.contrib.auth import views as auth_views
+from django.http import JsonResponse
 
 def redirect_to_inventario(request):
     """Redirigir desde la raíz al inventario"""
     return redirect('/inventario/')
 
+def healthcheck(request):
+    """Vista simple para healthcheck de Railway"""
+    return JsonResponse({"status": "ok", "service": "inventario-v2"})
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('inventario/', include('inventario.urls')),
+    
+    # Healthcheck endpoint
+    path('health/', healthcheck, name='healthcheck'),
     
     # Authentication URLs
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
