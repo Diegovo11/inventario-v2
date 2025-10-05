@@ -3676,3 +3676,150 @@ def confirmar_produccion(request, simulacion_id):
     except Exception as e:
         return JsonResponse({'error': f'Error interno: {str(e)}'}, status=500)
 
+
+
+# ============================================================================
+# FUNCIONES DE PRODUCCIÓN - SISTEMA DE LISTAS
+# ============================================================================
+
+@login_required
+def iniciar_produccion(request, lista_id):
+    """Inicia la producción de una lista, descontando materiales del inventario"""
+    if request.method != 'POST':
+        messages.error(request, 'Método no permitido.')
+        return redirect('inventario:reabastecimiento')
+    
+    try:
+        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+        
+        if lista.estado != 'reabastecido':
+            messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Reabastecido" para iniciar producción.')
+            return redirect('inventario:reabastecimiento')
+        
+        # Descontar materiales
+        materiales_descontados = descontar_materiales_produccion(lista, request.user)
+        
+        # Cambiar estado
+        lista.estado = 'en_produccion'
+        lista.save()
+        
+        messages.success(request, f'Producción iniciada para "{lista.nombre}". {materiales_descontados} materiales descontados del inventario.')
+        return redirect('inventario:reabastecimiento')
+        
+    except Exception as e:
+        messages.error(request, f'Error al iniciar producción: {str(e)}')
+        return redirect('inventario:reabastecimiento')
+
+
+@login_required
+def enviar_a_salida(request, lista_id):
+    """Marca una lista en producción como lista para salida"""
+    if request.method != 'POST':
+        messages.error(request, 'Método no permitido.')
+        return redirect('inventario:reabastecimiento')
+    
+    try:
+        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+        
+        if lista.estado != 'en_produccion':
+            messages.error(request, f'La lista "{lista.nombre}" debe estar "En Producción" para enviarla a salida.')
+            return redirect('inventario:reabastecimiento')
+        
+        # Cambiar estado a en_salida
+        lista.estado = 'en_salida'
+        lista.save()
+        
+        messages.success(request, f'Lista "{lista.nombre}" enviada a salida. Ahora puedes registrar las ventas.')
+        return redirect('inventario:lista_en_salida')
+        
+    except Exception as e:
+        messages.error(request, f'Error al enviar a salida: {str(e)}')
+        return redirect('inventario:reabastecimiento')
+
+
+@login_required
+def lista_en_salida(request):
+    """Vista para mostrar listas en estado de salida"""
+    listas_en_salida = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='en_salida'
+    ).prefetch_related('detalles_monos__monos').order_by('-fecha_actualizacion')
+    
+    context = {
+        'listas_en_salida': listas_en_salida,
+        'titulo': 'Listas en Salida - Pendientes de Venta'
+    }
+    
+    return render(request, 'inventario/lista_en_salida.html', context)
+
+
+@login_required
+def registrar_salida_materiales(request, lista_id):
+    """Registra la salida final de materiales (ya se hizo en iniciar_produccion)"""
+    # Esta función es redundante ya que los materiales se descontaron al iniciar producción
+    # Solo redirige al detalle
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    messages.info(request, 'Los materiales ya fueron descontados al iniciar la producción.')
+    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+
+
+@login_required
+def registrar_ventas_contaduria(request, lista_id):
+    """Registra las ventas de una lista de producción en contaduría"""
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    if lista.estado != 'en_salida':
+        messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "En Salida" para registrar ventas.')
+        return redirect('inventario:lista_en_salida')
+    
+    if request.method == 'POST':
+        try:
+            # Calcular ingreso total de las ventas
+            ingreso_total = Decimal('0')
+            
+            for detalle in lista.detalles_monos.all():
+                cantidad_vendida = Decimal(request.POST.get(f'cantidad_vendida_{detalle.id}', 0))
+                precio_venta = detalle.monos.precio_venta
+                
+                if cantidad_vendida > 0:
+                    ingreso_venta = cantidad_vendida * precio_venta
+                    ingreso_total += ingreso_venta
+                    
+                    # Actualizar cantidad producida en el detalle
+                    detalle.cantidad_producida = cantidad_vendida
+                    detalle.save()
+            
+            if ingreso_total > 0:
+                # Registrar el ingreso en contaduría
+                MovimientoEfectivo.registrar_movimiento(
+                    concepto=f'Venta de producción - Lista: {lista.nombre}',
+                    tipo_movimiento='ingreso',
+                    categoria='venta',
+                    monto=ingreso_total,
+                    usuario=request.user
+                )
+                
+                # Actualizar ganancia real de la lista
+                lista.ganancia_real = ingreso_total - (lista.costo_total_estimado or Decimal('0'))
+                lista.estado = 'finalizado'
+                lista.save()
+                
+                messages.success(
+                    request,
+                    f'Ventas registradas exitosamente. Ingreso total: ${ingreso_total:.2f}. '
+                    f'Ganancia: ${lista.ganancia_real:.2f}'
+                )
+                return redirect('inventario:listas_produccion')
+            else:
+                messages.warning(request, 'No se registraron ventas. Ingresa al menos una cantidad vendida.')
+                
+        except Exception as e:
+            messages.error(request, f'Error al registrar ventas: {str(e)}')
+    
+    context = {
+        'lista': lista,
+        'detalles_monos': lista.detalles_monos.all(),
+        'titulo': f'Registrar Ventas - {lista.nombre}'
+    }
+    
+    return render(request, 'inventario/registrar_ventas_contaduria.html', context)
