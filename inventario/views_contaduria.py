@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
+from django.utils import timezone
 from .models import MovimientoEfectivo
 from .forms import MovimientoEfectivoForm, FiltroMovimientosEfectivoForm
 from datetime import datetime, timedelta
@@ -20,8 +21,9 @@ def contaduria_home(request):
     ultimos_movimientos = MovimientoEfectivo.objects.all()[:10]
     
     # Calcular estadísticas del mes actual
-    inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     fin_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    fin_mes = fin_mes.replace(hour=23, minute=59, second=59)
     
     movimientos_mes = MovimientoEfectivo.objects.filter(
         fecha__gte=inicio_mes,
@@ -127,21 +129,26 @@ def estado_resultados(request):
     fecha_fin = request.GET.get('fecha_fin')
     
     if not fecha_inicio:
-        inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        fecha_inicio = inicio_mes.date()
+        inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        fecha_inicio = inicio_mes
     else:
-        fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        # Convertir string a datetime naive y luego a aware
+        fecha_dt = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        fecha_inicio = timezone.make_aware(datetime.combine(fecha_dt, datetime.min.time()))
     
     if not fecha_fin:
-        fin_mes = (datetime.now().replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-        fecha_fin = fin_mes.date()
+        # Último día del mes actual
+        fin_mes = (timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        fecha_fin = fin_mes.replace(hour=23, minute=59, second=59)
     else:
-        fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+        # Convertir string a datetime naive y luego a aware (fin del día)
+        fecha_dt = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        fecha_fin = timezone.make_aware(datetime.combine(fecha_dt, datetime.max.time()))
     
     # Obtener movimientos del período
     movimientos = MovimientoEfectivo.objects.filter(
-        fecha__date__gte=fecha_inicio,
-        fecha__date__lte=fecha_fin
+        fecha__gte=fecha_inicio,
+        fecha__lte=fecha_fin
     )
     
     # Calcular totales generales

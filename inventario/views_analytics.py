@@ -31,7 +31,8 @@ def analytics_dashboard(request):
     elif periodo == '12m':
         fecha_inicio = fecha_fin - timedelta(days=365)
     elif periodo == 'all':
-        fecha_inicio = datetime(2020, 1, 1)  # Desde el inicio
+        # Usar timezone-aware datetime para evitar warnings
+        fecha_inicio = timezone.make_aware(datetime(2020, 1, 1))
     
     # Obtener VENTAS REALES desde el nuevo modelo VentaMonos
     ventas_reales = VentaMonos.objects.filter(
