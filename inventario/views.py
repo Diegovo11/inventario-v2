@@ -1027,6 +1027,13 @@ NOTAS
     filename = f"lista_compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
+    # Cambiar automáticamente el estado a 'comprado' después de generar el archivo
+    if lista.estado == 'pendiente_compra':
+        lista.estado = 'comprado'
+        lista.save()
+        # El mensaje se mostrará en la próxima vista que visite el usuario
+        messages.success(request, f'✅ Archivo generado y lista "{lista.nombre}" marcada como COMPRADA. Ahora puedes registrar las compras en "Compra de Productos".')
+    
     return response
 
 
@@ -1444,23 +1451,27 @@ def compra_productos(request):
         
         if materiales_actualizados > 0:
             # Verificar si todas las compras de todas las listas están completas
+            listas_reabastecidas = []
             for lista in listas_comprado:
                 compras_completas = True
-                for resumen in lista.resumen_materiales.filter(cantidad_faltante__gt=0):
-                    if resumen.cantidad_comprada < resumen.cantidad_faltante:
+                for resumen in lista.resumen_materiales.all():
+                    # Verificar si el material actual tiene suficiente inventario
+                    if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
                         compras_completas = False
                         break
                 
-                # Si todas las compras están completas, cambiar estado
-                if compras_completas:
+                # Si todas las compras están completas, cambiar estado automáticamente a reabastecido
+                if compras_completas and lista.estado == 'comprado':
                     lista.estado = 'reabastecido'
                     lista.save()
+                    listas_reabastecidas.append(lista.nombre)
             
-            messages.success(
-                request, 
-                f'✅ Se registraron {materiales_actualizados} compra(s) por un total de ${total_invertido:.2f}. '
-                f'El inventario ha sido actualizado.'
-            )
+            # Mensaje de éxito con información de listas reabastecidas
+            mensaje_base = f'✅ Se registraron {materiales_actualizados} compra(s) por un total de ${total_invertido:.2f}.'
+            if listas_reabastecidas:
+                mensaje_base += f' 🎉 Lista(s) LISTA(S) PARA PRODUCIR: {", ".join(listas_reabastecidas)}'
+            
+            messages.success(request, mensaje_base)
             
             # Mostrar errores si los hubo
             if errores:
@@ -2978,6 +2989,66 @@ def reabastecer_automatico(request, simulacion_id):
     except Exception as e:
         return JsonResponse({'error': f'Error interno: {str(e)}'}, status=500)
 
+
+
+@login_required
+@login_required
+def iniciar_produccion(request, lista_id):
+    """Iniciar producción: cambiar estado a 'en_produccion' y descontar materiales automáticamente"""
+    
+    if request.method == 'POST':
+        try:
+            lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+            
+            # Verificar que esté en estado correcto
+            if lista.estado != 'reabastecido':
+                messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Reabastecido" para iniciar producción.')
+                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            
+            # Verificar que haya materiales suficientes
+            materiales_faltantes = []
+            for resumen in lista.resumen_materiales.all():
+                if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
+                    materiales_faltantes.append(resumen.material.nombre)
+            
+            if materiales_faltantes:
+                messages.error(
+                    request, 
+                    f'⚠️ No se puede iniciar producción. Faltan materiales: {", ".join(materiales_faltantes)}'
+                )
+                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            
+            # Descontar materiales automáticamente
+            try:
+                from django.db import transaction
+                with transaction.atomic():
+                    # Llamar a la función de descuento de materiales
+                    exito, mensaje = descontar_materiales_produccion(lista)
+                    
+                    if not exito:
+                        messages.error(request, f'❌ Error al descontar materiales: {mensaje}')
+                        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                    
+                    # Cambiar estado a en_produccion
+                    lista.estado = 'en_produccion'
+                    lista.save()
+                    
+                    messages.success(
+                        request, 
+                        f'🎉 ¡Producción iniciada! Lista "{lista.nombre}" ahora está EN PRODUCCIÓN. '
+                        f'Los materiales han sido descontados automáticamente del inventario.'
+                    )
+                    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                    
+            except Exception as e:
+                messages.error(request, f'❌ Error al iniciar producción: {str(e)}')
+                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            
+        except Exception as e:
+            messages.error(request, f'Error al iniciar producción: {str(e)}')
+            return redirect('inventario:lista_de_compras')
+    
+    return redirect('inventario:lista_de_compras')
 
 
 @login_required

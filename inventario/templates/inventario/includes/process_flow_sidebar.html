@@ -17,8 +17,8 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado in 'borrador,pendiente_compra,comprado,reabastecido,en_produccion,en_salida,finalizado' %}completed{% endif %} {% if lista.estado == 'borrador' %}active{% endif %}">
                 <div class="step-number">1</div>
                 <div class="step-content">
-                    <div class="step-title">Lista Creada</div>
-                    <div class="step-description">Configuración inicial</div>
+                    <div class="step-title">Lista Creada ✓</div>
+                    <div class="step-description">Ya tienes tu lista de moños configurada</div>
                 </div>
                 <div class="step-icon">
                     <i class="fas fa-check-circle"></i>
@@ -30,11 +30,19 @@ Muestra visualmente en qué paso está la lista y permite navegación
                 <div class="step-number">2</div>
                 <div class="step-content">
                     <div class="step-title">Lista de Compras</div>
-                    <div class="step-description">Generar y revisar</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'pendiente_compra' %}
+                            <strong>👉 PASO ACTUAL:</strong> Descarga el archivo TXT
+                        {% else %}
+                            Archivo descargado ✓
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'pendiente_compra' %}
-                        <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" class="btn btn-sm btn-primary mt-2">
-                            <i class="fas fa-download me-1"></i> Descargar
+                        <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" class="btn btn-sm btn-primary mt-2" 
+                           title="Descargar archivo TXT con materiales a comprar">
+                            <i class="fas fa-download me-1"></i> Descargar TXT
                         </a>
+                        <small class="text-muted d-block mt-1">� Al descargar, se marca como "Comprada"</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -50,12 +58,19 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado in 'reabastecido,en_produccion,en_salida,finalizado' %}completed{% elif lista.estado == 'comprado' %}active{% endif %}">
                 <div class="step-number">3</div>
                 <div class="step-content">
-                    <div class="step-title">Comprar Materiales</div>
-                    <div class="step-description">Adquisición real</div>
+                    <div class="step-title">Registrar Compras</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'comprado' %}
+                            <strong>👉 PASO ACTUAL:</strong> Ve a comprar y registra
+                        {% else %}
+                            Compras registradas ✓
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'comprado' %}
                         <a href="{% url 'inventario:compra_productos' %}" class="btn btn-sm btn-warning mt-2">
-                            <i class="fas fa-shopping-cart me-1"></i> Registrar
+                            <i class="fas fa-shopping-cart me-1"></i> Registrar Compras
                         </a>
+                        <small class="text-muted d-block mt-1">💡 Ingresa los materiales que compraste</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -71,12 +86,26 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado in 'en_produccion,en_salida,finalizado' %}completed{% elif lista.estado == 'reabastecido' %}active{% endif %}">
                 <div class="step-number">4</div>
                 <div class="step-content">
-                    <div class="step-title">Inventario Listo</div>
-                    <div class="step-description">Materiales disponibles</div>
+                    <div class="step-title">Materiales Listos</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'reabastecido' %}
+                            <strong>👉 PASO ACTUAL:</strong> ¡Listo para producir!
+                        {% else %}
+                            {% if lista.estado in 'en_produccion,en_salida,finalizado' %}
+                                Producción iniciada ✓
+                            {% else %}
+                                Esperando materiales...
+                            {% endif %}
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'reabastecido' %}
-                        <span class="badge bg-success mt-2">
-                            <i class="fas fa-check me-1"></i> Listo para producir
-                        </span>
+                        <form method="post" action="{% url 'inventario:iniciar_produccion' lista.id %}" class="mt-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-success w-100">
+                                <i class="fas fa-play me-1"></i> Iniciar Producción
+                            </button>
+                        </form>
+                        <small class="text-muted d-block mt-1">✨ Se descontarán materiales automáticamente</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -92,12 +121,23 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado in 'en_salida,finalizado' %}completed{% elif lista.estado == 'en_produccion' %}active{% endif %}">
                 <div class="step-number">5</div>
                 <div class="step-content">
-                    <div class="step-title">En Producción</div>
-                    <div class="step-description">Fabricando moños</div>
+                    <div class="step-title">Produciendo</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'en_produccion' %}
+                            <strong>👉 PASO ACTUAL:</strong> Fabricando los moños
+                        {% else %}
+                            {% if lista.estado in 'en_salida,finalizado' %}
+                                Producción completada ✓
+                            {% else %}
+                                Pendiente de iniciar
+                            {% endif %}
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'en_produccion' %}
-                        <span class="badge bg-info mt-2">
-                            <i class="fas fa-cog fa-spin me-1"></i> Produciendo
+                        <span class="badge bg-info mt-2 w-100">
+                            <i class="fas fa-cog fa-spin me-1"></i> En Producción
                         </span>
+                        <small class="text-muted d-block mt-1">💡 Cuando termines, envía a Salida</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -113,12 +153,23 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado == 'finalizado' %}completed{% elif lista.estado == 'en_salida' %}active{% endif %}">
                 <div class="step-number">6</div>
                 <div class="step-content">
-                    <div class="step-title">Lista en Salida</div>
-                    <div class="step-description">Registrar venta</div>
+                    <div class="step-title">Registrar Venta</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'en_salida' %}
+                            <strong>👉 PASO ACTUAL:</strong> Registra la venta
+                        {% else %}
+                            {% if lista.estado == 'finalizado' %}
+                                Venta registrada ✓
+                            {% else %}
+                                Pendiente...
+                            {% endif %}
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'en_salida' %}
-                        <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-sm btn-success mt-2">
-                            <i class="fas fa-clipboard-check me-1"></i> Registrar
+                        <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-sm btn-success mt-2 w-100">
+                            <i class="fas fa-clipboard-check me-1"></i> Ir a Salida
                         </a>
+                        <small class="text-muted d-block mt-1">💡 Registra precios de venta</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -134,11 +185,17 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado == 'finalizado' %}completed active{% endif %}">
                 <div class="step-number">7</div>
                 <div class="step-content">
-                    <div class="step-title">Finalizado</div>
-                    <div class="step-description">Proceso completo</div>
+                    <div class="step-title">¡Completado!</div>
+                    <div class="step-description">
+                        {% if lista.estado == 'finalizado' %}
+                            🎉 Proceso terminado exitosamente
+                        {% else %}
+                            Pendiente...
+                        {% endif %}
+                    </div>
                     {% if lista.estado == 'finalizado' %}
-                        <span class="badge bg-success mt-2">
-                            <i class="fas fa-trophy me-1"></i> Completado
+                        <span class="badge bg-success mt-2 w-100">
+                            <i class="fas fa-trophy me-1"></i> Proceso Finalizado
                         </span>
                     {% endif %}
                 </div>

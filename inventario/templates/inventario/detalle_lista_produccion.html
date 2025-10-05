@@ -17,21 +17,13 @@
                         {% if lista.estado == 'pendiente_compra' or lista.estado == 'borrador' %}
                             {% with materiales_faltantes=lista.resumen_materiales.all|dictsort:"cantidad_faltante"|last %}
                                 {% if materiales_faltantes.cantidad_faltante > 0 %}
-                                    <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" class="btn btn-outline-success btn-sm">
+                                    <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" class="btn btn-outline-success btn-sm" 
+                                       title="Descargar lista y marcar como comprada automáticamente">
                                         <i class="fas fa-download me-1"></i>
-                                        Lista Compras
+                                        Descargar Lista de Compras
                                     </a>
                                 {% endif %}
                             {% endwith %}
-                            {% if lista.estado == 'pendiente_compra' %}
-                                <form method="post" action="{% url 'inventario:marcar_como_comprado' lista.id %}" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-outline-warning btn-sm">
-                                        <i class="fas fa-shopping-cart me-1"></i>
-                                        Marcar como Comprado
-                                    </button>
-                                </form>
-                            {% endif %}
                         {% endif %}
                         {% if lista.estado == 'comprado' %}
                             <form method="post" action="{% url 'inventario:enviar_a_reabastecimiento' lista.id %}" class="d-inline">
