@@ -1,53 +1,154 @@
 {% extends 'inventario/base.html' %}
 
-{% block title %}{{ titulo }}{% endblock %}
+{% block title %}{{ titulo }} - Inventario{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        <!-- Sidebar -->
-        <div class="col-lg-3">
-            {% include 'inventario/includes/process_flow_sidebar.html' %}
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>
+                    Volver
+                </a>
+            </div>
         </div>
-        
-        <!-- Contenido Principal -->
-        <div class="col-lg-9">
-            <div class="card shadow-sm">
-                <div class="card-header bg-warning text-dark">
-                    <h4 class="mb-0">
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
                         <i class="fas fa-clipboard-check me-2"></i>
-                        Verificar Compras Realizadas
-                    </h4>
+                        ¿Cuántos paquetes/rollos compraste?
+                    </h5>
                 </div>
-                
                 <div class="card-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Instrucciones:</strong> Marca con ✓ los materiales que <strong>SÍ lograste comprar</strong>. 
-                        No te preocupes si no encontraste todos, el sistema llevará control de lo que falta.
+                        <strong>Instrucciones:</strong> Ingresa la cantidad de paquetes o rollos que compraste de cada material. 
+                        Si no compraste algún material, déjalo en 0.
                     </div>
-                    
-                    <div class="mb-4">
-                        <h5>Lista: <strong>{{ lista.nombre }}</strong></h5>
-                        <p class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</p>
-                    </div>
-                    
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-list me-2"></i>
-                                    Materiales Necesarios ({{ materiales_necesarios.count }})
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                {% if materiales_necesarios %}
-                                    <div class="row">
+
+                    {% if materiales_necesarios %}
+                        <form method="post" action="">
+                            {% csrf_token %}
+                            
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40%;">Material</th>
+                                            <th style="width: 20%;" class="text-center">Necesitas</th>
+                                            <th style="width: 40%;" class="text-center">¿Cuántos compraste?</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                         {% for resumen in materiales_necesarios %}
-                                            <div class="col-md-6 mb-3">
-                                                <div class="card h-100 border-2" style="border-left: 4px solid #ffc107;">
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ resumen.material.nombre }}</strong>
+                                                    <br>
+                                                    <small class="text-muted">{{ resumen.material.codigo }}</small>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <span class="badge bg-warning text-dark fs-6">
+                                                        {{ resumen.paquetes_rollos_necesarios }} 
+                                                        {{ resumen.unidad_compra_display }}{% if resumen.paquetes_rollos_necesarios > 1 %}s{% endif %}
+                                                    </span>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        ({{ resumen.cantidad_faltante|floatformat:0 }} {{ resumen.material.unidad_base }})
+                                                    </small>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <div class="input-group justify-content-center" style="max-width: 200px; margin: 0 auto;">
+                                                        <input 
+                                                            type="number" 
+                                                            name="cantidad_comprada_{{ resumen.id }}" 
+                                                            class="form-control form-control-lg text-center" 
+                                                            min="0" 
+                                                            value="{{ resumen.paquetes_rollos_necesarios }}"
+                                                            placeholder="0"
+                                                            style="font-size: 1.25rem; font-weight: bold;"
+                                                        >
+                                                        <span class="input-group-text">
+                                                            {{ resumen.unidad_compra_display }}{% if resumen.paquetes_rollos_necesarios > 1 %}s{% endif %}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-grid gap-2 mt-4">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Registrar Compras
+                                </button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            No hay materiales faltantes para comprar.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Tarjeta informativa -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        Información de la Lista
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Lista:</strong> {{ lista.nombre }}</p>
+                    <p><strong>Estado:</strong> <span class="badge bg-warning">{{ lista.get_estado_display }}</span></p>
+                    <p class="mb-0">
+                        <strong>Nota:</strong> Las cantidades se registrarán automáticamente en el inventario al guardar.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+        opacity: 1;
+        height: 40px;
+    }
+</style>
+{% endblock %}
                                                     <div class="card-body">
                                                         <div class="form-check">
                                                             <input class="form-check-input" 

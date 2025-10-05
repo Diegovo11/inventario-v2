@@ -927,7 +927,7 @@ def eliminar_lista_produccion(request, lista_id):
 
 @login_required  
 def generar_archivo_compras(request, lista_id):
-    """Generar archivo de texto plano con lista de compras"""
+    """Generar archivo TXT simple con lista de compras (solo material y cantidad)"""
     from django.http import HttpResponse
     from datetime import datetime
     
@@ -936,111 +936,40 @@ def generar_archivo_compras(request, lista_id):
     # Obtener materiales faltantes
     materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
     
-    # Generar archivo incluso si no hay materiales faltantes (para referencia)
-    tiene_faltantes = materiales_faltantes.exists()
+    # Generar contenido simple
+    contenido = f"LISTA DE COMPRAS - {lista.nombre}\n"
+    contenido += f"Fecha: {datetime.now().strftime('%d/%m/%Y')}\n\n"
     
-    # Generar contenido del archivo
-    contenido = f"""LISTA DE COMPRAS - {lista.nombre}
-Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}
-Usuario: {request.user.get_full_name() or request.user.username}
-
-========================================
-MATERIALES NECESARIOS PARA COMPRAR
-========================================
-
-"""
+    contenido += "MATERIALES A COMPRAR:\n"
+    contenido += "="*50 + "\n\n"
     
-    if not tiene_faltantes:
-        contenido += """✅ ¡EXCELENTE! No hay materiales faltantes.
-Todos los materiales necesarios están disponibles en inventario.
-
-"""
-    
-    total_estimado = 0
-    
-    if tiene_faltantes:
-        for i, resumen in enumerate(materiales_faltantes, 1):
+    if materiales_faltantes.exists():
+        for resumen in materiales_faltantes:
             material = resumen.material
             paquetes_necesarios = resumen.paquetes_rollos_necesarios
-            cantidad_total_compra = resumen.cantidad_total_compra
-            costo_estimado = resumen.costo_estimado_compra
-            total_estimado += costo_estimado
+            unidad = resumen.unidad_compra_display
             
-            # Información adicional si comprar paquetes/rollos da más cantidad
-            info_extra = ""
-            if cantidad_total_compra > resumen.cantidad_faltante:
-                sobrante = cantidad_total_compra - resumen.cantidad_faltante
-                info_extra = f"\n   ⚠️  Al comprar {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}, sobrarán {sobrante} {material.unidad_base}"
-            
-            contenido += f"""{i}. {material.nombre}
-   Código: {material.codigo}
-   ✅ COMPRAR: {paquetes_necesarios} {resumen.unidad_compra_display}{'s' if paquetes_necesarios > 1 else ''}
-   📦 Contenido: {cantidad_total_compra} {material.unidad_base} ({material.factor_conversion} {material.unidad_base}/{resumen.unidad_compra_display})
-   
-   Detalle de necesidad:
-   • Necesario: {resumen.cantidad_faltante} {material.unidad_base}
-   • Disponible: {resumen.cantidad_disponible} {material.unidad_base}
-   
-   Costo estimado:
-   • ${material.precio_compra:.2f} por {resumen.unidad_compra_display}
-   • Total: {paquetes_necesarios} × ${material.precio_compra:.2f} = ${costo_estimado:.2f}{info_extra}
-   
-   Categoría: {material.categoria or 'Sin categoría'}
-   
-"""
+            # Formato simple: Material - Cantidad Paquetes/Rollos
+            contenido += f"{material.nombre} - {paquetes_necesarios} {unidad}{'s' if paquetes_necesarios > 1 else ''}\n"
+    else:
+        contenido += "No hay materiales faltantes.\n"
     
-    contenido += f"""
-========================================
-RESUMEN
-========================================
-Total de materiales a comprar: {materiales_faltantes.count() if tiene_faltantes else 0}
-Costo total estimado: ${total_estimado:.2f}
-{'' if tiene_faltantes else '✅ No se requieren compras - Materiales suficientes'}
-
-========================================
-DETALLES DE LA LISTA DE PRODUCCIÓN
-========================================
-Lista: {lista.nombre}
-Descripción: {lista.descripcion or 'Sin descripción'}
-Estado: {lista.get_estado_display()}
-Moños planificados: {lista.total_moños_planificados}
-
-MOÑOS INCLUIDOS:
-"""
+    contenido += "\n" + "="*50 + "\n\n"
+    contenido += "MOÑOS A PRODUCIR:\n"
+    contenido += "="*50 + "\n\n"
     
     for detalle in lista.detalles_monos.all():
-        contenido += f"- {detalle.monos.nombre}: {detalle.cantidad} ({detalle.cantidad_total_planificada} moños)\n"
-    
-    contenido += f"""
-========================================
-NOTAS E INSTRUCCIONES
-========================================
-📋 PROCESO DE COMPRA:
-1. Utiliza esta lista como guía para realizar tus compras
-2. Al regresar con los materiales, ve a "Compra de Productos" en el sistema
-3. Registra las cantidades y precios reales de compra
-4. El sistema actualizará automáticamente el inventario
-
-⚠️  IMPORTANTE:
-- Verificar disponibilidad de materiales antes de comprar
-- Confirmar precios actuales con proveedores  
-- Este archivo es solo una guía de referencia
-- Los materiales deben registrarse manualmente en el sistema después de comprar
-
-📅 Información de generación:
-- Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}
-- Lista de producción: {lista.nombre}
-- Estado actual: {lista.get_estado_display()}
-
-"""
+        contenido += f"{detalle.monos.nombre} - {detalle.cantidad_total_planificada} unidades\n"
     
     # Crear respuesta HTTP con archivo
     response = HttpResponse(contenido, content_type='text/plain; charset=utf-8')
-    filename = f"lista_compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+    filename = f"compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.txt"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    # No cambiar estado automáticamente - el usuario debe verificar compras manualmente
-    # después de ir a comprar los materiales
+    # Cambiar estado a pendiente_compra si está en borrador
+    if lista.estado == 'borrador':
+        lista.estado = 'pendiente_compra'
+        lista.save()
     
     return response
 
@@ -1074,54 +1003,96 @@ def marcar_como_comprado(request, lista_id):
 
 
 @login_required
-@login_required
 def verificar_compras(request, lista_id):
-    """Vista para verificar qué materiales se compraron de la lista"""
+    """Vista simple para ingresar cuántos paquetes/rollos se compraron realmente"""
     
     lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
     
     # Solo disponible para listas en estado 'pendiente_compra'
     if lista.estado != 'pendiente_compra':
-        messages.warning(request, f'La lista "{lista.nombre}" ya fue verificada o no está en estado de compras pendientes.')
+        messages.warning(request, f'La lista "{lista.nombre}" ya pasó por verificación de compras.')
         return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
     
-    if request.method == 'POST':
-        # Obtener materiales seleccionados (los que SÍ se compraron)
-        materiales_comprados = request.POST.getlist('materiales_comprados')
-        
-        if not materiales_comprados:
-            messages.error(request, '❌ Debes seleccionar al menos un material que hayas comprado.')
-            return redirect('inventario:verificar_compras', lista_id=lista.id)
-        
-        # Marcar los materiales como comprados (para tracking)
-        total_comprados = 0
-        for resumen_id in materiales_comprados:
-            try:
-                resumen = lista.resumen_materiales.get(id=int(resumen_id))
-                # Marcar con flag temporal que se compró (usaremos fecha_compra)
-                resumen.fecha_compra = timezone.now()
-                resumen.save()
-                total_comprados += 1
-            except:
-                continue
-        
-        # Cambiar estado a 'comprado'
-        lista.estado = 'comprado'
-        lista.save()
-        
-        messages.success(
-            request, 
-            f'✅ Lista "{lista.nombre}" marcada como COMPRADA. '
-            f'Se verificaron {total_comprados} material(es). '
-            f'Ahora puedes registrar las cantidades exactas en "Compra de Productos".'
-        )
-        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-    
-    # GET - Mostrar checklist de materiales
     materiales_necesarios = lista.resumen_materiales.filter(cantidad_faltante__gt=0).select_related('material')
     
+    if request.method == 'POST':
+        try:
+            materiales_procesados = 0
+            materiales_registrados = 0
+            
+            for resumen in materiales_necesarios:
+                # Obtener cantidad comprada ingresada por el usuario
+                cantidad_comprada_key = f'cantidad_comprada_{resumen.id}'
+                cantidad_comprada_str = request.POST.get(cantidad_comprada_key, '0').strip()
+                
+                if not cantidad_comprada_str or cantidad_comprada_str == '0':
+                    continue  # Material no comprado, saltar
+                
+                try:
+                    paquetes_comprados = int(cantidad_comprada_str)
+                    
+                    if paquetes_comprados < 0:
+                        messages.warning(request, f'Cantidad inválida para {resumen.material.nombre}')
+                        continue
+                    
+                    if paquetes_comprados > 0:
+                        # Calcular cantidad en unidad base
+                        cantidad_total = paquetes_comprados * resumen.material.factor_conversion
+                        
+                        # Registrar entrada al inventario
+                        resumen.material.cantidad_disponible += cantidad_total
+                        resumen.material.save()
+                        
+                        # Crear movimiento
+                        Movimiento.objects.create(
+                            material=resumen.material,
+                            tipo_movimiento='entrada',
+                            cantidad=cantidad_total,
+                            usuario=request.user,
+                            notas=f'Compra para lista: {lista.nombre} - {paquetes_comprados} {resumen.unidad_compra_display}{"s" if paquetes_comprados > 1 else ""}'
+                        )
+                        
+                        # Actualizar resumen
+                        resumen.cantidad_disponible = resumen.material.cantidad_disponible
+                        resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - resumen.cantidad_disponible)
+                        resumen.fecha_compra = timezone.now()
+                        resumen.save()
+                        
+                        materiales_registrados += 1
+                    
+                    materiales_procesados += 1
+                    
+                except (ValueError, TypeError) as e:
+                    messages.error(request, f'Error con {resumen.material.nombre}: {str(e)}')
+                    continue
+            
+            if materiales_registrados > 0:
+                # Cambiar estado a 'comprado'
+                lista.estado = 'comprado'
+                lista.save()
+                
+                messages.success(
+                    request,
+                    f'✅ Compras registradas: {materiales_registrados} material(es) agregados al inventario.'
+                )
+                
+                # Verificar si ya se cubrieron todos los materiales
+                materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+                if materiales_aun_faltantes == 0:
+                    lista.estado = 'reabastecido'
+                    lista.save()
+                    messages.info(request, '🎉 Todos los materiales están listos. Lista movida a "Reabastecido".')
+                
+                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            else:
+                messages.warning(request, 'No se registró ninguna compra. Ingresa las cantidades.')
+        
+        except Exception as e:
+            messages.error(request, f'Error al procesar compras: {str(e)}')
+    
+    # GET - Mostrar formulario simple
     context = {
-        'titulo': f'Verificar Compras - {lista.nombre}',
+        'titulo': f'Registrar Compras - {lista.nombre}',
         'lista': lista,
         'materiales_necesarios': materiales_necesarios,
     }
