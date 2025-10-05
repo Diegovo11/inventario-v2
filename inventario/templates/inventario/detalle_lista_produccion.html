@@ -23,6 +23,15 @@
                                     </a>
                                 {% endif %}
                             {% endwith %}
+                            {% if lista.estado == 'pendiente_compra' %}
+                                <form method="post" action="{% url 'inventario:marcar_como_comprado' lista.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-warning btn-sm">
+                                        <i class="fas fa-shopping-cart me-1"></i>
+                                        Marcar como Comprado
+                                    </button>
+                                </form>
+                            {% endif %}
                         {% endif %}
                         {% if lista.estado == 'comprado' %}
                             <form method="post" action="{% url 'inventario:enviar_a_reabastecimiento' lista.id %}" class="d-inline">
@@ -103,6 +112,9 @@
         </div>
 
         <div class="col-lg-4">
+            <!-- Sidebar del flujo de producción -->
+            {% include 'inventario/includes/process_flow_sidebar.html' %}
+            
             <div class="card">
                 <div class="card-header">
                     <h6 class="mb-0">

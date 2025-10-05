@@ -1,0 +1,273 @@
+{% comment %}
+Sidebar de flujo de proceso de producción
+Muestra visualmente en qué paso está la lista y permite navegación
+{% endcomment %}
+
+{% if lista %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h6 class="mb-0">
+            <i class="fas fa-route me-2"></i>
+            Flujo de Producción
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="process-flow">
+            <!-- Paso 1: Crear Lista -->
+            <div class="process-step {% if lista.estado in 'borrador,pendiente_compra,comprado,reabastecido,en_produccion,en_salida,finalizado' %}completed{% endif %} {% if lista.estado == 'borrador' %}active{% endif %}">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">Lista Creada</div>
+                    <div class="step-description">Configuración inicial</div>
+                </div>
+                <div class="step-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+
+            <!-- Paso 2: Generar Compras -->
+            <div class="process-step {% if lista.estado in 'comprado,reabastecido,en_produccion,en_salida,finalizado' %}completed{% elif lista.estado == 'pendiente_compra' %}active{% endif %}">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Lista de Compras</div>
+                    <div class="step-description">Generar y revisar</div>
+                    {% if lista.estado == 'pendiente_compra' %}
+                        <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" class="btn btn-sm btn-primary mt-2">
+                            <i class="fas fa-download me-1"></i> Descargar
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    {% if lista.estado in 'comprado,reabastecido,en_produccion,en_salida,finalizado' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paso 3: Comprar Materiales -->
+            <div class="process-step {% if lista.estado in 'reabastecido,en_produccion,en_salida,finalizado' %}completed{% elif lista.estado == 'comprado' %}active{% endif %}">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Comprar Materiales</div>
+                    <div class="step-description">Adquisición real</div>
+                    {% if lista.estado == 'comprado' %}
+                        <a href="{% url 'inventario:compra_productos' %}" class="btn btn-sm btn-warning mt-2">
+                            <i class="fas fa-shopping-cart me-1"></i> Registrar
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    {% if lista.estado in 'reabastecido,en_produccion,en_salida,finalizado' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paso 4: Reabastecer Inventario -->
+            <div class="process-step {% if lista.estado in 'en_produccion,en_salida,finalizado' %}completed{% elif lista.estado == 'reabastecido' %}active{% endif %}">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">Inventario Listo</div>
+                    <div class="step-description">Materiales disponibles</div>
+                    {% if lista.estado == 'reabastecido' %}
+                        <span class="badge bg-success mt-2">
+                            <i class="fas fa-check me-1"></i> Listo para producir
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    {% if lista.estado in 'en_produccion,en_salida,finalizado' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paso 5: Producción -->
+            <div class="process-step {% if lista.estado in 'en_salida,finalizado' %}completed{% elif lista.estado == 'en_produccion' %}active{% endif %}">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <div class="step-title">En Producción</div>
+                    <div class="step-description">Fabricando moños</div>
+                    {% if lista.estado == 'en_produccion' %}
+                        <span class="badge bg-info mt-2">
+                            <i class="fas fa-cog fa-spin me-1"></i> Produciendo
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    {% if lista.estado in 'en_salida,finalizado' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paso 6: Salida -->
+            <div class="process-step {% if lista.estado == 'finalizado' %}completed{% elif lista.estado == 'en_salida' %}active{% endif %}">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                    <div class="step-title">Lista en Salida</div>
+                    <div class="step-description">Registrar venta</div>
+                    {% if lista.estado == 'en_salida' %}
+                        <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-sm btn-success mt-2">
+                            <i class="fas fa-clipboard-check me-1"></i> Registrar
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    {% if lista.estado == 'finalizado' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% else %}
+                        <i class="fas fa-circle"></i>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paso 7: Finalizado -->
+            <div class="process-step {% if lista.estado == 'finalizado' %}completed active{% endif %}">
+                <div class="step-number">7</div>
+                <div class="step-content">
+                    <div class="step-title">Finalizado</div>
+                    <div class="step-description">Proceso completo</div>
+                    {% if lista.estado == 'finalizado' %}
+                        <span class="badge bg-success mt-2">
+                            <i class="fas fa-trophy me-1"></i> Completado
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="step-icon">
+                    <i class="fas fa-{% if lista.estado == 'finalizado' %}check-circle{% else %}circle{% endif %}"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Estado actual destacado -->
+    <div class="card-footer bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <small class="text-muted">Estado Actual:</small>
+            <span class="badge bg-{% if lista.estado == 'borrador' %}secondary{% elif lista.estado == 'pendiente_compra' %}warning{% elif lista.estado == 'comprado' %}info{% elif lista.estado == 'reabastecido' %}success{% elif lista.estado == 'en_produccion' %}primary{% elif lista.estado == 'en_salida' %}dark{% else %}success{% endif %} fs-6">
+                {{ lista.get_estado_display }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<style>
+.process-flow {
+    padding: 1.5rem 1rem;
+}
+
+.process-step {
+    display: flex;
+    align-items: flex-start;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.process-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 2rem;
+    top: 3.5rem;
+    width: 2px;
+    height: calc(100% - 1rem);
+    background: #dee2e6;
+}
+
+.process-step.completed:not(:last-child)::after {
+    background: #28a745;
+}
+
+.process-step.active:not(:last-child)::after {
+    background: linear-gradient(to bottom, #28a745 0%, #dee2e6 100%);
+}
+
+.process-step.completed {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+}
+
+.process-step.active {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+}
+
+.step-number {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    background: #6c757d;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-right: 1rem;
+    position: relative;
+    z-index: 1;
+}
+
+.process-step.completed .step-number {
+    background: #28a745;
+}
+
+.process-step.active .step-number {
+    background: #ffc107;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+
+.step-content {
+    flex-grow: 1;
+}
+
+.step-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.step-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.step-icon {
+    flex-shrink: 0;
+    font-size: 1.5rem;
+    color: #dee2e6;
+    margin-left: 1rem;
+}
+
+.process-step.completed .step-icon {
+    color: #28a745;
+}
+
+.process-step.active .step-icon {
+    color: #ffc107;
+}
+</style>
+{% endif %}

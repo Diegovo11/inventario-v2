@@ -35,7 +35,13 @@
     {% endif %}
 
     <div class="row">
-        <div class="col-12">
+        <!-- Sidebar del flujo de producción -->
+        <div class="col-lg-3">
+            {% include 'inventario/includes/process_flow_sidebar.html' %}
+        </div>
+        
+        <!-- Contenido principal -->
+        <div class="col-lg-9">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0">
@@ -60,21 +66,19 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        
 
     {% if materiales_pendientes %}
         <form method="post">
             {% csrf_token %}
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-warning text-dark">
-                            <h5 class="mb-0">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                Materiales Pendientes de Entrada
-                            </h5>
-                        </div>
+            
+                <div class="card mt-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Materiales Pendientes de Entrada
+                        </h5>
+                    </div>
                         <div class="card-body">
                             <p class="text-muted mb-4">Registra la entrada de los materiales que ya compraste:</p>
                             
@@ -198,20 +202,19 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            
         </form>
     {% else %}
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
-                        <h5>¡Todo el inventario está completo!</h5>
-                        <p class="text-muted">Todos los materiales necesarios están disponibles en el inventario.</p>
-                        <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-primary">
-                            <i class="fas fa-arrow-left me-2"></i>
-                            Volver a Reabastecimiento
-                        </a>
+        
+            <div class="card mt-4">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                    <h5>¡Todo el inventario está completo!</h5>
+                    <p class="text-muted">Todos los materiales necesarios están disponibles en el inventario.</p>
+                    <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left me-2"></i>
+                        Volver a Reabastecimiento
+                    </a>
                     </div>
                 </div>
             </div>
@@ -271,7 +274,10 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </div>
     {% endif %}
-</div>
+    
+        </div><!-- Cierre col-lg-9 -->
+    </div><!-- Cierre row con sidebar -->
+</div><!-- Cierre container-fluid -->
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

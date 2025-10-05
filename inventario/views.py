@@ -1031,6 +1031,34 @@ NOTAS
 
 
 @login_required
+@login_required
+def marcar_como_comprado(request, lista_id):
+    """Cambiar estado de una lista de 'pendiente_compra' a 'comprado'"""
+    
+    if request.method == 'POST':
+        try:
+            lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+            
+            # Verificar que esté en estado correcto
+            if lista.estado != 'pendiente_compra':
+                messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Pendiente de Compra" para marcar como comprado.')
+                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            
+            # Cambiar estado a comprado
+            lista.estado = 'comprado'
+            lista.save()
+            
+            messages.success(request, f'Lista "{lista.nombre}" marcada como comprada. Ahora puede registrar las compras en "Compra de Productos".')
+            return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+            
+        except Exception as e:
+            messages.error(request, f'Error al marcar como comprado: {str(e)}')
+            return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    
+    return redirect('inventario:lista_de_compras')
+
+
+@login_required
 def enviar_a_reabastecimiento(request, lista_id):
     """Enviar lista de estado 'comprado' a 'reabastecido'"""
     

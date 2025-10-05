@@ -36,6 +36,7 @@ urlpatterns = [
     path('lista-produccion/<int:lista_id>/editar/', views.editar_lista_produccion, name='editar_lista_produccion'),
     path('lista-produccion/<int:lista_id>/eliminar/', views.eliminar_lista_produccion, name='eliminar_lista_produccion'),
     path('lista-produccion/<int:lista_id>/generar-compras/', views.generar_archivo_compras, name='generar_archivo_compras'),
+    path('lista-produccion/<int:lista_id>/marcar-comprado/', views.marcar_como_comprado, name='marcar_como_comprado'),
     path('lista-produccion/<int:lista_id>/enviar-reabastecimiento/', views.enviar_a_reabastecimiento, name='enviar_a_reabastecimiento'),
     path('lista-produccion/<int:lista_id>/registrar-entrada/', views.registrar_entrada_reabastecimiento, name='registrar_entrada_reabastecimiento'),
     path('lista-produccion/<int:lista_id>/enviar-salida/', views.enviar_a_salida, name='enviar_a_salida'),
