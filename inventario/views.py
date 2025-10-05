@@ -902,9 +902,9 @@ def eliminar_lista_produccion(request, lista_id):
         nombre_lista = lista.nombre
         
         # Verificar si se puede eliminar según el estado
-        estados_no_eliminables = ['en_produccion']
+        estados_no_eliminables = ['en_salida']
         if lista.estado in estados_no_eliminables:
-            messages.error(request, f'No se puede eliminar la lista "{nombre_lista}" porque está en producción.')
+            messages.error(request, f'No se puede eliminar la lista "{nombre_lista}" porque está en salida.')
             return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
         
         try:
@@ -1292,16 +1292,9 @@ def listado_listas_produccion(request):
             'color': 'success',
             'listas': todas_listas.filter(estado='reabastecido')
         },
-        'en_produccion': {
-            'nombre': 'Produciendo',
-            'numero': 5,
-            'icono': 'fas fa-industry',
-            'color': 'primary',
-            'listas': todas_listas.filter(estado='en_produccion')
-        },
         'en_salida': {
             'nombre': 'Salida y Ventas',
-            'numero': 6,
+            'numero': 5,
             'icono': 'fas fa-cash-register',
             'color': 'dark',
             'listas': todas_listas.filter(estado='en_salida')
@@ -1600,8 +1593,8 @@ def reabastecimiento(request):
                     )
                     return redirect('inventario:reabastecimiento')
                 
-                # Cambiar estado a 'en_produccion'
-                lista.estado = 'en_produccion'
+                # Cambiar estado directamente a 'en_salida'
+                lista.estado = 'en_salida'
                 lista.save()
                 
                 # Verificar nuevamente justo antes del descuento (por seguridad)
@@ -1740,22 +1733,11 @@ def reabastecimiento(request):
             
         return redirect('inventario:reabastecimiento')
     
-    # Obtener también listas en producción para mostrar progreso
-    listas_en_produccion = ListaProduccion.objects.filter(
-        usuario_creador=request.user,
-        estado='en_produccion'
-    ).prefetch_related('detalles_monos__monos')
-    
-    # Obtener listas en salida (producción completada, esperando salida)
-    listas_en_salida = ListaProduccion.objects.filter(
-        usuario_creador=request.user,
-        estado='en_salida'
-    ).prefetch_related('detalles_monos__monos')
+    # Ya no hay estado intermedio 'en_produccion'
+    # Las listas van directamente de 'reabastecido' a 'en_salida'
     
     context = {
         'listas_reabastecidas': listas_reabastecidas,
-        'listas_en_produccion': listas_en_produccion,
-        'listas_en_salida': listas_en_salida,
         'titulo': 'Reabastecimiento y Producción'
     }
     
@@ -3577,41 +3559,15 @@ def iniciar_produccion(request, lista_id):
         # Descontar materiales
         materiales_descontados = descontar_materiales_produccion(lista, request.user)
         
-        # Cambiar estado
-        lista.estado = 'en_produccion'
-        lista.save()
-        
-        messages.success(request, f'Producción iniciada para "{lista.nombre}". {materiales_descontados} materiales descontados del inventario.')
-        return redirect('inventario:reabastecimiento')
-        
-    except Exception as e:
-        messages.error(request, f'Error al iniciar producción: {str(e)}')
-        return redirect('inventario:reabastecimiento')
-
-
-@login_required
-def enviar_a_salida(request, lista_id):
-    """Marca una lista en producción como lista para salida"""
-    if request.method != 'POST':
-        messages.error(request, 'Método no permitido.')
-        return redirect('inventario:reabastecimiento')
-    
-    try:
-        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
-        
-        if lista.estado != 'en_produccion':
-            messages.error(request, f'La lista "{lista.nombre}" debe estar "En Producción" para enviarla a salida.')
-            return redirect('inventario:reabastecimiento')
-        
-        # Cambiar estado a en_salida
+        # Cambiar estado directamente a 'en_salida' (eliminando paso intermedio)
         lista.estado = 'en_salida'
         lista.save()
         
-        messages.success(request, f'Lista "{lista.nombre}" enviada a salida. Ahora puedes registrar las ventas.')
+        messages.success(request, f'Producción iniciada para "{lista.nombre}". {materiales_descontados} materiales descontados del inventario. Lista enviada a salida.')
         return redirect('inventario:lista_en_salida')
         
     except Exception as e:
-        messages.error(request, f'Error al enviar a salida: {str(e)}')
+        messages.error(request, f'Error al iniciar producción: {str(e)}')
         return redirect('inventario:reabastecimiento')
 
 
@@ -3745,26 +3701,18 @@ def panel_lista_produccion(request, lista_id):
             'estado_requerido': 'reabastecido',
             'icono': 'fas fa-box-check',
             'color': 'warning',
-            'descripcion': 'Verificar inventario actualizado'
+            'descripcion': 'Iniciar producción y descontar materiales'
         },
         {
             'numero': 5,
-            'nombre': 'Produciendo',
-            'estado_requerido': 'en_produccion',
-            'icono': 'fas fa-industry',
-            'color': 'purple',
-            'descripcion': 'Crear moños y registrar producción'
-        },
-        {
-            'numero': 6,
             'nombre': 'Salida y Ventas',
             'estado_requerido': 'en_salida',
             'icono': 'fas fa-cash-register',
-            'color': 'orange',
+            'color': 'purple',
             'descripcion': 'Registrar ventas realizadas'
         },
         {
-            'numero': 7,
+            'numero': 6,
             'nombre': 'Completado',
             'estado_requerido': 'finalizado',
             'icono': 'fas fa-trophy',
@@ -3773,15 +3721,14 @@ def panel_lista_produccion(request, lista_id):
         }
     ]
     
-    # Determinar paso actual
+    # Determinar paso actual (ahora solo 6 pasos)
     mapa_estados_a_paso = {
         'borrador': 1,
         'pendiente_compra': 2,
         'comprado': 3,
         'reabastecido': 4,
-        'en_produccion': 5,
-        'en_salida': 6,
-        'finalizado': 7
+        'en_salida': 5,
+        'finalizado': 6
     }
     
     paso_actual = mapa_estados_a_paso.get(lista.estado, 1)

@@ -211,138 +211,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Listas en Producción -->
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-cogs me-2 text-warning"></i>
-                        En Producción
-                    </h5>
-                    <span class="badge bg-warning text-dark">{{ listas_en_produccion.count }}</span>
-                </div>
-                <div class="card-body">
-                    {% if listas_en_produccion %}
-                        {% for lista in listas_en_produccion %}
-                            <div class="lista-produccion-card lista-en-produccion p-3">
-                                <div class="d-flex justify-content-between align-items-start mb-3">
-                                    <div>
-                                        <h6 class="mb-1">{{ lista.nombre }}</h6>
-                                        <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
-                                        <br>
-                                        <span class="badge bg-warning text-dark estado-badge">{{ lista.get_estado_display }}</span>
-                                    </div>
-                                    <div>
-                                        <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
-                                           class="btn btn-outline-info btn-sm me-1" title="Ver Detalle">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
-                                           class="btn btn-outline-primary btn-sm me-1" title="Editar Lista">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        {% if lista.estado != 'en_produccion' %}
-                                            <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
-                                               class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
-                                        {% else %}
-                                            <button class="btn btn-outline-secondary btn-sm" disabled title="No se puede eliminar mientras está en producción">
-                                                <i class="fas fa-ban"></i>
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="accion" value="finalizar_produccion">
-                                    <input type="hidden" name="lista_id" value="{{ lista.id }}">
-
-                                    <!-- Registro de cantidades producidas -->
-                                    <div class="mb-3">
-                                        <h6 class="text-muted mb-2">Registrar Producción:</h6>
-                                        {% for detalle in lista.detalles_monos.all %}
-                                            <div class="moño-item">
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <div class="flex-grow-1">
-                                                        <strong>{{ detalle.monos.nombre }}</strong>
-                                                        <br>
-                                                        <small class="material-info">
-                                                            Planificado: {{ detalle.cantidad }} {{ detalle.monos.get_tipo_venta_display|lower }}s 
-                                                            ({{ detalle.cantidad_total_planificada }} moños)
-                                                        </small>
-                                                        
-                                                        <!-- Barra de progreso -->
-                                                        {% if detalle.cantidad_producida > 0 %}
-                                                            {% widthratio detalle.cantidad_producida detalle.cantidad 100 as porcentaje_progreso %}
-                                                            <div class="progreso-bar mt-2">
-                                                                <div class="progreso-fill" data-width="{{ porcentaje_progreso }}"></div>
-                                                            </div>
-                                                            <small class="text-muted">
-                                                                Progreso: {{ detalle.cantidad_producida }}/{{ detalle.cantidad }} 
-                                                                ({{ porcentaje_progreso }}%)
-                                                            </small>
-                                                        {% endif %}
-                                                    </div>
-                                                    
-                                                    <div class="ms-3">
-                                                        <label class="form-label">Producido:</label>
-                                                        <input type="number" 
-                                                               name="cantidad_producida_{{ detalle.id }}" 
-                                                               class="form-control cantidad-input"
-                                                               min="0" 
-                                                               max="{{ detalle.cantidad }}"
-                                                               value="{{ detalle.cantidad_producida }}"
-                                                               placeholder="0">
-                                                        <small class="text-muted">Máx: {{ detalle.cantidad }}</small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-
-                                    <div class="d-flex justify-content-between">
-                                        <div>
-                                            {% with progreso_total=lista.detalles_monos.all|length %}
-                                                {% with completados=lista.detalles_monos.all|length %}
-                                                    <small class="text-muted">
-                                                        Progreso general: 
-                                                        <strong>
-                                                            {% for detalle in lista.detalles_monos.all %}
-                                                                {% if forloop.first %}
-                                                                    {% widthratio detalle.cantidad_producida detalle.cantidad 100 %}%
-                                                                {% endif %}
-                                                            {% endfor %}
-                                                        </strong>
-                                                    </small>
-                                                {% endwith %}
-                                            {% endwith %}
-                                        </div>
-                                        <button type="submit" class="btn btn-primary me-2">
-                                            <i class="fas fa-save me-1"></i>
-                                            Actualizar Producción
-                                        </button>
-                                        <a href="{% url 'inventario:enviar_a_salida' lista.id %}" 
-                                           class="btn btn-success">
-                                            <i class="fas fa-shipping-fast me-1"></i>
-                                            Enviar a Salida
-                                        </a>
-                                    </div>
-                                </form>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="sin-listas">
-                            <i class="fas fa-hourglass-half fa-3x mb-3 d-block"></i>
-                            <h5>No hay producciones en curso</h5>
-                            <p class="mb-0">Las listas aparecerán aquí cuando inicies la producción.</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Resumen de Estados -->
@@ -351,19 +219,15 @@
             <div class="card">
                 <div class="card-body">
                     <div class="row text-center">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <h4 class="text-success">{{ listas_reabastecidas.count }}</h4>
                             <small class="text-muted">Listas para Producción</small>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-warning">{{ listas_en_produccion.count }}</h4>
-                            <small class="text-muted">En Producción</small>
-                        </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <h4 class="text-info">0</h4>
                             <small class="text-muted">Finalizadas Hoy</small>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="d-grid">
                                 <a href="{% url 'inventario:compra_productos' %}" class="btn btn-outline-primary">
                                     <i class="fas fa-arrow-left me-1"></i>
