@@ -64,6 +64,7 @@
 </div>
 
 <!-- Métricas Principales -->
+{% if user.userprofile.puede_ver_precios %}
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="card text-center h-100">
@@ -128,6 +129,13 @@
         </div>
     </div>
 </div>
+{% else %}
+<div class="alert alert-info mb-4">
+    <i class="fas fa-lock me-2"></i>
+    <strong>Información de Costos y Ganancias Oculta</strong>
+    <p class="mb-0 mt-2">Tu nivel de usuario no permite ver información financiera. Contacta al administrador si necesitas acceso.</p>
+</div>
+{% endif %}
 
 <!-- Análisis por Materiales -->
 <div class="card shadow mb-4">

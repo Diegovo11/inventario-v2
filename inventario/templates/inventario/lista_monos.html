@@ -67,9 +67,11 @@
                             <th>Código</th>
                             <th>Nombre</th>
                             <th>Tipo de Venta</th>
+                            {% if user.userprofile.puede_ver_precios %}
                             <th>Precio Venta</th>
                             <th>Costo Producción</th>
                             <th>Ganancia</th>
+                            {% endif %}
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
@@ -91,6 +93,7 @@
                                     {{ monos.get_tipo_venta_display }}
                                 </span>
                             </td>
+                            {% if user.userprofile.puede_ver_precios %}
                             <td>${{ monos.precio_venta|floatformat:2 }}</td>
                             <td>${{ monos.costo_produccion|floatformat:2 }}</td>
                             <td>
@@ -98,6 +101,11 @@
                                     <span class="text-success">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
                                 {% elif monos.ganancia_unitaria < 0 %}
                                     <span class="text-danger">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
+                                {% else %}
+                                    <span class="text-muted">$0.00</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
                                 {% else %}
                                     <span class="text-warning">${{ monos.ganancia_unitaria|floatformat:2 }}</span>
                                 {% endif %}

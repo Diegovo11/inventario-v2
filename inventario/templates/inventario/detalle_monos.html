@@ -46,6 +46,7 @@
                     </div>
                     <div class="col-md-6">
                         <dl class="row">
+                            {% if user.userprofile.puede_ver_precios %}
                             <dt class="col-sm-4">Precio Venta:</dt>
                             <dd class="col-sm-8">
                                 <strong class="text-success">${{ monos.precio_venta|floatformat:2 }}</strong>
@@ -62,6 +63,12 @@
                                     {{ monos.margen_ganancia|floatformat:1 }}%
                                 </span>
                             </dd>
+                            {% else %}
+                            <dt class="col-sm-4">Información:</dt>
+                            <dd class="col-sm-8">
+                                <span class="text-muted"><i class="fas fa-lock me-1"></i>Información de precios oculta</span>
+                            </dd>
+                            {% endif %}
                         </dl>
                     </div>
                 </div>
@@ -91,8 +98,10 @@
                                     <th>Material</th>
                                     <th>Cantidad Necesaria</th>
                                     <th>Unidad</th>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     <th>Costo Unitario</th>
                                     <th>Costo Total</th>
+                                    {% endif %}
                                     <th>Stock Disponible</th>
                                 </tr>
                             </thead>
@@ -108,10 +117,15 @@
                                     </td>
                                     <td>{{ receta.cantidad_necesaria }}</td>
                                     <td>{{ receta.material.unidad_base }}</td>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     <td>${{ receta.material.costo_unitario|floatformat:2 }}</td>
                                     <td>
                                         <strong>${{ receta.costo_total|floatformat:2 }}</strong>
                                     </td>
+                                    {% else %}
+                                    <td><span class="text-muted">-</span></td>
+                                    <td><span class="text-muted">-</span></td>
+                                    {% endif %}
                                     <td>
                                         <span class="badge bg-{% if receta.material.cantidad_disponible >= receta.cantidad_necesaria %}success{% elif receta.material.cantidad_disponible > 0 %}warning{% else %}danger{% endif %}">
                                             {{ receta.material.cantidad_disponible }} {{ receta.material.unidad_base }}
@@ -120,6 +134,7 @@
                                 </tr>
                                 {% endfor %}
                             </tbody>
+                            {% if user.userprofile.puede_ver_precios %}
                             <tfoot class="table-light">
                                 <tr>
                                     <th colspan="4" class="text-end">Costo Total de Materiales:</th>
@@ -128,6 +143,7 @@
                                     </th>
                                 </tr>
                             </tfoot>
+                            {% endif %}
                         </table>
                     </div>
                 {% else %}

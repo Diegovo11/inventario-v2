@@ -63,8 +63,10 @@
                             <th>Categoría</th>
                             <th>Tipo</th>
                             <th>Stock</th>
+                            {% if user.userprofile.puede_ver_precios %}
                             <th>Costo Unitario</th>
                             <th>Valor Total</th>
+                            {% endif %}
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
@@ -85,8 +87,10 @@
                             <td>
                                 {{ material.cantidad_disponible }} {{ material.unidad_base }}
                             </td>
+                            {% if user.userprofile.puede_ver_precios %}
                             <td>${{ material.costo_unitario|floatformat:2 }}</td>
                             <td>${{ material.valor_inventario|floatformat:2 }}</td>
+                            {% endif %}
                             <td>
                                 {% if material.cantidad_disponible <= 10 %}
                                     <span class="badge bg-danger">Bajo</span>
