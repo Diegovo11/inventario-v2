@@ -90,7 +90,9 @@
                                             <th>Estado Actual</th>
                                             <th>Recomendación de Compra</th>
                                             <th>Cantidad a Ingresar</th>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <th>Precio por {{ 'Paquete' if materiales_pendientes.0.material.tipo_material == 'paquete' else 'Rollo' }}</th>
+                                            {% endif %}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -159,6 +161,7 @@
                                                                readonly>
                                                     </div>
                                                 </td>
+                                                {% if user.userprofile.puede_ver_precios %}
                                                 <td>
                                                     <div class="input-group">
                                                         <span class="input-group-text">$</span>
@@ -172,6 +175,7 @@
                                                     </div>
                                                     <small class="text-muted">Por {{ resumen.unidad_compra_display }}</small>
                                                 </td>
+                                                {% endif %}
                                             </tr>
                                         {% endfor %}
                                     </tbody>

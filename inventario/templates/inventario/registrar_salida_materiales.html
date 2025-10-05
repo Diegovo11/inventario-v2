@@ -123,7 +123,7 @@
                                         {{ resumen.material.codigo }} - {{ resumen.material.categoria }}
                                     </small>
                                 </div>
-                                <div class="col-md-3 text-center">
+                                <div class="{% if user.userprofile.puede_ver_precios %}col-md-3{% else %}col-md-6{% endif %} text-center">
                                     <div class="mb-1">
                                         <span class="badge bg-danger costo-badge">
                                             Usar: {{ resumen.cantidad_necesaria|floatformat:2 }} {{ resumen.material.unidad_base }}
@@ -133,6 +133,7 @@
                                         Disponible: {{ resumen.material.cantidad_disponible|floatformat:2 }} {{ resumen.material.unidad_base }}
                                     </small>
                                 </div>
+                                {% if user.userprofile.puede_ver_precios %}
                                 <div class="col-md-3 text-end">
                                     <div class="mb-1">
                                         <strong>${{ resumen.costo_material_necesario|floatformat:2 }}</strong>
@@ -141,6 +142,7 @@
                                         ${{ resumen.material.costo_unitario|floatformat:2 }}/{{ resumen.material.unidad_base }}
                                     </small>
                                 </div>
+                                {% endif %}
                             </div>
                             {% if resumen.material.cantidad_disponible < resumen.cantidad_necesaria %}
                                 <div class="alert alert-danger mt-2 mb-0">
@@ -153,6 +155,7 @@
                     {% endfor %}
 
                     <!-- Resumen total -->
+                    {% if user.userprofile.puede_ver_precios %}
                     <div class="border-top pt-3 mt-4">
                         <div class="row">
                             <div class="col-md-8">
@@ -166,6 +169,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Botones de acción -->
                     <div class="d-flex justify-content-end gap-3 mt-4">

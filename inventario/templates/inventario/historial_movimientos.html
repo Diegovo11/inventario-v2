@@ -153,7 +153,9 @@
                             <th>Material</th>
                             <th>Tipo</th>
                             <th>Cantidad</th>
+                            {% if user.userprofile.puede_ver_precios %}
                             <th>Precio/Costo</th>
+                            {% endif %}
                             <th>Usuario</th>
                             <th>Detalle</th>
                             <th>Acciones</th>
@@ -200,6 +202,7 @@
                                     </div>
                                     <small class="text-muted">{{ movimiento.material.unidad_base }}</small>
                                 </td>
+                                {% if user.userprofile.puede_ver_precios %}
                                 <td>
                                     {% if movimiento.precio_unitario %}
                                         <div class="fw-bold">${{ movimiento.precio_unitario|floatformat:4 }}</div>
@@ -210,6 +213,7 @@
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
+                                {% endif %}
                                 <td>
                                     <div class="fw-bold">{{ movimiento.usuario.username }}</div>
                                     {% if movimiento.usuario.first_name %}

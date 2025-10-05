@@ -60,6 +60,7 @@
                                 <th width="40%">Factor Conversión:</th>
                                 <td>{{ material.factor_conversion }} {{ material.unidad_base }}/{{ material.tipo_material }}</td>
                             </tr>
+                            {% if user.userprofile.puede_ver_precios %}
                             <tr>
                                 <th>Precio Compra:</th>
                                 <td>${{ material.precio_compra|floatformat:2 }}</td>
@@ -68,6 +69,7 @@
                                 <th>Costo Unitario:</th>
                                 <td>${{ material.costo_unitario|floatformat:4 }}/{{ material.unidad_base }}</td>
                             </tr>
+                            {% endif %}
                             <tr>
                                 <th>Estado:</th>
                                 <td>
@@ -133,11 +135,15 @@
                 <hr>
                 
                 <div class="row text-center">
+                    {% if user.userprofile.puede_ver_precios %}
                     <div class="col-6">
                         <h6 class="text-muted">Valor Total</h6>
                         <h5 class="text-primary">${{ material.valor_inventario|floatformat:2 }}</h5>
                     </div>
                     <div class="col-6">
+                    {% else %}
+                    <div class="col-12">
+                    {% endif %}
                         <h6 class="text-muted">Equivalente</h6>
                         <h5 class="text-info">
                             <span id="equivalente-paquetes">--</span>
