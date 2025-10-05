@@ -5,25 +5,34 @@
 {% block extra_css %}
 <style>
     .material-compra-card {
-        border: 1px solid #e9ecef;
-        border-radius: 0.375rem;
+        border: 2px solid #e9ecef;
+        border-radius: 0.5rem;
         transition: all 0.2s ease-in-out;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        background: #fff;
     }
     
     .material-compra-card:hover {
         border-color: #0d6efd;
-        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+        transform: translateY(-2px);
     }
     
     .compra-input {
-        border-radius: 0.25rem;
-        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+        border: 2px solid #ced4da;
+        font-size: 1rem;
+        padding: 0.5rem 0.75rem;
     }
     
     .compra-input:focus {
         border-color: #86b7fe;
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .form-control-lg {
+        font-size: 1.1rem;
+        padding: 0.6rem 1rem;
     }
     
     .costo-estimado {
@@ -45,8 +54,31 @@
     }
     
     .lista-badge {
-        font-size: 0.75rem;
-        margin-bottom: 0.25rem;
+        font-size: 0.85rem;
+        padding: 0.35rem 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-label {
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .small {
+        font-size: 0.875rem;
+    }
+    
+    .fw-bold {
+        font-weight: 600 !important;
+    }
+    
+    .input-group-text {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    
+    .bg-light {
+        background-color: #f8f9fa !important;
     }
 </style>
 {% endblock %}
@@ -86,44 +118,58 @@
             {% csrf_token %}
             
             <div class="row">
-                <div class="col-lg-8">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
                             <h5 class="mb-0">
                                 <i class="fas fa-boxes me-2"></i>
                                 Materiales por Comprar
                             </h5>
-                            <span class="badge bg-warning">{{ materiales_pendientes|length }} pendientes</span>
+                            <span class="badge bg-warning text-dark fs-6">
+                                <i class="fas fa-exclamation-circle me-1"></i>
+                                {{ materiales_pendientes|length }} pendiente{{ materiales_pendientes|length|pluralize }}
+                            </span>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body p-4">
                             {% for material_info in materiales_pendientes %}
-                                <div class="material-compra-card p-3">
-                                    <div class="row align-items-center">
-                                        <div class="col-lg-4">
-                                            <div class="mb-2">
-                                                <h6 class="mb-1">{{ material_info.material.nombre }}</h6>
-                                                <small class="text-muted">{{ material_info.material.categoria.nombre|default:"Sin categoría" }}</small>
-                                                <br>
-                                                <span class="badge bg-info lista-badge">{{ material_info.lista.nombre }}</span>
+                                <div class="material-compra-card p-4">
+                                    <div class="row align-items-start">
+                                        <div class="col-lg-4 mb-3 mb-lg-0">
+                                            <div class="mb-3">
+                                                <h5 class="mb-1"><i class="fas fa-box me-2 text-primary"></i>{{ material_info.material.nombre }}</h5>
+                                                <p class="text-muted mb-2">
+                                                    <i class="fas fa-tag me-1"></i>
+                                                    <small>{{ material_info.material.codigo }} - {{ material_info.material.categoria|default:"Sin categoría" }}</small>
+                                                </p>
+                                                <span class="badge bg-info lista-badge">
+                                                    <i class="fas fa-list me-1"></i>{{ material_info.lista.nombre }}
+                                                </span>
                                             </div>
-                                            <div class="mb-2">
-                                                <strong>Necesario:</strong> {{ material_info.paquetes_rollos_necesarios }} {{ material_info.unidad_compra_display }}{{ material_info.paquetes_rollos_necesarios|pluralize:"s" }}
-                                                <br>
-                                                <small class="text-muted">{{ material_info.cantidad_faltante|floatformat:2 }} {{ material_info.material.unidad_base }} total</small>
-                                                <br>
-                                                <small class="costo-estimado">Estimado: ${{ material_info.costo_estimado|floatformat:2 }}</small>
+                                            <div class="alert alert-warning mb-0 py-2">
+                                                <div class="mb-2">
+                                                    <i class="fas fa-shopping-bag me-2"></i>
+                                                    <strong>Comprar:</strong> {{ material_info.paquetes_rollos_necesarios }} {{ material_info.unidad_compra_display }}{{ material_info.paquetes_rollos_necesarios|pluralize:"s" }}
+                                                </div>
+                                                <div class="mb-2">
+                                                    <i class="fas fa-cube me-2"></i>
+                                                    <strong>Cantidad:</strong> {{ material_info.cantidad_faltante|floatformat:2 }} {{ material_info.material.unidad_base }}
+                                                </div>
+                                                <div>
+                                                    <i class="fas fa-dollar-sign me-2"></i>
+                                                    <strong>Estimado:</strong> ${{ material_info.costo_estimado|floatformat:2 }}
+                                                </div>
                                             </div>
                                         </div>
                                         
                                         <div class="col-lg-8">
-                                            <div class="row">
-                                                <div class="col-md-3">
-                                                    <label class="form-label">
-                                                        <strong>{{ material_info.unidad_compra_display }}s Comprados</strong>
+                                            <div class="row g-3">
+                                                <div class="col-md-3 col-sm-6">
+                                                    <label class="form-label small fw-bold">
+                                                        {{ material_info.unidad_compra_display }}s Comprados
                                                     </label>
                                                     <input type="number" 
                                                            name="paquetes_{{ material_info.resumen.id }}" 
-                                                           class="form-control compra-input paquetes-input" 
+                                                           class="form-control form-control-lg compra-input paquetes-input" 
                                                            step="1" 
                                                            min="0" 
                                                            value="{{ material_info.paquetes_rollos_necesarios }}"
@@ -132,25 +178,25 @@
                                                            data-material-id="{{ material_info.resumen.id }}">
                                                     <small class="text-muted">Mín: {{ material_info.paquetes_rollos_necesarios }}</small>
                                                 </div>
-                                                <div class="col-md-3">
-                                                    <label class="form-label">
-                                                        <strong>Total {{ material_info.material.unidad_base }}</strong>
+                                                <div class="col-md-3 col-sm-6">
+                                                    <label class="form-label small fw-bold">
+                                                        Total {{ material_info.material.unidad_base }}
                                                     </label>
                                                     <input type="number" 
                                                            name="cantidad_{{ material_info.resumen.id }}" 
                                                            id="cantidad_{{ material_info.resumen.id }}"
-                                                           class="form-control" 
+                                                           class="form-control form-control-lg bg-light" 
                                                            step="0.01" 
                                                            value="{{ material_info.cantidad_total_compra|floatformat:2 }}"
                                                            readonly>
-                                                    <small class="text-muted">Calculado automáticamente</small>
+                                                    <small class="text-muted">Auto-calculado</small>
                                                 </div>
                                                 
-                                                <div class="col-md-3">
-                                                    <label class="form-label">
-                                                        <strong>Precio Real</strong>
+                                                <div class="col-md-3 col-sm-6">
+                                                    <label class="form-label small fw-bold">
+                                                        Precio Real (c/u)
                                                     </label>
-                                                    <div class="input-group">
+                                                    <div class="input-group input-group-lg">
                                                         <span class="input-group-text">$</span>
                                                         <input type="number" 
                                                                name="precio_{{ material_info.resumen.id }}" 
@@ -161,24 +207,30 @@
                                                                placeholder="0.00"
                                                                data-material-id="{{ material_info.resumen.id }}">
                                                     </div>
-                                                    <small class="text-muted">Por {{ material_info.material.unidad_base }}</small>
+                                                    <small class="text-muted">Por {{ material_info.unidad_compra_display }}</small>
                                                 </div>
                                                 
-                                                <div class="col-md-1">
-                                                    <label class="form-label">
-                                                        <strong>Proveedor</strong>
+                                                <div class="col-md-3 col-sm-6">
+                                                    <label class="form-label small fw-bold">
+                                                        Proveedor
                                                     </label>
                                                     <input type="text" 
                                                            name="proveedor_{{ material_info.resumen.id }}" 
-                                                           class="form-control compra-input" 
-                                                           placeholder="Proveedor"
+                                                           class="form-control form-control-lg compra-input" 
+                                                           placeholder="Nombre proveedor"
                                                            maxlength="200">
+                                                    <small class="text-muted">Opcional</small>
                                                 </div>
-                                                
-                                                <div class="col-md-2 d-flex align-items-end">
-                                                    <div class="text-center">
-                                                        <small class="text-muted d-block">Total:</small>
-                                                        <strong class="text-success total-material" data-material-id="{{ material_info.resumen.id }}">$0.00</strong>
+                                            </div>
+                                            
+                                            <!-- Fila adicional para total -->
+                                            <div class="row mt-3">
+                                                <div class="col-12">
+                                                    <div class="alert alert-success mb-0 py-2">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span><i class="fas fa-calculator me-2"></i><strong>Total a pagar:</strong></span>
+                                                            <strong class="fs-5 total-material" data-material-id="{{ material_info.resumen.id }}">$0.00</strong>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -186,71 +238,80 @@
                                     </div>
                                 </div>
                             {% endfor %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas fa-calculator me-2"></i>
-                                Resumen de Inversión
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <small class="text-muted d-block">Total Materiales:</small>
-                                <h4 id="total-materiales">0</h4>
-                            </div>
                             
-                            <div class="mb-3">
-                                <small class="text-muted d-block">Inversión Total:</small>
-                                <h3 class="total-inversion" id="total-inversion">$0.00</h3>
-                            </div>
-                            
-                            <hr>
-                            
-                            <div class="mb-3">
-                                <h6 class="text-muted">Listas Afectadas:</h6>
-                                {% for lista in listas_comprado %}
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div>
-                                            <span class="badge bg-warning">{{ lista.nombre }}</span>
-                                            <br><small class="text-muted">{{ lista.detalles_monos.count }} tipos de moños</small>
-                                        </div>
-                                        <div>
-                                            <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
-                                               class="btn btn-outline-info btn-sm me-1" title="Ver Detalle">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
-                                               class="btn btn-outline-primary btn-sm me-1" title="Editar Lista">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" 
-                                               class="btn btn-outline-success btn-sm me-1" title="Generar Lista de Compras">
-                                                <i class="fas fa-download"></i>
-                                            </a>
-                                            <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
-                                               class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
+                            <!-- Resumen y botón de envío -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="card bg-light border-primary">
+                                        <div class="card-body p-4">
+                                            <div class="row align-items-center">
+                                                <div class="col-md-4 text-center border-end">
+                                                    <small class="text-muted d-block mb-2">Total de Materiales:</small>
+                                                    <h2 class="mb-0 text-primary" id="total-materiales">0</h2>
+                                                </div>
+                                                <div class="col-md-4 text-center border-end">
+                                                    <small class="text-muted d-block mb-2">Inversión Total:</small>
+                                                    <h2 class="mb-0 text-success total-inversion" id="total-inversion">$0.00</h2>
+                                                </div>
+                                                <div class="col-md-4 text-center">
+                                                    <button type="submit" class="btn btn-success btn-lg px-5" id="btn-registrar-compras" disabled>
+                                                        <i class="fas fa-check-circle me-2"></i>
+                                                        Registrar Compras
+                                                    </button>
+                                                    <small class="text-muted mt-2 d-block">
+                                                        Completa al menos una compra
+                                                    </small>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                {% endfor %}
+                                </div>
                             </div>
-                        </div>
-                        <div class="card-footer">
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-success" id="btn-registrar-compras" disabled>
-                                    <i class="fas fa-check me-2"></i>
-                                    Registrar Compras
-                                </button>
+                            
+                            <!-- Listas afectadas -->
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-list-alt me-2"></i>
+                                                Listas de Producción Afectadas
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-3">
+                                                {% for lista in listas_comprado %}
+                                                    <div class="col-md-6 col-lg-4">
+                                                        <div class="card border">
+                                                            <div class="card-body">
+                                                                <h6 class="card-title">
+                                                                    <span class="badge bg-warning text-dark mb-2">{{ lista.nombre }}</span>
+                                                                </h6>
+                                                                <p class="card-text mb-3">
+                                                                    <small class="text-muted">
+                                                                        <i class="fas fa-bow-tie me-1"></i>
+                                                                        {{ lista.detalles_monos.count }} tipo{{ lista.detalles_monos.count|pluralize }} de moños
+                                                                    </small>
+                                                                </p>
+                                                                <div class="d-flex gap-2">
+                                                                    <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
+                                                                       class="btn btn-sm btn-outline-info flex-grow-1" title="Ver Detalle">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </a>
+                                                                    <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" 
+                                                                       class="btn btn-sm btn-outline-success flex-grow-1" title="Descargar">
+                                                                        <i class="fas fa-download"></i>
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <small class="text-muted mt-2 d-block text-center">
-                                Completa al menos una compra para habilitar
-                            </small>
                         </div>
                     </div>
                 </div>
