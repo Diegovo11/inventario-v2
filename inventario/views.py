@@ -1659,36 +1659,36 @@ def reabastecimiento(request):
                             continue
                 
                 if cantidades_actualizadas > 0:
-                    # Verificar si la producción está completa
+                    # Actualizar total de moños producidos
+                    total_producidos = sum(
+                        detalle.cantidad_total_producida 
+                        for detalle in lista.detalles_monos.all()
+                    )
+                    lista.total_moños_producidos = total_producidos
+                    
+                    # SIEMPRE cambiar a estado EN_SALIDA al guardar producción
+                    lista.estado = 'en_salida'
+                    lista.save()
+                    
+                    # Verificar si la producción está completa para el mensaje
                     produccion_completa = all(
                         detalle.cantidad_producida >= detalle.cantidad 
                         for detalle in lista.detalles_monos.all()
                     )
                     
                     if produccion_completa:
-                        # Cambiar a estado EN_SALIDA (no finalizado todavía)
-                        lista.estado = 'en_salida'
-                        lista.save()
-                        
-                        # Actualizar total de moños producidos
-                        total_producidos = sum(
-                            detalle.cantidad_total_producida 
-                            for detalle in lista.detalles_monos.all()
-                        )
-                        lista.total_moños_producidos = total_producidos
-                        lista.save()
-                        
                         messages.success(
                             request, 
-                            f'¡Producción de "{lista.nombre}" completada! '
+                            f'✅ Producción de "{lista.nombre}" completada! '
                             f'Se produjeron {total_producidos} moños en total. '
-                            f'La lista está lista para marcar SALIDA y registrar la venta.'
+                            f'Lista enviada a Salida para registrar ventas.'
                         )
                     else:
-                        messages.info(
+                        messages.success(
                             request, 
-                            f'Se actualizaron las cantidades de "{lista.nombre}". '
-                            f'Aún faltan algunos moños por completar.'
+                            f'✅ Producción de "{lista.nombre}" guardada! '
+                            f'Se produjeron {total_producidos} moños hasta ahora. '
+                            f'Lista enviada a Salida para registrar ventas.'
                         )
                 else:
                     messages.warning(request, 'No se actualizó ninguna cantidad.')
@@ -3586,32 +3586,6 @@ def iniciar_produccion(request, lista_id):
         
     except Exception as e:
         messages.error(request, f'Error al iniciar producción: {str(e)}')
-        return redirect('inventario:reabastecimiento')
-
-
-@login_required
-def enviar_a_salida(request, lista_id):
-    """Marca una lista en producción como lista para salida"""
-    if request.method != 'POST':
-        messages.error(request, 'Método no permitido.')
-        return redirect('inventario:reabastecimiento')
-    
-    try:
-        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
-        
-        if lista.estado != 'en_produccion':
-            messages.error(request, f'La lista "{lista.nombre}" debe estar "En Producción" para enviarla a salida.')
-            return redirect('inventario:reabastecimiento')
-        
-        # Cambiar estado a en_salida
-        lista.estado = 'en_salida'
-        lista.save()
-        
-        messages.success(request, f'Lista "{lista.nombre}" enviada a salida. Ahora puedes registrar las ventas.')
-        return redirect('inventario:lista_en_salida')
-        
-    except Exception as e:
-        messages.error(request, f'Error al enviar a salida: {str(e)}')
         return redirect('inventario:reabastecimiento')
 
 

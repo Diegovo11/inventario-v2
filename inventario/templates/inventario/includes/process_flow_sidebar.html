@@ -121,29 +121,23 @@ Muestra visualmente en qué paso está la lista y permite navegación
             <div class="process-step {% if lista.estado in 'en_salida,finalizado' %}completed{% elif lista.estado == 'en_produccion' %}active{% endif %}">
                 <div class="step-number">5</div>
                 <div class="step-content">
-                    <div class="step-title">Produciendo</div>
+                    <div class="step-title">Registrar Producción</div>
                     <div class="step-description">
                         {% if lista.estado == 'en_produccion' %}
-                            <strong>👉 PASO ACTUAL:</strong> Fabricando los moños
+                            <strong>👉 PASO ACTUAL:</strong> Registra los moños producidos
                         {% else %}
                             {% if lista.estado in 'en_salida,finalizado' %}
-                                Producción completada ✓
+                                Producción registrada ✓
                             {% else %}
                                 Pendiente de iniciar
                             {% endif %}
                         {% endif %}
                     </div>
                     {% if lista.estado == 'en_produccion' %}
-                        <span class="badge bg-info mt-2 w-100 mb-2">
-                            <i class="fas fa-cog fa-spin me-1"></i> En Producción
-                        </span>
-                        <form method="post" action="{% url 'inventario:enviar_a_salida' lista.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-success w-100">
-                                <i class="fas fa-check me-1"></i> Confirmar Producción Completada
-                            </button>
-                        </form>
-                        <small class="text-muted d-block mt-1">✅ Cuando termines de producir todos los moños</small>
+                        <a href="{% url 'inventario:reabastecimiento' %}" class="btn btn-sm btn-success w-100 mt-2">
+                            <i class="fas fa-clipboard-check me-1"></i> Ir a Registrar Producción
+                        </a>
+                        <small class="text-muted d-block mt-2">💡 Ingresa las cantidades producidas en la página de Reabastecimiento</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
