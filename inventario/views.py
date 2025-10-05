@@ -1300,6 +1300,7 @@ def detalle_lista_produccion(request, lista_id):
 @login_required
 def compra_productos(request):
     """Vista para registrar compras reales de materiales"""
+    from decimal import Decimal
     
     # Obtener listas en estado 'comprado' que necesitan registro de compras
     listas_comprado = ListaProduccion.objects.filter(
@@ -1363,9 +1364,9 @@ def compra_productos(request):
             
             if paquetes_comprados and precio_real:
                 try:
-                    paquetes = float(paquetes_comprados)
-                    cantidad = float(cantidad_comprada) if cantidad_comprada else paquetes * resumen.material.factor_conversion
-                    precio = float(precio_real)
+                    paquetes = Decimal(str(paquetes_comprados))
+                    cantidad = Decimal(str(cantidad_comprada)) if cantidad_comprada else paquetes * resumen.material.factor_conversion
+                    precio = Decimal(str(precio_real))
                     
                     print(f"   Valores convertidos:")
                     print(f"   - Paquetes: {paquetes}")
