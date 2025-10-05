@@ -7,11 +7,14 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">
-                    <i class="fas fa-list-alt me-2"></i>
-                    {{ titulo }}
-                </h1>
-                <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="fas fa-list-alt me-2"></i>
+                        {{ titulo }}
+                    </h1>
+                    <p class="text-muted mb-0">Gestiona tus listas por etapa del proceso</p>
+                </div>
+                <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary btn-lg">
                     <i class="fas fa-plus me-2"></i>
                     Nueva Lista
                 </a>
@@ -32,141 +35,206 @@
         </div>
     {% endif %}
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-table me-2"></i>
-                        Todas las Listas
-                    </h5>
-                    <span class="badge bg-primary">{{ listas.count }}</span>
-                </div>
-                <div class="card-body">
-                    {% if listas %}
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Lista</th>
-                                        <th>Estado</th>
-                                        <th>Moños</th>
-                                        <th>Ganancia Estimada</th>
-                                        <th>Fecha</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for lista in listas %}
-                                        <tr>
-                                            <td>
-                                                <h6 class="mb-1">{{ lista.nombre }}</h6>
-                                                <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-{% if lista.estado == 'borrador' %}secondary{% elif lista.estado == 'pendiente_compra' %}warning{% elif lista.estado == 'comprado' %}info{% elif lista.estado == 'reabastecido' %}success{% elif lista.estado == 'en_produccion' %}primary{% else %}dark{% endif %}">
-                                                    {{ lista.get_estado_display }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <strong>{{ lista.total_moños_planificados }}</strong>
-                                                <small class="text-muted d-block">{{ lista.detalles_monos.count }} tipo{{ lista.detalles_monos.count|pluralize }}</small>
-                                            </td>
-                                            <td>
-                                                {% if lista.ganancia_estimada %}
-                                                    <strong class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</strong>
-                                                {% else %}
-                                                    <small class="text-muted">No calculado</small>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <small>{{ lista.fecha_creacion|date:"d/m/Y H:i" }}</small>
-                                            </td>
-                                            <td>
-                                                <div class="btn-group" role="group">
-                                                    <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
-                                                       class="btn btn-primary btn-sm" title="Gestionar Lista">
-                                                        <i class="fas fa-tasks"></i> Panel
-                                                    </a>
-                                                    <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
-                                                       class="btn btn-outline-primary btn-sm" title="Editar Lista">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
-                                                    <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
-                                                       class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
-                                                        <i class="fas fa-trash-alt"></i>
-                                                    </a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+    {% if total_listas > 0 %}
+        <!-- Resumen de listas por paso -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            {% for key, paso in listas_por_paso.items %}
+                                <div class="text-center">
+                                    <div class="position-relative d-inline-block">
+                                        <i class="{{ paso.icono }} fa-2x text-{{ paso.color }}"></i>
+                                        {% if paso.listas.count > 0 %}
+                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-{{ paso.color }}">
+                                                {{ paso.listas.count }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="mb-0 mt-2 small fw-bold">{{ paso.nombre }}</p>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <i class="fas fa-list-alt fa-4x text-muted mb-3"></i>
-                            <h5 class="text-muted">No hay listas de producción</h5>
-                            <p class="text-muted mb-4">Comienza creando tu primera lista de producción</p>
-                            <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>
-                                Crear Primera Lista
-                            </a>
-                        </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Estadísticas rápidas -->
-    {% if listas %}
+        <!-- Acordeón de listas por paso -->
+        <div class="row">
+            <div class="col-12">
+                <div class="accordion" id="accordionListas">
+                    {% for key, paso in listas_por_paso.items %}
+                        <div class="accordion-item border-start border-{{ paso.color }} border-4">
+                            <h2 class="accordion-header" id="heading{{ key }}">
+                                <button class="accordion-button {% if paso.listas.count == 0 %}collapsed{% endif %}" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#collapse{{ key }}" 
+                                        aria-expanded="{% if paso.listas.count > 0 %}true{% else %}false{% endif %}" 
+                                        aria-controls="collapse{{ key }}">
+                                    <div class="d-flex align-items-center w-100">
+                                        <div class="me-3">
+                                            <div class="rounded-circle bg-{{ paso.color }} text-white d-flex align-items-center justify-content-center" 
+                                                 style="width: 45px; height: 45px; font-weight: bold;">
+                                                {{ paso.numero }}
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h5 class="mb-0">
+                                                <i class="{{ paso.icono }} me-2 text-{{ paso.color }}"></i>
+                                                {{ paso.nombre }}
+                                            </h5>
+                                        </div>
+                                        <div class="me-3">
+                                            <span class="badge bg-{{ paso.color }} fs-6">
+                                                {{ paso.listas.count }} lista{{ paso.listas.count|pluralize }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ key }}" 
+                                 class="accordion-collapse collapse {% if paso.listas.count > 0 and forloop.first %}show{% endif %}" 
+                                 aria-labelledby="heading{{ key }}" 
+                                 data-bs-parent="#accordionListas">
+                                <div class="accordion-body">
+                                    {% if paso.listas %}
+                                        <div class="row g-3">
+                                            {% for lista in paso.listas %}
+                                                <div class="col-md-6 col-lg-4">
+                                                    <div class="card h-100 border-{{ paso.color }} shadow-sm lista-card">
+                                                        <div class="card-body">
+                                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                                <h6 class="card-title mb-0 flex-grow-1">
+                                                                    {{ lista.nombre }}
+                                                                </h6>
+                                                                <span class="badge bg-{{ paso.color }}">
+                                                                    Paso {{ paso.numero }}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            <p class="card-text text-muted small mb-3">
+                                                                {{ lista.descripcion|default:"Sin descripción"|truncatewords:10 }}
+                                                            </p>
+                                                            
+                                                            <div class="row g-2 mb-3 small">
+                                                                <div class="col-6">
+                                                                    <i class="fas fa-ribbon text-muted me-1"></i>
+                                                                    <strong>{{ lista.total_moños_planificados }}</strong> moños
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <i class="fas fa-calendar text-muted me-1"></i>
+                                                                    {{ lista.fecha_creacion|date:"d/m/y" }}
+                                                                </div>
+                                                                {% if lista.ganancia_estimada %}
+                                                                    <div class="col-12">
+                                                                        <i class="fas fa-dollar-sign text-success me-1"></i>
+                                                                        <strong class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</strong>
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                            
+                                                            <div class="d-grid gap-2">
+                                                                <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
+                                                                   class="btn btn-{{ paso.color }} btn-sm">
+                                                                    <i class="fas fa-tasks me-1"></i>
+                                                                    Abrir Panel
+                                                                </a>
+                                                                <div class="btn-group" role="group">
+                                                                    <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
+                                                                       class="btn btn-outline-secondary btn-sm">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </a>
+                                                                    <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
+                                                                       class="btn btn-outline-danger btn-sm">
+                                                                        <i class="fas fa-trash-alt"></i>
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4 text-muted">
+                                            <i class="{{ paso.icono }} fa-3x mb-3 opacity-50"></i>
+                                            <p class="mb-0">No hay listas en este paso</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ver listas completadas -->
         <div class="row mt-4">
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title text-secondary">
-                            <i class="fas fa-edit me-2"></i>
-                            Borradores
-                        </h5>
-                        <h3 class="text-secondary">{{ listas|length }}</h3>
-                    </div>
-                </div>
+            <div class="col-12 text-center">
+                <a href="{% url 'inventario:listas_produccion' %}?ver=finalizadas" class="btn btn-outline-success">
+                    <i class="fas fa-trophy me-2"></i>
+                    Ver Listas Completadas
+                </a>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title text-warning">
-                            <i class="fas fa-shopping-cart me-2"></i>
-                            Pend. Compra
-                        </h5>
-                        <h3 class="text-warning">{{ listas|length }}</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title text-success">
-                            <i class="fas fa-check me-2"></i>
-                            Reabastecidas
-                        </h5>
-                        <h3 class="text-success">{{ listas|length }}</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title text-primary">
-                            <i class="fas fa-cogs me-2"></i>
-                            En Producción
-                        </h5>
-                        <h3 class="text-primary">{{ listas|length }}</h3>
+        </div>
+
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-list-alt fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted mb-3">No hay listas de producción</h4>
+                        <p class="text-muted mb-4">
+                            Comienza creando tu primera lista para gestionar el proceso de producción paso a paso.
+                        </p>
+                        <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i>
+                            Crear Primera Lista
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     {% endif %}
 </div>
+
+<style>
+    .lista-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .lista-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .accordion-button:not(.collapsed) {
+        background-color: rgba(var(--bs-primary-rgb), 0.05);
+    }
+    
+    .accordion-button:focus {
+        box-shadow: none;
+    }
+    
+    .border-4 {
+        border-width: 4px !important;
+    }
+    
+    @media (max-width: 768px) {
+        .accordion-button {
+            font-size: 0.9rem;
+        }
+        
+        .accordion-button h5 {
+            font-size: 1rem;
+        }
+    }
+</style>
 {% endblock %}

@@ -1243,14 +1243,65 @@ def registrar_entrada_reabastecimiento(request, lista_id):
 
 @login_required
 def listado_listas_produccion(request):
-    """Vista para mostrar todas las listas de producción"""
+    """Vista para mostrar todas las listas de producción agrupadas por paso"""
     
-    listas = ListaProduccion.objects.filter(
+    # Obtener todas las listas (excluyendo finalizadas)
+    todas_listas = ListaProduccion.objects.filter(
         usuario_creador=request.user
     ).exclude(estado='finalizado').prefetch_related('detalles_monos__monos').order_by('-fecha_creacion')
     
+    # Agrupar listas por paso/estado
+    listas_por_paso = {
+        'borrador': {
+            'nombre': 'Creada',
+            'numero': 1,
+            'icono': 'fas fa-check-circle',
+            'color': 'secondary',
+            'listas': todas_listas.filter(estado='borrador')
+        },
+        'pendiente_compra': {
+            'nombre': 'Lista de Compras',
+            'numero': 2,
+            'icono': 'fas fa-file-download',
+            'color': 'warning',
+            'listas': todas_listas.filter(estado='pendiente_compra')
+        },
+        'comprado': {
+            'nombre': 'Registrar Compras',
+            'numero': 3,
+            'icono': 'fas fa-shopping-cart',
+            'color': 'info',
+            'listas': todas_listas.filter(estado='comprado')
+        },
+        'reabastecido': {
+            'nombre': 'Materiales Listos',
+            'numero': 4,
+            'icono': 'fas fa-box-check',
+            'color': 'success',
+            'listas': todas_listas.filter(estado='reabastecido')
+        },
+        'en_produccion': {
+            'nombre': 'Produciendo',
+            'numero': 5,
+            'icono': 'fas fa-industry',
+            'color': 'primary',
+            'listas': todas_listas.filter(estado='en_produccion')
+        },
+        'en_salida': {
+            'nombre': 'Salida y Ventas',
+            'numero': 6,
+            'icono': 'fas fa-cash-register',
+            'color': 'dark',
+            'listas': todas_listas.filter(estado='en_salida')
+        }
+    }
+    
+    # Contar totales
+    total_listas = todas_listas.count()
+    
     context = {
-        'listas': listas,
+        'listas_por_paso': listas_por_paso,
+        'total_listas': total_listas,
         'titulo': 'Listas de Producción'
     }
     
