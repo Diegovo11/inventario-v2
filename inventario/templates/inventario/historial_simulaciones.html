@@ -111,7 +111,9 @@
                             <th>Cantidad</th>
                             <th>Usuario</th>
                             <th>Necesita Compras</th>
+                            {% if user.userprofile.puede_ver_precios %}
                             <th>Costo Total</th>
+                            {% endif %}
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -153,12 +155,14 @@
                                         </span>
                                     {% endif %}
                                 </td>
+                                {% if user.userprofile.puede_ver_precios %}
                                 <td>
                                     <span class="fw-bold text-success">
                                         <i class="fas fa-dollar-sign me-1"></i>
                                         ${{ simulacion.costo_total|floatformat:0 }}
                                     </span>
                                 </td>
+                                {% endif %}
                                 <td>
                                     <div class="btn-group" role="group">
                                         <a href="{% url 'inventario:detalle_simulacion' simulacion.pk %}" 
