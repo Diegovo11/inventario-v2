@@ -134,16 +134,10 @@ Muestra visualmente en qué paso está la lista y permite navegación
                         {% endif %}
                     </div>
                     {% if lista.estado == 'en_produccion' %}
-                        <span class="badge bg-info mt-2 w-100 mb-2">
+                        <span class="badge bg-info mt-2 w-100">
                             <i class="fas fa-cog fa-spin me-1"></i> En Producción
                         </span>
-                        <form method="post" action="{% url 'inventario:enviar_a_salida' lista.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-success w-100">
-                                <i class="fas fa-check me-1"></i> Confirmar Producción Completada
-                            </button>
-                        </form>
-                        <small class="text-muted d-block mt-1">✅ Cuando termines de producir todos los moños</small>
+                        <small class="text-muted d-block mt-1">💡 Cuando termines, envía a Salida</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">
@@ -155,17 +149,17 @@ Muestra visualmente en qué paso está la lista y permite navegación
                 </div>
             </div>
 
-            <!-- Paso 6: Salida y Ventas -->
+            <!-- Paso 6: Salida -->
             <div class="process-step {% if lista.estado == 'finalizado' %}completed{% elif lista.estado == 'en_salida' %}active{% endif %}">
                 <div class="step-number">6</div>
                 <div class="step-content">
-                    <div class="step-title">Salida y Ventas</div>
+                    <div class="step-title">Registrar Venta</div>
                     <div class="step-description">
                         {% if lista.estado == 'en_salida' %}
-                            <strong>👉 PASO ACTUAL:</strong> Registra salida de materiales y ventas
+                            <strong>👉 PASO ACTUAL:</strong> Registra la venta
                         {% else %}
                             {% if lista.estado == 'finalizado' %}
-                                Ventas registradas ✓
+                                Venta registrada ✓
                             {% else %}
                                 Pendiente...
                             {% endif %}
@@ -173,9 +167,9 @@ Muestra visualmente en qué paso está la lista y permite navegación
                     </div>
                     {% if lista.estado == 'en_salida' %}
                         <a href="{% url 'inventario:lista_en_salida' %}" class="btn btn-sm btn-success mt-2 w-100">
-                            <i class="fas fa-cash-register me-1"></i> Ir a Registrar Ventas
+                            <i class="fas fa-clipboard-check me-1"></i> Ir a Salida
                         </a>
-                        <small class="text-muted d-block mt-1">� Registra salida de materiales y precios</small>
+                        <small class="text-muted d-block mt-1">💡 Registra precios de venta</small>
                     {% endif %}
                 </div>
                 <div class="step-icon">

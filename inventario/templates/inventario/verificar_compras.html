@@ -1,0 +1,149 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            {% include 'inventario/includes/process_flow_sidebar.html' %}
+        </div>
+        
+        <!-- Contenido Principal -->
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-clipboard-check me-2"></i>
+                        Verificar Compras Realizadas
+                    </h4>
+                </div>
+                
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Instrucciones:</strong> Marca con ✓ los materiales que <strong>SÍ lograste comprar</strong>. 
+                        No te preocupes si no encontraste todos, el sistema llevará control de lo que falta.
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Lista: <strong>{{ lista.nombre }}</strong></h5>
+                        <p class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</p>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-list me-2"></i>
+                                    Materiales Necesarios ({{ materiales_necesarios.count }})
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% if materiales_necesarios %}
+                                    <div class="row">
+                                        {% for resumen in materiales_necesarios %}
+                                            <div class="col-md-6 mb-3">
+                                                <div class="card h-100 border-2" style="border-left: 4px solid #ffc107;">
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" 
+                                                                   type="checkbox" 
+                                                                   name="materiales_comprados" 
+                                                                   value="{{ resumen.id }}" 
+                                                                   id="material_{{ resumen.id }}"
+                                                                   checked>
+                                                            <label class="form-check-label w-100" for="material_{{ resumen.id }}">
+                                                                <div class="d-flex justify-content-between align-items-start">
+                                                                    <div>
+                                                                        <h6 class="mb-1">{{ resumen.material.nombre }}</h6>
+                                                                        <small class="text-muted d-block">
+                                                                            Código: {{ resumen.material.codigo }}
+                                                                        </small>
+                                                                    </div>
+                                                                    <span class="badge bg-warning text-dark">
+                                                                        Falta
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <hr class="my-2">
+                                                                
+                                                                <div class="row g-2 small">
+                                                                    <div class="col-6">
+                                                                        <strong>Necesario:</strong><br>
+                                                                        {{ resumen.cantidad_faltante|floatformat:2 }} {{ resumen.material.unidad_base }}
+                                                                    </div>
+                                                                    <div class="col-6">
+                                                                        <strong>Comprar:</strong><br>
+                                                                        {{ resumen.paquetes_rollos_necesarios }} {{ resumen.unidad_compra_display }}{{ resumen.paquetes_rollos_necesarios|pluralize }}
+                                                                    </div>
+                                                                    <div class="col-12 mt-2">
+                                                                        <strong>Costo estimado:</strong> 
+                                                                        <span class="text-success">${{ resumen.costo_estimado_compra|floatformat:2 }}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-success">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        No hay materiales faltantes. Todos los materiales están disponibles en inventario.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if materiales_necesarios %}
+                            <div class="d-flex justify-content-between align-items-center mt-4">
+                                <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Cancelar
+                                </a>
+                                
+                                <button type="submit" class="btn btn-warning btn-lg">
+                                    <i class="fas fa-check me-2"></i>
+                                    Confirmar Materiales Comprados
+                                </button>
+                            </div>
+                            
+                            <div class="alert alert-light mt-3 text-center">
+                                <small>
+                                    <i class="fas fa-lightbulb me-1"></i>
+                                    <strong>Tip:</strong> Después de confirmar, podrás registrar las cantidades exactas que compraste en "Compra de Productos"
+                                </small>
+                            </div>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-check-input:checked ~ .form-check-label {
+    background-color: #e7f9e7;
+    padding: 10px;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.form-check-input {
+    width: 1.5em;
+    height: 1.5em;
+    margin-top: 0.1em;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+}
+</style>
+{% endblock %}

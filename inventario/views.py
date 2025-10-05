@@ -1027,12 +1027,8 @@ NOTAS
     filename = f"lista_compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    # Cambiar automáticamente el estado a 'comprado' después de generar el archivo
-    if lista.estado == 'pendiente_compra':
-        lista.estado = 'comprado'
-        lista.save()
-        # El mensaje se mostrará en la próxima vista que visite el usuario
-        messages.success(request, f'✅ Archivo generado y lista "{lista.nombre}" marcada como COMPRADA. Ahora puedes registrar las compras en "Compra de Productos".')
+    # No cambiar estado automáticamente - el usuario debe verificar compras manualmente
+    # después de ir a comprar los materiales
     
     return response
 
@@ -1063,6 +1059,62 @@ def marcar_como_comprado(request, lista_id):
             return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
     
     return redirect('inventario:lista_de_compras')
+
+
+@login_required
+@login_required
+def verificar_compras(request, lista_id):
+    """Vista para verificar qué materiales se compraron de la lista"""
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    # Solo disponible para listas en estado 'pendiente_compra'
+    if lista.estado != 'pendiente_compra':
+        messages.warning(request, f'La lista "{lista.nombre}" ya fue verificada o no está en estado de compras pendientes.')
+        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    
+    if request.method == 'POST':
+        # Obtener materiales seleccionados (los que SÍ se compraron)
+        materiales_comprados = request.POST.getlist('materiales_comprados')
+        
+        if not materiales_comprados:
+            messages.error(request, '❌ Debes seleccionar al menos un material que hayas comprado.')
+            return redirect('inventario:verificar_compras', lista_id=lista.id)
+        
+        # Marcar los materiales como comprados (para tracking)
+        total_comprados = 0
+        for resumen_id in materiales_comprados:
+            try:
+                resumen = lista.resumen_materiales.get(id=int(resumen_id))
+                # Marcar con flag temporal que se compró (usaremos fecha_compra)
+                resumen.fecha_compra = timezone.now()
+                resumen.save()
+                total_comprados += 1
+            except:
+                continue
+        
+        # Cambiar estado a 'comprado'
+        lista.estado = 'comprado'
+        lista.save()
+        
+        messages.success(
+            request, 
+            f'✅ Lista "{lista.nombre}" marcada como COMPRADA. '
+            f'Se verificaron {total_comprados} material(es). '
+            f'Ahora puedes registrar las cantidades exactas en "Compra de Productos".'
+        )
+        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    
+    # GET - Mostrar checklist de materiales
+    materiales_necesarios = lista.resumen_materiales.filter(cantidad_faltante__gt=0).select_related('material')
+    
+    context = {
+        'titulo': f'Verificar Compras - {lista.nombre}',
+        'lista': lista,
+        'materiales_necesarios': materiales_necesarios,
+    }
+    
+    return render(request, 'inventario/verificar_compras.html', context)
 
 
 @login_required
@@ -3052,20 +3104,30 @@ def iniciar_produccion(request, lista_id):
 
 
 @login_required
+@login_required
 def enviar_a_salida(request, lista_id):
-    """Enviar lista de producción a fase de salida"""
-    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    """Confirmar que la producción está completada y enviar a fase de salida"""
     
-    if lista.estado != "en_produccion":
-        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en producción para enviarla a salida.")
-        return redirect("inventario:reabastecimiento")
+    if request.method == 'POST':
+        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+        
+        if lista.estado != "en_produccion":
+            messages.error(request, f"La lista \"{lista.nombre}\" debe estar en producción para enviarla a salida.")
+            return redirect("inventario:detalle_lista_produccion", lista_id=lista.id)
+        
+        # Cambiar estado a en_salida
+        lista.estado = "en_salida"
+        lista.save()
+        
+        messages.success(
+            request, 
+            f"✅ ¡Producción confirmada! Lista \"{lista.nombre}\" enviada a SALIDA. "
+            f"Ahora puedes registrar las ventas."
+        )
+        return redirect("inventario:detalle_lista_produccion", lista_id=lista.id)
     
-    # Cambiar estado a en_salida
-    lista.estado = "en_salida"
-    lista.save()
-    
-    messages.success(request, f"Lista \"{lista.nombre}\" enviada a salida. Ya puedes registrar las salidas de material y ventas.")
-    return redirect("inventario:lista_en_salida")
+    # Si no es POST, redirigir
+    return redirect("inventario:lista_de_compras")
 
 
 @login_required
