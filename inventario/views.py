@@ -3662,20 +3662,38 @@ def registrar_ventas_contaduria(request, lista_id):
     
     if request.method == 'POST':
         try:
+            # Importar el modelo VentaMonos
+            from .models import VentaMonos
+            
             # Calcular ingreso total de las ventas
             ingreso_total = Decimal('0')
+            ventas_registradas = []
             
             for detalle in lista.detalles_monos.all():
-                cantidad_vendida = Decimal(request.POST.get(f'cantidad_vendida_{detalle.id}', 0))
-                precio_venta = detalle.monos.precio_venta
+                cantidad_vendida = int(request.POST.get(f'cantidad_vendida_{detalle.id}', 0))
                 
                 if cantidad_vendida > 0:
-                    ingreso_venta = cantidad_vendida * precio_venta
+                    precio_venta = detalle.monos.precio_venta
+                    ingreso_venta = Decimal(cantidad_vendida) * precio_venta
                     ingreso_total += ingreso_venta
                     
                     # Actualizar cantidad producida en el detalle
                     detalle.cantidad_producida = cantidad_vendida
                     detalle.save()
+                    
+                    # Crear registro de venta individual para analytics
+                    venta_mono = VentaMonos.objects.create(
+                        lista_produccion=lista,
+                        monos=detalle.monos,
+                        cantidad_vendida=cantidad_vendida,
+                        tipo_venta=detalle.monos.tipo_venta,
+                        precio_unitario=precio_venta,
+                        ingreso_total=ingreso_venta,
+                        costo_unitario=detalle.monos.costo_produccion,
+                        ganancia_total=ingreso_venta - (detalle.monos.costo_produccion * cantidad_vendida),
+                        usuario=request.user
+                    )
+                    ventas_registradas.append(venta_mono)
             
             if ingreso_total > 0:
                 # Registrar el ingreso en contaduría
@@ -3694,7 +3712,8 @@ def registrar_ventas_contaduria(request, lista_id):
                 
                 messages.success(
                     request,
-                    f'Ventas registradas exitosamente. Ingreso total: ${ingreso_total:.2f}. '
+                    f'✅ {len(ventas_registradas)} venta(s) registrada(s) exitosamente. '
+                    f'Ingreso total: ${ingreso_total:.2f}. '
                     f'Ganancia: ${lista.ganancia_real:.2f}'
                 )
                 return redirect('inventario:listas_produccion')

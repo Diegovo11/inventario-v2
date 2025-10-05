@@ -459,6 +459,80 @@ class MovimientoEfectivo(models.Model):
         return movimiento
 
 
+class VentaMonos(models.Model):
+    """Modelo para registrar ventas individuales de moños"""
+    
+    lista_produccion = models.ForeignKey(
+        'ListaProduccion',
+        on_delete=models.CASCADE,
+        related_name='ventas_monos',
+        null=True,
+        blank=True,
+        help_text="Lista de producción relacionada (si aplica)"
+    )
+    monos = models.ForeignKey(
+        Monos,
+        on_delete=models.CASCADE,
+        related_name='ventas'
+    )
+    cantidad_vendida = models.PositiveIntegerField(
+        help_text="Cantidad vendida (pares o individuales según tipo_venta)"
+    )
+    tipo_venta = models.CharField(
+        max_length=10,
+        choices=Monos.TIPO_VENTA_CHOICES,
+        help_text="Tipo de venta: individual o par"
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Precio de venta por unidad/par"
+    )
+    ingreso_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Ingreso total de esta venta"
+    )
+    costo_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Costo de producción por unidad/par"
+    )
+    ganancia_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Ganancia de esta venta"
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    class Meta:
+        verbose_name = "Venta de Moño"
+        verbose_name_plural = "Ventas de Moños"
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['monos', 'fecha']),
+            models.Index(fields=['fecha']),
+        ]
+    
+    @property
+    def cantidad_total_monos(self):
+        """Cantidad total de moños vendidos considerando el tipo"""
+        if self.tipo_venta == 'par':
+            return self.cantidad_vendida * 2
+        return self.cantidad_vendida
+    
+    def __str__(self):
+        return f"{self.monos.nombre} - {self.cantidad_vendida} {self.tipo_venta} - ${self.ingreso_total}"
+
+
 class ListaProduccion(models.Model):
     """Modelo principal para gestionar listas de producción de moños"""
     

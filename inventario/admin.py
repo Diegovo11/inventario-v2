@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, 
                    Simulacion, DetalleSimulacion, MovimientoEfectivo, ListaProduccion, 
-                   DetalleListaMonos, ResumenMateriales)
+                   DetalleListaMonos, ResumenMateriales, VentaMonos)
 
 
 @admin.register(Material)
@@ -438,6 +438,53 @@ class ResumenMaterialesAdmin(admin.ModelAdmin):
     ]
     list_filter = ['lista_produccion__estado', 'material__categoria']
     search_fields = ['lista_produccion__nombre', 'material__nombre']
+
+
+@admin.register(VentaMonos)
+class VentaMonosAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'monos',
+        'cantidad_vendida',
+        'tipo_venta',
+        'cantidad_total_monos',
+        'precio_unitario',
+        'ingreso_total_formatted',
+        'ganancia_total_formatted',
+        'fecha',
+        'usuario'
+    ]
+    list_filter = ['tipo_venta', 'monos', 'fecha']
+    search_fields = ['monos__nombre', 'lista_produccion__nombre']
+    readonly_fields = ['fecha', 'cantidad_total_monos']
+    date_hierarchy = 'fecha'
+    
+    fieldsets = (
+        ('Información de Venta', {
+            'fields': ('lista_produccion', 'monos', 'cantidad_vendida', 'tipo_venta', 'cantidad_total_monos')
+        }),
+        ('Finanzas', {
+            'fields': ('precio_unitario', 'ingreso_total', 'costo_unitario', 'ganancia_total')
+        }),
+        ('Metadatos', {
+            'fields': ('fecha', 'usuario')
+        }),
+    )
+    
+    def ingreso_total_formatted(self, obj):
+        return f"${obj.ingreso_total:.2f}"
+    ingreso_total_formatted.short_description = "Ingreso Total"
+    ingreso_total_formatted.admin_order_field = 'ingreso_total'
+    
+    def ganancia_total_formatted(self, obj):
+        color = 'green' if obj.ganancia_total > 0 else 'red'
+        return format_html(
+            '<span style="color: {};">${:.2f}</span>',
+            color,
+            obj.ganancia_total
+        )
+    ganancia_total_formatted.short_description = "Ganancia"
+    ganancia_total_formatted.admin_order_field = 'ganancia_total'
 
 
 # Personalización del admin site

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, IntegerField
 from django.db.models.functions import TruncMonth, TruncYear
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -8,7 +8,7 @@ from collections import defaultdict
 import json
 from decimal import Decimal
 
-from .models import MovimientoEfectivo, Simulacion, Monos
+from .models import MovimientoEfectivo, Simulacion, Monos, VentaMonos
 
 
 @login_required
@@ -33,60 +33,44 @@ def analytics_dashboard(request):
     elif periodo == 'all':
         fecha_inicio = datetime(2020, 1, 1)  # Desde el inicio
     
-    # Obtener ventas reales (MovimientoEfectivo de ingresos con simulación relacionada)
-    ventas_reales = MovimientoEfectivo.objects.filter(
-        tipo_movimiento='ingreso',
-        categoria='venta',
-        simulacion_relacionada__isnull=False,
+    # Obtener VENTAS REALES desde el nuevo modelo VentaMonos
+    ventas_reales = VentaMonos.objects.filter(
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin
-    ).select_related('simulacion_relacionada__monos')
+    ).select_related('monos')
     
     # 1. MOÑOS MÁS VENDIDOS (por cantidad)
     monos_vendidos = {}
     for venta in ventas_reales:
-        simulacion = venta.simulacion_relacionada
-        mono = simulacion.monos
+        mono = venta.monos
         mono_nombre = mono.nombre
-        cantidad = simulacion.cantidad_producir
         
         if mono_nombre not in monos_vendidos:
             monos_vendidos[mono_nombre] = {
                 'id': mono.id,
                 'cantidad': 0,
+                'cantidad_total_monos': 0,  # Total considerando pares
                 'ingresos': Decimal('0'),
                 'costos': Decimal('0'),
                 'ganancia': Decimal('0'),
                 'ventas_count': 0
             }
         
-        monos_vendidos[mono_nombre]['cantidad'] += cantidad
-        monos_vendidos[mono_nombre]['ingresos'] += venta.monto
+        monos_vendidos[mono_nombre]['cantidad'] += venta.cantidad_vendida
+        monos_vendidos[mono_nombre]['cantidad_total_monos'] += venta.cantidad_total_monos
+        monos_vendidos[mono_nombre]['ingresos'] += venta.ingreso_total
+        monos_vendidos[mono_nombre]['costos'] += venta.costo_unitario * venta.cantidad_vendida
+        monos_vendidos[mono_nombre]['ganancia'] += venta.ganancia_total
         monos_vendidos[mono_nombre]['ventas_count'] += 1
     
-    # Calcular costos por moño
-    costos_por_mono = MovimientoEfectivo.objects.filter(
-        tipo_movimiento='egreso',
-        categoria='produccion',
-        simulacion_relacionada__isnull=False,
-        fecha__gte=fecha_inicio,
-        fecha__lte=fecha_fin
-    ).select_related('simulacion_relacionada__monos')
-    
-    for costo in costos_por_mono:
-        mono_nombre = costo.simulacion_relacionada.monos.nombre
-        if mono_nombre in monos_vendidos:
-            monos_vendidos[mono_nombre]['costos'] += costo.monto
-    
-    # Calcular ganancia y rendimiento
+    # Calcular rendimiento
     for mono_nombre, data in monos_vendidos.items():
-        data['ganancia'] = data['ingresos'] - data['costos']
         data['rendimiento'] = float((data['ganancia'] / data['costos'] * 100)) if data['costos'] > 0 else 0
     
-    # Ordenar por cantidad vendida
+    # Ordenar por cantidad vendida (usar cantidad_total_monos para el análisis real)
     top_monos_cantidad = sorted(
         monos_vendidos.items(),
-        key=lambda x: x[1]['cantidad'],
+        key=lambda x: x[1]['cantidad_total_monos'],
         reverse=True
     )[:10]
     
@@ -101,25 +85,24 @@ def analytics_dashboard(request):
     ventas_por_mes = ventas_reales.annotate(
         mes=TruncMonth('fecha')
     ).values('mes').annotate(
-        total_ventas=Sum('monto'),
-        cantidad_ventas=Count('id')
+        total_ventas=Sum('ingreso_total'),
+        cantidad_ventas=Count('id'),
+        total_cantidad_monos=Sum('cantidad_vendida')
     ).order_by('mes')
     
     # 3. EVOLUCIÓN MENSUAL DE CADA MOÑO
-    evolución_monos = defaultdict(list)
+    evolución_monos = defaultdict(lambda: defaultdict(int))
     for venta in ventas_reales:
         mes = venta.fecha.strftime('%Y-%m')
-        mono_nombre = venta.simulacion_relacionada.monos.nombre
-        if mono_nombre not in evolución_monos:
-            evolución_monos[mono_nombre] = defaultdict(Decimal)
-        evolución_monos[mono_nombre][mes] += venta.simulacion_relacionada.cantidad_producir
+        mono_nombre = venta.monos.nombre
+        evolución_monos[mono_nombre][mes] += venta.cantidad_total_monos
     
     # 4. ESTADÍSTICAS GENERALES
     stats = {
         'total_ventas': sum(data['ingresos'] for data in monos_vendidos.values()),
         'total_costos': sum(data['costos'] for data in monos_vendidos.values()),
         'total_ganancias': sum(data['ganancia'] for data in monos_vendidos.values()),
-        'total_cantidad_vendida': sum(data['cantidad'] for data in monos_vendidos.values()),
+        'total_cantidad_vendida': sum(data['cantidad_total_monos'] for data in monos_vendidos.values()),
         'tipos_monos_vendidos': len(monos_vendidos),
         'total_transacciones': len(ventas_reales),
     }
@@ -133,7 +116,7 @@ def analytics_dashboard(request):
     chart_data = {
         'monos_cantidad': {
             'labels': [item[0] for item in top_monos_cantidad],
-            'data': [float(item[1]['cantidad']) for item in top_monos_cantidad],
+            'data': [float(item[1]['cantidad_total_monos']) for item in top_monos_cantidad],
             'colors': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384']
         },
         'monos_rendimiento': {
@@ -174,29 +157,19 @@ def analytics_detalle_mono(request, mono_id):
     fecha_fin = timezone.now()
     fecha_inicio = fecha_fin - timedelta(days=365)
     
-    # Ventas del moño específico
-    ventas_mono = MovimientoEfectivo.objects.filter(
-        tipo_movimiento='ingreso',
-        categoria='venta',
-        simulacion_relacionada__monos=mono,
+    # Ventas del moño específico desde VentaMonos
+    ventas_mono = VentaMonos.objects.filter(
+        monos=mono,
         fecha__gte=fecha_inicio,
         fecha__lte=fecha_fin
-    ).select_related('simulacion_relacionada')
-    
-    # Costos del moño específico
-    costos_mono = MovimientoEfectivo.objects.filter(
-        tipo_movimiento='egreso',
-        categoria='produccion',
-        simulacion_relacionada__monos=mono,
-        fecha__gte=fecha_inicio,
-        fecha__lte=fecha_fin
-    ).select_related('simulacion_relacionada')
+    ).order_by('-fecha')
     
     # Estadísticas del moño
-    total_ingresos = sum(venta.monto for venta in ventas_mono)
-    total_costos = sum(costo.monto for costo in costos_mono)
-    total_ganancia = total_ingresos - total_costos
-    total_cantidad = sum(venta.simulacion_relacionada.cantidad_producir for venta in ventas_mono)
+    total_ingresos = sum(venta.ingreso_total for venta in ventas_mono)
+    total_costos = sum(venta.costo_unitario * venta.cantidad_vendida for venta in ventas_mono)
+    total_ganancia = sum(venta.ganancia_total for venta in ventas_mono)
+    total_cantidad = sum(venta.cantidad_vendida for venta in ventas_mono)
+    total_cantidad_monos = sum(venta.cantidad_total_monos for venta in ventas_mono)
     
     rendimiento = float(total_ganancia / total_costos * 100) if total_costos > 0 else 0
     
@@ -204,8 +177,9 @@ def analytics_detalle_mono(request, mono_id):
     ventas_por_mes = ventas_mono.annotate(
         mes=TruncMonth('fecha')
     ).values('mes').annotate(
-        ingresos=Sum('monto'),
-        cantidad=Sum('simulacion_relacionada__cantidad_producir')
+        ingresos=Sum('ingreso_total'),
+        cantidad=Sum('cantidad_vendida'),
+        total_monos=Sum(F('cantidad_vendida') * 2, output_field=IntegerField()) if mono.tipo_venta == 'par' else Sum('cantidad_vendida')
     ).order_by('mes')
     
     # Preparar datos para gráficos
@@ -225,6 +199,7 @@ def analytics_detalle_mono(request, mono_id):
         'total_costos': total_costos,
         'total_ganancia': total_ganancia,
         'total_cantidad': total_cantidad,
+        'total_cantidad_monos': total_cantidad_monos,
         'rendimiento': rendimiento,
         'ventas_por_mes': ventas_por_mes,
         'ventas_detalle': ventas_mono,
