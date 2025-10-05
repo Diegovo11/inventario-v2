@@ -229,6 +229,7 @@
                         <span>Producción</span>
                     </h6>
                     <ul class="nav flex-column">
+                        <!-- Gestión de Moños -->
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'lista_monos' %}active{% endif %}" href="{% url 'inventario:lista_monos' %}">
                                 <i class="fas fa-ribbon me-2"></i>Moños
@@ -239,39 +240,83 @@
                                 <i class="fas fa-plus me-2"></i>Agregar Moño
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'crear_lista_produccion' %}active{% endif %}" href="{% url 'inventario:crear_lista_produccion' %}">
-                                <i class="fas fa-list-ul me-2"></i>Crear Lista
-                            </a>
+                        
+                        <!-- Separador visual -->
+                        <li class="nav-item mt-2">
+                            <div class="border-top border-light opacity-25 mx-3"></div>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'lista_de_compras' %}active{% endif %}" href="{% url 'inventario:lista_de_compras' %}">
-                                <i class="fas fa-shopping-list me-2"></i>Lista de Compras
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'compra_productos' %}active{% endif %}" href="{% url 'inventario:compra_productos' %}">
-                                <i class="fas fa-shopping-cart me-2"></i>Compra de Productos
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'reabastecimiento' %}active{% endif %}" href="{% url 'inventario:reabastecimiento' %}">
-                                <i class="fas fa-industry me-2"></i>Reabastecimiento
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'lista_en_salida' %}active{% endif %}" href="{% url 'inventario:lista_en_salida' %}">
-                                <i class="fas fa-shipping-fast me-2"></i>Lista en Salida
-                            </a>
-                        </li>
-                        <li class="nav-item">
+                        
+                        <!-- Listas de Producción -->
+                        <li class="nav-item mt-2">
                             <a class="nav-link {% if request.resolver_match.url_name == 'listas_produccion' %}active{% endif %}" href="{% url 'inventario:listas_produccion' %}">
-                                <i class="fas fa-clipboard-list me-2"></i>Listas de Producción
+                                <i class="fas fa-tasks me-2 text-warning"></i>
+                                <strong>Listas de Producción</strong>
                             </a>
                         </li>
+                        
+                        <!-- 7 Pasos del Proceso -->
+                        <li class="nav-item ps-3">
+                            <small class="text-muted d-block ps-3 mt-2 mb-1">Pasos del Proceso:</small>
+                        </li>
+                        
                         <li class="nav-item">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'crear_lista_produccion' %}active{% endif %}" href="{% url 'inventario:crear_lista_produccion' %}">
+                                <span class="badge bg-secondary me-2">1</span>
+                                <small>Crear Lista</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'lista_de_compras' %}active{% endif %}" href="{% url 'inventario:lista_de_compras' %}">
+                                <span class="badge bg-warning me-2">2</span>
+                                <small>Lista de Compras</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'compra_productos' %}active{% endif %}" href="{% url 'inventario:compra_productos' %}">
+                                <span class="badge bg-info me-2">3</span>
+                                <small>Registrar Compras</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'reabastecimiento' %}active{% endif %}" href="{% url 'inventario:reabastecimiento' %}">
+                                <span class="badge bg-success me-2">4</span>
+                                <small>Materiales Listos</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2" href="#" title="Disponible en el panel de cada lista">
+                                <span class="badge bg-primary me-2">5</span>
+                                <small>Produciendo</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'lista_en_salida' %}active{% endif %}" href="{% url 'inventario:lista_en_salida' %}">
+                                <span class="badge bg-dark me-2">6</span>
+                                <small>Salida y Ventas</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2" href="{% url 'inventario:listas_produccion' %}?ver=finalizadas" title="Ver listas completadas">
+                                <span class="badge bg-success me-2">7</span>
+                                <small>Completadas</small>
+                            </a>
+                        </li>
+                        
+                        <!-- Herramientas adicionales -->
+                        <li class="nav-item mt-2">
+                            <div class="border-top border-light opacity-25 mx-3"></div>
+                        </li>
+                        
+                        <li class="nav-item mt-2">
                             <a class="nav-link {% if request.resolver_match.url_name == 'simulador' %}active{% endif %}" href="{% url 'inventario:simulador' %}">
-                                <i class="fas fa-calculator me-2"></i>Simulador (Legacy)
+                                <i class="fas fa-calculator me-2 text-muted"></i>
+                                <small>Simulador (Legacy)</small>
                             </a>
                         </li>
                     </ul>
