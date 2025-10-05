@@ -33,6 +33,8 @@ urlpatterns = [
     # Sistema de Listas de Producción (Nuevo)
     path('listas-produccion/', views.listado_listas_produccion, name='listas_produccion'),
     path('lista-produccion/crear/', views.crear_lista_produccion, name='crear_lista_produccion'),
+    path('lista-produccion/<int:lista_id>/', views.panel_lista_produccion, name='panel_lista_produccion'),  # Panel unificado
+    path('lista-produccion/<int:lista_id>/detalle/', views.detalle_lista_produccion, name='detalle_lista_produccion'),  # Vista anterior
     path('lista-produccion/<int:lista_id>/editar/', views.editar_lista_produccion, name='editar_lista_produccion'),
     path('lista-produccion/<int:lista_id>/eliminar/', views.eliminar_lista_produccion, name='eliminar_lista_produccion'),
     path('lista-produccion/<int:lista_id>/generar-compras/', views.generar_archivo_compras, name='generar_archivo_compras'),

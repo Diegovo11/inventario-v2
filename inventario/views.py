@@ -3794,3 +3794,171 @@ def registrar_ventas_contaduria(request, lista_id):
     }
     
     return render(request, 'inventario/registrar_ventas_contaduria.html', context)
+
+
+# ============================================================================
+# PANEL UNIFICADO DE GESTIÓN DE LISTAS - SISTEMA DE 7 PASOS
+# ============================================================================
+
+@login_required
+def panel_lista_produccion(request, lista_id):
+    """Panel unificado para gestionar lista de producción con stepper visual de 7 pasos"""
+    
+    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    
+    # Definir los 7 pasos del proceso
+    pasos = [
+        {
+            'numero': 1,
+            'nombre': 'Creada',
+            'estado_requerido': 'borrador',
+            'icono': 'fas fa-check-circle',
+            'color': 'success',
+            'descripcion': 'Lista creada exitosamente'
+        },
+        {
+            'numero': 2,
+            'nombre': 'Lista de Compras',
+            'estado_requerido': 'pendiente_compra',
+            'icono': 'fas fa-file-download',
+            'color': 'primary',
+            'descripcion': 'Descargar lista de materiales a comprar'
+        },
+        {
+            'numero': 3,
+            'nombre': 'Registrar Compras',
+            'estado_requerido': 'comprado',
+            'icono': 'fas fa-shopping-cart',
+            'color': 'info',
+            'descripcion': 'Ingresar cantidades compradas'
+        },
+        {
+            'numero': 4,
+            'nombre': 'Materiales Listos',
+            'estado_requerido': 'reabastecido',
+            'icono': 'fas fa-box-check',
+            'color': 'warning',
+            'descripcion': 'Verificar inventario actualizado'
+        },
+        {
+            'numero': 5,
+            'nombre': 'Produciendo',
+            'estado_requerido': 'en_produccion',
+            'icono': 'fas fa-industry',
+            'color': 'purple',
+            'descripcion': 'Crear moños y registrar producción'
+        },
+        {
+            'numero': 6,
+            'nombre': 'Salida y Ventas',
+            'estado_requerido': 'en_salida',
+            'icono': 'fas fa-cash-register',
+            'color': 'orange',
+            'descripcion': 'Registrar ventas realizadas'
+        },
+        {
+            'numero': 7,
+            'nombre': 'Completado',
+            'estado_requerido': 'finalizado',
+            'icono': 'fas fa-trophy',
+            'color': 'success',
+            'descripcion': 'Lista finalizada exitosamente'
+        }
+    ]
+    
+    # Determinar paso actual
+    mapa_estados_a_paso = {
+        'borrador': 1,
+        'pendiente_compra': 2,
+        'comprado': 3,
+        'reabastecido': 4,
+        'en_produccion': 5,
+        'en_salida': 6,
+        'finalizado': 7
+    }
+    
+    paso_actual = mapa_estados_a_paso.get(lista.estado, 1)
+    
+    # Marcar pasos como completados, actual o pendientes
+    for paso in pasos:
+        if paso['numero'] < paso_actual:
+            paso['status'] = 'completado'
+        elif paso['numero'] == paso_actual:
+            paso['status'] = 'actual'
+        else:
+            paso['status'] = 'pendiente'
+    
+    # Obtener datos específicos según el paso actual
+    materiales_necesarios = None
+    materiales_faltantes = None
+    detalles_monos = lista.detalles_monos.all()
+    
+    if paso_actual >= 2:
+        materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
+    
+    if paso_actual == 3:
+        materiales_necesarios = lista.resumen_materiales.filter(cantidad_faltante__gt=0).select_related('material')
+    
+    # Determinar acción siguiente
+    accion_siguiente = None
+    
+    if paso_actual == 1:
+        accion_siguiente = {
+            'texto': 'Descargar Lista de Compras',
+            'url': 'inventario:generar_archivo_compras',
+            'clase': 'btn-primary',
+            'icono': 'fas fa-download'
+        }
+    elif paso_actual == 2:
+        accion_siguiente = {
+            'texto': 'Registrar Compras Realizadas',
+            'url': 'inventario:verificar_compras',
+            'clase': 'btn-success',
+            'icono': 'fas fa-shopping-cart'
+        }
+    elif paso_actual == 3:
+        # Verificar si ya se registraron todas las compras
+        if lista.resumen_materiales.filter(cantidad_faltante__gt=0).count() == 0:
+            accion_siguiente = {
+                'texto': 'Continuar a Materiales Listos',
+                'url': 'inventario:enviar_a_reabastecimiento',
+                'clase': 'btn-success',
+                'icono': 'fas fa-arrow-right',
+                'tipo': 'POST'
+            }
+    elif paso_actual == 4:
+        accion_siguiente = {
+            'texto': 'Iniciar Producción',
+            'url': 'inventario:iniciar_produccion',
+            'clase': 'btn-warning',
+            'icono': 'fas fa-play',
+            'tipo': 'POST'
+        }
+    elif paso_actual == 5:
+        accion_siguiente = {
+            'texto': 'Enviar a Salida',
+            'url': 'inventario:enviar_a_salida',
+            'clase': 'btn-info',
+            'icono': 'fas fa-truck',
+            'tipo': 'POST'
+        }
+    elif paso_actual == 6:
+        accion_siguiente = {
+            'texto': 'Registrar Ventas',
+            'url': 'inventario:registrar_ventas_contaduria',
+            'clase': 'btn-success',
+            'icono': 'fas fa-dollar-sign'
+        }
+    
+    context = {
+        'titulo': f'Panel de Gestión - {lista.nombre}',
+        'lista': lista,
+        'pasos': pasos,
+        'paso_actual': paso_actual,
+        'detalles_monos': detalles_monos,
+        'materiales_necesarios': materiales_necesarios,
+        'materiales_faltantes': materiales_faltantes,
+        'accion_siguiente': accion_siguiente,
+    }
+    
+    return render(request, 'inventario/panel_lista_produccion.html', context)

@@ -1,0 +1,445 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }} - Inventario{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="fas fa-tasks me-2"></i>
+                        {{ lista.nombre }}
+                    </h1>
+                    <p class="text-muted mb-0">{{ lista.descripcion|default:"Panel de gestión paso a paso" }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver a Listas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Stepper Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <div class="stepper-wrapper">
+                        {% for paso in pasos %}
+                            <div class="stepper-item {% if paso.status == 'completado' %}completed{% elif paso.status == 'actual' %}active{% endif %}">
+                                <div class="step-counter">
+                                    {% if paso.status == 'completado' %}
+                                        <i class="fas fa-check"></i>
+                                    {% else %}
+                                        {{ paso.numero }}
+                                    {% endif %}
+                                </div>
+                                <div class="step-name">{{ paso.nombre }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Columna Principal -->
+        <div class="col-lg-8">
+            <!-- Paso Actual -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        {% for paso in pasos %}
+                            {% if paso.status == 'actual' %}
+                                <i class="{{ paso.icono }} me-2"></i>
+                                Paso {{ paso.numero }}: {{ paso.nombre }}
+                            {% endif %}
+                        {% endfor %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if paso_actual == 1 %}
+                        <!-- PASO 1: Creada -->
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>¡Lista creada exitosamente!</strong>
+                        </div>
+                        <p>Tu lista de producción está lista. El siguiente paso es descargar la lista de materiales a comprar.</p>
+                        
+                    {% elif paso_actual == 2 %}
+                        <!-- PASO 2: Lista de Compras -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Descarga la lista de compras</strong> en formato TXT para llevarla contigo.
+                        </div>
+                        
+                        {% if materiales_faltantes %}
+                            <h6 class="mb-3">Materiales a comprar ({{ materiales_faltantes.count }}):</h6>
+                            <div class="list-group">
+                                {% for resumen in materiales_faltantes %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ resumen.material.nombre }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ resumen.material.codigo }}</small>
+                                            </div>
+                                            <span class="badge bg-warning text-dark fs-6">
+                                                {{ resumen.paquetes_rollos_necesarios }} 
+                                                {{ resumen.unidad_compra_display }}{% if resumen.paquetes_rollos_necesarios > 1 %}s{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Todos los materiales están disponibles en inventario.
+                            </div>
+                        {% endif %}
+                        
+                    {% elif paso_actual == 3 %}
+                        <!-- PASO 3: Registrar Compras -->
+                        <div class="alert alert-warning">
+                            <i class="fas fa-shopping-cart me-2"></i>
+                            <strong>Registra las cantidades que compraste</strong>
+                        </div>
+                        
+                        <p>Ve a <strong>"Registrar Compras"</strong> e ingresa cuántos paquetes o rollos compraste de cada material.</p>
+                        
+                        {% if lista.resumen_materiales.filter.cantidad_faltante__gt=0.count == 0 %}
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Todas las compras fueron registradas. Puedes continuar al siguiente paso.
+                            </div>
+                        {% endif %}
+                        
+                    {% elif paso_actual == 4 %}
+                        <!-- PASO 4: Materiales Listos -->
+                        <div class="alert alert-success">
+                            <i class="fas fa-box-check me-2"></i>
+                            <strong>Materiales verificados y listos</strong>
+                        </div>
+                        
+                        <p>El inventario ha sido actualizado con los materiales comprados. Todo está listo para iniciar la producción.</p>
+                        
+                        <h6 class="mb-3">Resumen de inventario:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Material</th>
+                                        <th>Necesario</th>
+                                        <th>Disponible</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for resumen in lista.resumen_materiales.all %}
+                                        <tr>
+                                            <td>{{ resumen.material.nombre }}</td>
+                                            <td>{{ resumen.cantidad_necesaria|floatformat:0 }} {{ resumen.material.unidad_base }}</td>
+                                            <td>{{ resumen.cantidad_disponible|floatformat:0 }} {{ resumen.material.unidad_base }}</td>
+                                            <td>
+                                                {% if resumen.cantidad_faltante <= 0 %}
+                                                    <span class="badge bg-success">✓ OK</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Falta: {{ resumen.cantidad_faltante|floatformat:0 }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                    {% elif paso_actual == 5 %}
+                        <!-- PASO 5: Produciendo -->
+                        <div class="alert alert-primary">
+                            <i class="fas fa-industry me-2"></i>
+                            <strong>Producción en proceso</strong>
+                        </div>
+                        
+                        <p>Los materiales han sido descontados del inventario. Registra los moños que se van creando.</p>
+                        
+                        <h6 class="mb-3">Moños a producir:</h6>
+                        <div class="list-group">
+                            {% for detalle in detalles_monos %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ detalle.monos.nombre }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ detalle.cantidad_total_planificada }} unidades planificadas</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="badge bg-info">Produciendo</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        
+                    {% elif paso_actual == 6 %}
+                        <!-- PASO 6: Salida y Ventas -->
+                        <div class="alert alert-warning">
+                            <i class="fas fa-cash-register me-2"></i>
+                            <strong>Lista en salida - Registra las ventas</strong>
+                        </div>
+                        
+                        <p>Los moños están listos para vender. Registra las cantidades vendidas y los ingresos.</p>
+                        
+                        <h6 class="mb-3">Moños en salida:</h6>
+                        <div class="list-group">
+                            {% for detalle in detalles_monos %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ detalle.monos.nombre }}</strong>
+                                            <br>
+                                            <small class="text-muted">Precio: ${{ detalle.monos.precio_venta|floatformat:2 }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-success">{{ detalle.cantidad_total_planificada }} disponibles</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        
+                    {% elif paso_actual == 7 %}
+                        <!-- PASO 7: Completado -->
+                        <div class="alert alert-success">
+                            <i class="fas fa-trophy me-2"></i>
+                            <strong>¡Lista completada exitosamente!</strong>
+                        </div>
+                        
+                        <p>Todas las etapas fueron completadas. Puedes revisar el resumen financiero.</p>
+                        
+                        {% if lista.ganancia_real %}
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6>Ganancia Obtenida</h6>
+                                    <h2 class="text-success mb-0">${{ lista.ganancia_real|floatformat:2 }}</h2>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                    
+                    <!-- Botón de Acción -->
+                    {% if accion_siguiente %}
+                        <div class="mt-4 text-center">
+                            {% if accion_siguiente.tipo == 'POST' %}
+                                <form method="post" action="{% url accion_siguiente.url lista.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn {{ accion_siguiente.clase }} btn-lg">
+                                        <i class="{{ accion_siguiente.icono }} me-2"></i>
+                                        {{ accion_siguiente.texto }}
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url accion_siguiente.url lista.id %}" class="btn {{ accion_siguiente.clase }} btn-lg">
+                                    <i class="{{ accion_siguiente.icono }} me-2"></i>
+                                    {{ accion_siguiente.texto }}
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Info de la Lista -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Información General
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Estado Actual:</strong><br>
+                        <span class="badge bg-primary">{{ lista.get_estado_display }}</span>
+                    </p>
+                    <p class="mb-2">
+                        <strong>Creado:</strong><br>
+                        {{ lista.fecha_creacion|date:"d/m/Y H:i" }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Moños Planificados:</strong><br>
+                        {{ lista.total_moños_planificados }} unidades
+                    </p>
+                    {% if lista.ganancia_estimada %}
+                        <p class="mb-0">
+                            <strong>Ganancia Estimada:</strong><br>
+                            <span class="text-success fs-5">${{ lista.ganancia_estimada|floatformat:2 }}</span>
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Moños en la Lista -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-ribbon me-2"></i>
+                        Moños en Lista ({{ detalles_monos.count }})
+                    </h6>
+                </div>
+                <div class="card-body p-2">
+                    <div class="list-group list-group-flush">
+                        {% for detalle in detalles_monos %}
+                            <div class="list-group-item px-2 py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <small class="fw-bold">{{ detalle.monos.nombre }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ detalle.cantidad_total_planificada }} unid.</small>
+                                    </div>
+                                    <small class="text-success">${{ detalle.total_estimado|floatformat:2 }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Stepper Styles */
+    .stepper-wrapper {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    
+    .stepper-item {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+    }
+    
+    .stepper-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        border-bottom: 3px solid #dee2e6;
+        width: 100%;
+        top: 20px;
+        left: 50%;
+        z-index: -1;
+    }
+    
+    .stepper-item.completed:not(:last-child)::after {
+        border-bottom-color: #28a745;
+    }
+    
+    .stepper-item.active:not(:last-child)::after {
+        border-bottom-color: #0d6efd;
+    }
+    
+    .step-counter {
+        position: relative;
+        z-index: 5;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: #dee2e6;
+        color: #6c757d;
+        font-weight: bold;
+        margin-bottom: 8px;
+        transition: all 0.3s;
+    }
+    
+    .stepper-item.completed .step-counter {
+        background-color: #28a745;
+        color: white;
+        font-size: 1.2rem;
+    }
+    
+    .stepper-item.active .step-counter {
+        background-color: #0d6efd;
+        color: white;
+        transform: scale(1.15);
+        box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+    }
+    
+    .step-name {
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #6c757d;
+        max-width: 100px;
+    }
+    
+    .stepper-item.completed .step-name {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .stepper-item.active .step-name {
+        color: #0d6efd;
+        font-weight: 700;
+    }
+    
+    @media (max-width: 768px) {
+        .stepper-wrapper {
+            flex-direction: column;
+        }
+        
+        .stepper-item:not(:last-child)::after {
+            border-bottom: none;
+            border-left: 3px solid #dee2e6;
+            width: 0;
+            height: 100%;
+            top: 50%;
+            left: 22px;
+        }
+        
+        .stepper-item {
+            flex-direction: row;
+            margin-bottom: 20px;
+        }
+        
+        .step-counter {
+            margin-right: 15px;
+            margin-bottom: 0;
+        }
+        
+        .step-name {
+            text-align: left;
+            max-width: none;
+        }
+    }
+</style>
+{% endblock %}
