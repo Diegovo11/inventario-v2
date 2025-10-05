@@ -8,16 +8,19 @@
         border: 1px solid #e9ecef;
         border-radius: 0.375rem;
         transition: all 0.2s ease-in-out;
+        cursor: pointer;
     }
     
     .lista-card:hover {
         border-color: #0d6efd;
         box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+        transform: translateY(-2px);
     }
     
     .lista-card.selected {
         border-color: #0d6efd;
         background-color: #f8f9ff;
+        box-shadow: 0 0.25rem 0.5rem rgba(13,110,253,0.15);
     }
     
     .material-row {
@@ -31,6 +34,7 @@
     .material-row:hover {
         border-color: #0d6efd;
         box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+        transform: translateX(3px);
     }
     
     .material-row:last-child {
@@ -56,6 +60,43 @@
         font-style: italic;
         text-align: center;
         padding: 2rem;
+    }
+    
+    .lista-container {
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    
+    .lista-container::-webkit-scrollbar,
+    .materiales-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .lista-container::-webkit-scrollbar-thumb {
+        background: #0d6efd;
+        border-radius: 4px;
+    }
+    
+    .materiales-container {
+        max-height: 600px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    
+    .materiales-container::-webkit-scrollbar-thumb {
+        background: #198754;
+        border-radius: 4px;
+    }
+    
+    .compra-form {
+        position: relative;
+    }
+    
+    .cantidad-total-display {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
     }
 </style>
 {% endblock %}
@@ -90,7 +131,7 @@
         </div>
     {% endif %}
 
-    <form method="post">
+    <form method="post" id="formPrincipal">
         {% csrf_token %}
         
         <!-- Sección de Listas Disponibles -->
@@ -117,7 +158,7 @@
                                 </button>
                             </div>
                             
-                            <div class="lista-container" style="max-height: 400px; overflow-y: auto;">
+                            <div class="lista-container">
                                 {% for lista in listas_disponibles %}
                                     <div class="lista-card p-3 mb-2">
                                         <div class="form-check">
@@ -189,30 +230,35 @@
 
             <!-- Sección de Lista de Compras Consolidada -->
             <div class="col-lg-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="fas fa-shopping-cart me-2"></i>
                             Lista de Compras Consolidada
                         </h5>
                         {% if materiales_consolidados %}
-                            <span class="badge bg-success">{{ materiales_consolidados|length }} materiales</span>
+                            <span class="badge bg-light text-success">{{ materiales_consolidados|length }} material{{ materiales_consolidados|length|pluralize:"es" }}</span>
                         {% endif %}
                     </div>
                     <div class="card-body">
                         {% if materiales_consolidados %}
                             <!-- Resumen de Listas Seleccionadas -->
-                            <div class="mb-4">
-                                <h6 class="text-muted mb-2">Listas Incluidas:</h6>
-                                {% for lista in listas_seleccionadas %}
-                                    <span class="badge bg-info me-1 mb-1">{{ lista.nombre }}</span>
-                                {% endfor %}
+                            <div class="alert alert-info mb-4">
+                                <h6 class="alert-heading mb-2">
+                                    <i class="fas fa-clipboard-list me-2"></i>
+                                    Listas Incluidas:
+                                </h6>
+                                <div>
+                                    {% for lista in listas_seleccionadas %}
+                                        <span class="badge bg-primary me-1 mb-1">{{ lista.nombre }}</span>
+                                    {% endfor %}
+                                </div>
                             </div>
 
                             <!-- Lista de Materiales -->
-                            <div class="materiales-container" style="max-height: 600px; overflow-y: auto;">
+                            <div class="materiales-container">
                                 {% for material_data in materiales_consolidados %}
-                                    <div class="material-row p-4">
+                                    <div class="material-row p-4" data-material-id="{{ material_data.material.id }}">
                                         <div class="row">
                                             <!-- Información del Material -->
                                             <div class="col-12 mb-3">
@@ -244,7 +290,7 @@
                                                 {% else %}
                                                     <span class="badge bg-info cantidad-badge w-100 text-start">
                                                         <i class="fas fa-thumbs-up me-2"></i>
-                                                        <strong>¡Stock suficiente!</strong>
+                                                        <strong>¡Stock Suficiente!</strong>
                                                     </span>
                                                 {% endif %}
                                             </div>
@@ -257,7 +303,7 @@
                                                             <small><i class="fas fa-shopping-cart me-1"></i> <strong>Registrar Compra</strong></small>
                                                         </div>
                                                         <div class="card-body p-3">
-                                                            <form method="post" class="compra-form">
+                                                            <form method="post" class="compra-form" onsubmit="return validarCompra(this)">
                                                                 {% csrf_token %}
                                                                 <input type="hidden" name="material_id" value="{{ material_data.material.id }}">
                                                                 {% for lista in listas_seleccionadas %}
@@ -265,30 +311,41 @@
                                                                 {% endfor %}
                                                                 
                                                                 <div class="mb-2">
-                                                                    <label class="form-label small mb-1">Comprar (sugerido: {{ material_data.paquetes_rollos_necesarios }})</label>
+                                                                    <label class="form-label small mb-1">
+                                                                        Comprar (sugerido: {{ material_data.paquetes_rollos_necesarios }})
+                                                                    </label>
                                                                     <div class="input-group input-group-sm">
                                                                         <input type="number" 
                                                                                name="paquetes" 
-                                                                               class="form-control" 
+                                                                               class="form-control paquetes-input" 
                                                                                min="0" 
                                                                                step="1"
                                                                                value="{{ material_data.paquetes_rollos_necesarios }}"
+                                                                               data-unidad-compra="{{ material_data.material.cantidad_por_paquete }}"
+                                                                               data-material-id="{{ material_data.material.id }}"
+                                                                               onchange="actualizarCantidadTotal(this)"
                                                                                required>
                                                                         <span class="input-group-text">{{ material_data.unidad_compra_display }}(s)</span>
                                                                     </div>
-                                                                    <small class="text-muted">= <span id="cantidad-{{ material_data.material.id }}">{{ material_data.cantidad_total_compra|floatformat:2 }}</span> {{ material_data.material.unidad_base }}</small>
+                                                                    <div class="cantidad-total-display">
+                                                                        = <span class="cantidad-calculada" id="cantidad-{{ material_data.material.id }}">{{ material_data.cantidad_total_compra|floatformat:2 }}</span> {{ material_data.material.unidad_base }}
+                                                                    </div>
                                                                 </div>
                                                                 
                                                                 <div class="mb-2">
-                                                                    <label class="form-label small mb-1">Precio por {{ material_data.unidad_compra_display }}</label>
+                                                                    <label class="form-label small mb-1">
+                                                                        Precio por {{ material_data.unidad_compra_display }}
+                                                                    </label>
                                                                     <div class="input-group input-group-sm">
                                                                         <span class="input-group-text">$</span>
                                                                         <input type="number" 
                                                                                name="precio" 
-                                                                               class="form-control" 
+                                                                               class="form-control precio-input" 
                                                                                min="0" 
                                                                                step="0.01"
-                                                                               value="{{ material_data.material.precio_compra }}"
+                                                                               value="{{ material_data.material.precio_compra|default:'0' }}"
+                                                                               data-material-id="{{ material_data.material.id }}"
+                                                                               onchange="actualizarCostoEstimado(this)"
                                                                                required>
                                                                     </div>
                                                                 </div>
@@ -298,7 +355,8 @@
                                                                     <input type="text" 
                                                                            name="proveedor" 
                                                                            class="form-control form-control-sm"
-                                                                           placeholder="Nombre del proveedor">
+                                                                           placeholder="Nombre del proveedor"
+                                                                           maxlength="200">
                                                                 </div>
                                                                 
                                                                 <button type="submit" name="registrar_compra" class="btn btn-success btn-sm w-100">
@@ -307,8 +365,8 @@
                                                             </form>
                                                             
                                                             <div class="mt-2 p-2 bg-light rounded text-center">
-                                                                <small class="text-muted d-block">Costo Estimado</small>
-                                                                <div class="fw-bold text-success">
+                                                                <small class="text-muted d-block mb-1">Costo Estimado</small>
+                                                                <div class="fw-bold text-success costo-estimado-material" id="costo-{{ material_data.material.id }}">
                                                                     ${{ material_data.costo_estimado_compra|floatformat:2 }}
                                                                 </div>
                                                             </div>
@@ -317,7 +375,7 @@
                                                 {% else %}
                                                     <div class="alert alert-success mb-0 py-4 text-center">
                                                         <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-                                                        <h5 class="mb-0">Stock Suficiente</h5>
+                                                        <h5 class="mb-1">Stock Suficiente</h5>
                                                         <small class="text-muted">No requiere compra</small>
                                                     </div>
                                                 {% endif %}
@@ -329,28 +387,39 @@
 
                             <!-- Resumen Total -->
                             <div class="border-top pt-3 mt-3">
-                                <div class="row">
+                                <div class="row align-items-center">
                                     <div class="col-md-6">
-                                        <h6 class="text-muted mb-1">Costo Total de Compras:</h6>
+                                        <h6 class="text-muted mb-1">
+                                            <i class="fas fa-calculator me-2"></i>
+                                            Costo Total de Compras:
+                                        </h6>
                                     </div>
                                     <div class="col-md-6 text-end">
-                                        <h4 class="costo-total mb-0">
+                                        <h4 class="costo-total mb-0" id="costoTotalGeneral">
                                             ${{ costo_total|floatformat:2 }}
                                         </h4>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Acción de Confirmar Compra -->
-                            <div class="d-grid mt-3">
-                                <button type="submit" name="confirmar_compra" class="btn btn-success">
-                                    <i class="fas fa-check me-2"></i>
-                                    Marcar como Comprado
-                                </button>
+                            <!-- Botones de Acción -->
+                            <div class="row mt-3 g-2">
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="imprimirLista()">
+                                        <i class="fas fa-print me-2"></i>
+                                        Imprimir Lista
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="submit" name="confirmar_compra" class="btn btn-success w-100" onclick="return confirmarCompraTotal()">
+                                        <i class="fas fa-check me-2"></i>
+                                        Marcar como Comprado
+                                    </button>
+                                </div>
                             </div>
                         {% else %}
                             <div class="sin-materiales">
-                                <i class="fas fa-shopping-cart fa-3x mb-3 d-block"></i>
+                                <i class="fas fa-shopping-cart fa-3x mb-3 d-block text-secondary"></i>
                                 <h5>Selecciona listas para generar</h5>
                                 <p class="mb-0">Marca las casillas de las listas de producción para consolidar sus materiales.</p>
                             </div>
@@ -402,30 +471,113 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
     
-    // Calcular costo total dinámicamente
-    function calcularCostoTotal() {
-        const materiales = document.querySelectorAll('.material-row');
-        let costoTotal = 0;
-        
-        materiales.forEach(function(material) {
-            const costoElement = material.querySelector('.costo-total');
-            if (costoElement) {
-                const costo = parseFloat(costoElement.textContent.replace('$', '').replace(',', ''));
-                if (!isNaN(costo)) {
-                    costoTotal += costo;
-                }
-            }
-        });
-        
-        // Actualizar display del costo total si existe
-        const costoTotalElement = document.querySelector('.border-top .costo-total');
-        if (costoTotalElement && materiales.length > 0) {
-            costoTotalElement.textContent = '$' + costoTotal.toFixed(2);
-        }
-    }
-    
-    // Ejecutar cálculo al cargar
+    // Inicializar cálculos
     calcularCostoTotal();
 });
+
+// Actualizar cantidad total al cambiar paquetes
+function actualizarCantidadTotal(input) {
+    const materialId = input.dataset.materialId;
+    const paquetes = parseFloat(input.value) || 0;
+    const unidadCompra = parseFloat(input.dataset.unidadCompra) || 1;
+    const cantidadTotal = paquetes * unidadCompra;
+    
+    const cantidadDisplay = document.getElementById('cantidad-' + materialId);
+    if (cantidadDisplay) {
+        cantidadDisplay.textContent = cantidadTotal.toFixed(2);
+    }
+    
+    // Actualizar costo estimado también
+    const form = input.closest('form');
+    const precioInput = form.querySelector('.precio-input');
+    if (precioInput) {
+        actualizarCostoEstimado(precioInput);
+    }
+}
+
+// Actualizar costo estimado al cambiar precio o cantidad
+function actualizarCostoEstimado(input) {
+    const form = input.closest('form');
+    const materialId = input.dataset.materialId;
+    const paquetesInput = form.querySelector('.paquetes-input');
+    const precioInput = form.querySelector('.precio-input');
+    
+    const paquetes = parseFloat(paquetesInput.value) || 0;
+    const precio = parseFloat(precioInput.value) || 0;
+    const costoEstimado = paquetes * precio;
+    
+    const costoDisplay = document.getElementById('costo-' + materialId);
+    if (costoDisplay) {
+        costoDisplay.textContent = '$' + costoEstimado.toFixed(2);
+    }
+    
+    // Recalcular costo total general
+    calcularCostoTotal();
+}
+
+// Calcular costo total de todos los materiales
+function calcularCostoTotal() {
+    let costoTotal = 0;
+    const costosEstimados = document.querySelectorAll('.costo-estimado-material');
+    
+    costosEstimados.forEach(function(element) {
+        const costo = parseFloat(element.textContent.replace('$', '').replace(',', '')) || 0;
+        costoTotal += costo;
+    });
+    
+    const costoTotalElement = document.getElementById('costoTotalGeneral');
+    if (costoTotalElement) {
+        costoTotalElement.textContent = '$' + costoTotal.toFixed(2);
+    }
+}
+
+// Validar formulario de compra
+function validarCompra(form) {
+    const paquetes = parseFloat(form.querySelector('.paquetes-input').value);
+    const precio = parseFloat(form.querySelector('.precio-input').value);
+    
+    if (paquetes <= 0) {
+        alert('La cantidad debe ser mayor a 0');
+        return false;
+    }
+    
+    if (precio < 0) {
+        alert('El precio no puede ser negativo');
+        return false;
+    }
+    
+    return confirm('¿Confirmar registro de compra?');
+}
+
+// Confirmar compra total
+function confirmarCompraTotal() {
+    const materialesFaltantes = document.querySelectorAll('.badge.bg-warning');
+    if (materialesFaltantes.length > 0) {
+        return confirm('Aún hay materiales faltantes. ¿Deseas marcar como comprado de todas formas?');
+    }
+    return confirm('¿Confirmar que todos los materiales han sido comprados?');
+}
+
+// Imprimir lista
+function imprimirLista() {
+    window.print();
+}
+
+// Funciones para selección de listas
+window.seleccionarTodas = function() {
+    const checkboxes = document.querySelectorAll('.lista-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = true;
+        checkbox.closest('.lista-card').classList.add('selected');
+    });
+};
+
+window.limpiarSeleccion = function() {
+    const checkboxes = document.querySelectorAll('.lista-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = false;
+        checkbox.closest('.lista-card').classList.remove('selected');
+    });
+};
 </script>
 {% endblock %}
