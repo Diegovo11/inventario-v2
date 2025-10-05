@@ -1096,18 +1096,8 @@ def verificar_compras(request, lista_id):
             messages.error(request, f'Error al procesar compras: {str(e)}')
     
     # GET - Mostrar formulario simple
-    # Calcular paquetes/rollos necesarios y unidad de compra para cada material
-    import math
-    for resumen in materiales_necesarios:
-        material = resumen.material
-        if material.factor_conversion > 0:
-            paquetes_necesarios = math.ceil(float(resumen.cantidad_faltante / material.factor_conversion))
-            resumen.paquetes_rollos_necesarios = paquetes_necesarios
-            resumen.unidad_compra_display = material.get_tipo_material_display()
-        else:
-            resumen.paquetes_rollos_necesarios = 0
-            resumen.unidad_compra_display = 'unidad'
-    
+    # Las properties paquetes_rollos_necesarios y unidad_compra_display
+    # ya están definidas en el modelo ResumenMateriales y se calculan automáticamente
     context = {
         'titulo': f'Registrar Compras - {lista.nombre}',
         'lista': lista,
