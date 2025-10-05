@@ -157,6 +157,7 @@
                                         </div>
                                         
                                         <!-- Información del moño seleccionado -->
+                                        {% if user.userprofile.puede_ver_precios %}
                                         <div class="mono-info d-none" id="info-{{ forloop.counter0 }}">
                                             <div class="row">
                                                 <div class="col-md-6">
@@ -167,6 +168,7 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
                             </div>
@@ -246,6 +248,7 @@
             </div>
         </div>
         
+        {% if user.userprofile.puede_ver_precios %}
         <div class="mono-info d-none" id="info-__prefix__">
             <div class="row">
                 <div class="col-md-4">
@@ -259,6 +262,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -239,6 +239,7 @@
                         
                         <p>Todas las etapas fueron completadas. Puedes revisar el resumen financiero.</p>
                         
+                        {% if user.userprofile.puede_ver_precios %}
                         {% if lista.ganancia_real %}
                             <div class="card bg-light">
                                 <div class="card-body text-center">
@@ -246,6 +247,7 @@
                                     <h2 class="text-success mb-0">${{ lista.ganancia_real|floatformat:2 }}</h2>
                                 </div>
                             </div>
+                        {% endif %}
                         {% endif %}
                     {% endif %}
                     

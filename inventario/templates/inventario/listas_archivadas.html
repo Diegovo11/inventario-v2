@@ -68,6 +68,7 @@
                                     <i class="fas fa-calendar-check text-muted me-1"></i>
                                     {{ lista.fecha_modificacion|date:"d/m/Y" }}
                                 </div>
+                                {% if user.userprofile.puede_ver_precios %}
                                 {% if lista.ganancia_real %}
                                     <div class="col-12">
                                         <i class="fas fa-chart-line me-1 {% if lista.ganancia_real > 0 %}text-success{% else %}text-danger{% endif %}"></i>
@@ -75,6 +76,7 @@
                                             Ganancia: ${{ lista.ganancia_real|floatformat:2 }}
                                         </strong>
                                     </div>
+                                {% endif %}
                                 {% endif %}
                                 <div class="col-12">
                                     <i class="fas fa-clock text-muted me-1"></i>
@@ -113,6 +115,7 @@
                                 <h4 class="text-secondary">{{ total_archivadas }}</h4>
                                 <small class="text-muted">Lista{{ total_archivadas|pluralize }} Archivada{{ total_archivadas|pluralize }}</small>
                             </div>
+                            {% if user.userprofile.puede_ver_precios %}
                             <div class="col-md-4">
                                 <h4 class="text-success">
                                     ${% widthratio listas_archivadas|length 1 1 as total %}
@@ -124,6 +127,7 @@
                                 </h4>
                                 <small class="text-muted">Ganancia Total Archivada</small>
                             </div>
+                            {% endif %}
                             <div class="col-md-4">
                                 <button class="btn btn-outline-danger" disabled title="Funcionalidad en desarrollo">
                                     <i class="fas fa-trash-alt me-1"></i>

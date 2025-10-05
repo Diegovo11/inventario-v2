@@ -79,11 +79,13 @@
                                         <i class="fas fa-calendar-check text-muted me-1"></i>
                                         {{ lista.fecha_modificacion|date:"d/m/y" }}
                                     </div>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     {% if lista.ganancia_real %}
                                         <div class="col-12">
                                             <i class="fas fa-chart-line text-success me-1"></i>
                                             <strong class="text-success">Ganancia: ${{ lista.ganancia_real|floatformat:2 }}</strong>
                                         </div>
+                                    {% endif %}
                                     {% endif %}
                                 </div>
                                 
@@ -204,11 +206,13 @@
                                                                     <i class="fas fa-calendar text-muted me-1"></i>
                                                                     {{ lista.fecha_creacion|date:"d/m/y" }}
                                                                 </div>
+                                                                {% if user.userprofile.puede_ver_precios %}
                                                                 {% if lista.ganancia_estimada %}
                                                                     <div class="col-12">
                                                                         <i class="fas fa-dollar-sign text-success me-1"></i>
                                                                         <strong class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</strong>
                                                                     </div>
+                                                                {% endif %}
                                                                 {% endif %}
                                                             </div>
                                                             

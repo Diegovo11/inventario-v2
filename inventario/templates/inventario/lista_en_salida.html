@@ -123,11 +123,13 @@
                                             <!-- Información adicional -->
                                             <div class="d-flex justify-content-between align-items-center text-muted mb-3">
                                                 <small>{{ lista.fecha_creacion|date:"d/m/Y" }}</small>
+                                                {% if user.userprofile.puede_ver_precios %}
                                                 <small>
                                                     {% if lista.ganancia_estimada %}
                                                         Ganancia Est: ${{ lista.ganancia_estimada|floatformat:2 }}
                                                     {% endif %}
                                                 </small>
+                                                {% endif %}
                                             </div>
 
                                             <!-- Botones de acción -->
