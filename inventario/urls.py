@@ -50,6 +50,7 @@ urlpatterns = [
     path('compra-productos/', views.compra_productos, name='compra_productos'),
     path('reabastecimiento/', views.reabastecimiento, name='reabastecimiento'),
     path('lista-en-salida/', views.lista_en_salida, name='lista_en_salida'),
+    path('listas-archivadas/', views.listas_archivadas, name='listas_archivadas'),
     path('lista-produccion/<int:lista_id>/', views.detalle_lista_produccion, name='detalle_lista_produccion'),
     # path('lista-produccion/<int:lista_id>/compras/', views.lista_compras, name='lista_compras'),
     # path('lista-produccion/<int:lista_id>/produccion/', views.posible_venta, name='posible_venta'),

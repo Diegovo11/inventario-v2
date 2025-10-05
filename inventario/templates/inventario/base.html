@@ -308,9 +308,16 @@
                             </a>
                         </li>
                         
-                        <!-- Herramientas adicionales -->
+                        <!-- Archivo y herramientas adicionales -->
                         <li class="nav-item mt-2">
                             <div class="border-top border-light opacity-25 mx-3"></div>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'listas_archivadas' %}active{% endif %}" href="{% url 'inventario:listas_archivadas' %}">
+                                <i class="fas fa-archive me-2 text-secondary"></i>
+                                <small>Archivo</small>
+                            </a>
                         </li>
                         
                         <li class="nav-item mt-2">

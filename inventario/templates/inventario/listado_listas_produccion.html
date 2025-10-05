@@ -38,10 +38,14 @@
     {% if ver_finalizadas %}
         <!-- Mostrar listas finalizadas -->
         <div class="row mb-3">
-            <div class="col-12">
+            <div class="col-12 d-flex justify-content-between align-items-center">
                 <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-outline-primary">
                     <i class="fas fa-arrow-left me-2"></i>
                     Volver a Listas Activas
+                </a>
+                <a href="{% url 'inventario:listas_archivadas' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-archive me-2"></i>
+                    Ver Archivo (30+ días)
                 </a>
             </div>
         </div>
@@ -244,13 +248,19 @@
             </div>
         </div>
 
-        <!-- Ver listas completadas -->
+        <!-- Ver listas completadas y archivo -->
         <div class="row mt-4">
             <div class="col-12 text-center">
-                <a href="{% url 'inventario:listas_produccion' %}?ver=finalizadas" class="btn btn-outline-success">
-                    <i class="fas fa-trophy me-2"></i>
-                    Ver Listas Completadas
-                </a>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'inventario:listas_produccion' %}?ver=finalizadas" class="btn btn-outline-success">
+                        <i class="fas fa-trophy me-2"></i>
+                        Ver Listas Completadas
+                    </a>
+                    <a href="{% url 'inventario:listas_archivadas' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-archive me-2"></i>
+                        Ver Archivo
+                    </a>
+                </div>
             </div>
         </div>
 

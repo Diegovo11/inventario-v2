@@ -470,6 +470,7 @@ class ListaProduccion(models.Model):
         ('en_produccion', 'En Producción'),
         ('en_salida', 'Lista en Salida'),
         ('finalizado', 'Finalizado'),
+        ('archivado', 'Archivado'),
     ]
     
     nombre = models.CharField(

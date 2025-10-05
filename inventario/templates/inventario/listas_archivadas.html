@@ -1,0 +1,174 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="fas fa-archive me-2"></i>
+                        {{ titulo }}
+                    </h1>
+                    <p class="text-muted mb-0">Listas finalizadas hace más de 30 días • Puedes eliminarlas permanentemente</p>
+                </div>
+                <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Volver a Listas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if total_archivadas > 0 %}
+        <!-- Información sobre el archivo -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info d-flex align-items-center" role="alert">
+                    <i class="fas fa-info-circle fa-2x me-3"></i>
+                    <div>
+                        <h5 class="alert-heading mb-1">Archivo Automático</h5>
+                        <p class="mb-0">
+                            Las listas se archivan automáticamente después de 30 días de haber sido finalizadas.
+                            Desde aquí puedes consultarlas o eliminarlas permanentemente.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Listas archivadas -->
+        <div class="row g-3">
+            {% for lista in listas_archivadas %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-secondary shadow-sm lista-archivada-card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0 flex-grow-1">
+                                    {{ lista.nombre }}
+                                </h6>
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-archive me-1"></i>
+                                    Archivada
+                                </span>
+                            </div>
+                            
+                            <p class="card-text text-muted small mb-3">
+                                {{ lista.descripcion|default:"Sin descripción"|truncatewords:10 }}
+                            </p>
+                            
+                            <div class="row g-2 mb-3 small">
+                                <div class="col-6">
+                                    <i class="fas fa-ribbon text-muted me-1"></i>
+                                    <strong>{{ lista.total_moños_producidos|default:lista.total_moños_planificados }}</strong> moños
+                                </div>
+                                <div class="col-6">
+                                    <i class="fas fa-calendar-check text-muted me-1"></i>
+                                    {{ lista.fecha_modificacion|date:"d/m/Y" }}
+                                </div>
+                                {% if lista.ganancia_real %}
+                                    <div class="col-12">
+                                        <i class="fas fa-chart-line me-1 {% if lista.ganancia_real > 0 %}text-success{% else %}text-danger{% endif %}"></i>
+                                        <strong class="{% if lista.ganancia_real > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            Ganancia: ${{ lista.ganancia_real|floatformat:2 }}
+                                        </strong>
+                                    </div>
+                                {% endif %}
+                                <div class="col-12">
+                                    <i class="fas fa-clock text-muted me-1"></i>
+                                    <small class="text-muted">
+                                        Archivada hace {{ lista.fecha_modificacion|timesince }}
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
+                                   class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-eye me-1"></i>
+                                    Ver Detalles
+                                </a>
+                                <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
+                                   class="btn btn-outline-danger btn-sm"
+                                   onclick="return confirm('¿Estás seguro de eliminar permanentemente esta lista? Esta acción no se puede deshacer.');">
+                                    <i class="fas fa-trash-alt me-1"></i>
+                                    Eliminar Permanentemente
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Resumen de estadísticas -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <h4 class="text-secondary">{{ total_archivadas }}</h4>
+                                <small class="text-muted">Lista{{ total_archivadas|pluralize }} Archivada{{ total_archivadas|pluralize }}</small>
+                            </div>
+                            <div class="col-md-4">
+                                <h4 class="text-success">
+                                    ${% widthratio listas_archivadas|length 1 1 as total %}
+                                    {% for lista in listas_archivadas %}
+                                        {% if forloop.first %}
+                                            {{ lista.ganancia_real|default:0|add:0|floatformat:0 }}
+                                        {% endif %}
+                                    {% endfor %}
+                                </h4>
+                                <small class="text-muted">Ganancia Total Archivada</small>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-danger" disabled title="Funcionalidad en desarrollo">
+                                    <i class="fas fa-trash-alt me-1"></i>
+                                    Limpiar Todo el Archivo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-archive fa-4x text-muted mb-3"></i>
+                        <h4 class="text-muted mb-3">No hay listas archivadas</h4>
+                        <p class="text-muted mb-4">
+                            Las listas finalizadas se archivan automáticamente después de 30 días.<br>
+                            Cuando tengas listas archivadas, aparecerán aquí.
+                        </p>
+                        <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-primary">
+                            <i class="fas fa-list me-2"></i>
+                            Ver Listas Activas
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .lista-archivada-card {
+        transition: all 0.3s ease;
+        opacity: 0.9;
+    }
+    
+    .lista-archivada-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        opacity: 1;
+    }
+</style>
+{% endblock %}

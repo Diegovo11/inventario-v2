@@ -3625,6 +3625,23 @@ def lista_en_salida(request):
 
 
 @login_required
+def listas_archivadas(request):
+    """Vista para mostrar listas archivadas (pueden ser eliminadas)"""
+    listas_archivadas = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='archivado'
+    ).prefetch_related('detalles_monos__monos').order_by('-fecha_modificacion')
+    
+    context = {
+        'listas_archivadas': listas_archivadas,
+        'titulo': 'Archivo de Listas',
+        'total_archivadas': listas_archivadas.count()
+    }
+    
+    return render(request, 'inventario/listas_archivadas.html', context)
+
+
+@login_required
 def registrar_salida_materiales(request, lista_id):
     """Registra la salida final de materiales (ya se hizo en iniciar_produccion)"""
     # Esta función es redundante ya que los materiales se descontaron al iniciar producción
