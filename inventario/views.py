@@ -1276,12 +1276,13 @@ def listado_listas_produccion(request):
 
 @login_required
 def lista_de_compras(request):
-    """Vista para generar lista consolidada de compras"""
+    """Vista para generar lista consolidada de compras y registrar compras directamente"""
+    from decimal import Decimal
     
-    # Obtener listas de producción disponibles para compra
+    # Obtener listas de producción disponibles para compra (pendiente_compra o comprado)
     listas_disponibles = ListaProduccion.objects.filter(
         usuario_creador=request.user,
-        estado__in=['borrador', 'pendiente_compra']
+        estado__in=['borrador', 'pendiente_compra', 'comprado']
     ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material')
     
     # Procesar selección de listas si es POST
@@ -1289,6 +1290,83 @@ def lista_de_compras(request):
     listas_seleccionadas = []
     
     if request.method == 'POST':
+        # Si se está registrando una compra directa
+        if 'registrar_compra' in request.POST:
+            material_id = request.POST.get('material_id')
+            paquetes = request.POST.get('paquetes')
+            precio = request.POST.get('precio')
+            proveedor = request.POST.get('proveedor', '')
+            
+            try:
+                material = Material.objects.get(id=material_id)
+                paquetes_decimal = Decimal(str(paquetes))
+                precio_decimal = Decimal(str(precio))
+                
+                if paquetes_decimal > 0 and precio_decimal > 0:
+                    # Calcular cantidad total
+                    cantidad_total = paquetes_decimal * material.factor_conversion
+                    
+                    # Actualizar inventario
+                    material.cantidad_disponible += cantidad_total
+                    material.save()
+                    
+                    # Actualizar resúmenes de listas que necesitan este material
+                    listas_ids = request.POST.getlist('listas_seleccionadas')
+                    if listas_ids:
+                        listas_afectadas = ListaProduccion.objects.filter(
+                            id__in=listas_ids,
+                            usuario_creador=request.user,
+                            estado__in=['pendiente_compra', 'comprado']
+                        )
+                        
+                        for lista in listas_afectadas:
+                            try:
+                                resumen = lista.resumen_materiales.get(material=material)
+                                resumen.cantidad_comprada += cantidad_total
+                                resumen.precio_compra_real = precio_decimal
+                                resumen.proveedor = proveedor
+                                resumen.fecha_compra = timezone.now()
+                                resumen.save()
+                            except:
+                                pass
+                    
+                    # Crear movimiento de entrada
+                    Movimiento.objects.create(
+                        material=material,
+                        tipo_movimiento='entrada',
+                        cantidad=cantidad_total,
+                        precio_unitario=precio_decimal / paquetes_decimal if paquetes_decimal > 0 else precio_decimal,
+                        descripcion=f'Compra desde Lista Consolidada - {paquetes_decimal} {material.tipo_material}(s)',
+                        usuario=request.user
+                    )
+                    
+                    messages.success(
+                        request, 
+                        f'✅ Compra registrada: {paquetes_decimal} {material.tipo_material}(s) de {material.nombre} '
+                        f'(+{cantidad_total} {material.unidad_base})'
+                    )
+                    
+                    # Verificar si alguna lista ahora está completa
+                    if listas_ids:
+                        for lista in listas_afectadas:
+                            todas_completas = True
+                            for resumen in lista.resumen_materiales.all():
+                                if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
+                                    todas_completas = False
+                                    break
+                            
+                            if todas_completas and lista.estado in ['pendiente_compra', 'comprado']:
+                                lista.estado = 'reabastecido'
+                                lista.save()
+                                messages.success(request, f'🎉 Lista "{lista.nombre}" ahora está REABASTECIDA y lista para producción!')
+                else:
+                    messages.error(request, 'Cantidad y precio deben ser mayores a 0')
+            except Exception as e:
+                messages.error(request, f'Error al registrar compra: {str(e)}')
+            
+            return redirect('inventario:lista_de_compras')
+        
+        # Si se está seleccionando listas para ver
         listas_ids = request.POST.getlist('listas_seleccionadas')
         if listas_ids:
             listas_seleccionadas = ListaProduccion.objects.filter(
@@ -1301,22 +1379,13 @@ def lista_de_compras(request):
             
             # Calcular costo total
             costo_total = sum(material['costo_total'] for material in materiales_consolidados)
-            
-            # Si se confirma la compra, actualizar estados
-            if 'confirmar_compra' in request.POST:
-                for lista in listas_seleccionadas:
-                    lista.estado = 'comprado'
-                    lista.save()
-                
-                messages.success(request, f'Se han marcado {len(listas_seleccionadas)} listas como compradas.')
-                return redirect('inventario:lista_de_compras')
     
     context = {
         'listas_disponibles': listas_disponibles,
         'listas_seleccionadas': listas_seleccionadas,
         'materiales_consolidados': materiales_consolidados,
         'costo_total': costo_total if 'costo_total' in locals() else 0,
-        'titulo': 'Lista de Compras'
+        'titulo': 'Lista de Compras Consolidada'
     }
     
     return render(request, 'inventario/lista_de_compras.html', context)
