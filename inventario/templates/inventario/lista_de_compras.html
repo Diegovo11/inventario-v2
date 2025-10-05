@@ -255,168 +255,179 @@
                                 </div>
                             </div>
 
-                            <!-- Lista de Materiales -->
-                            <div class="materiales-container">
-                                {% for material_data in materiales_consolidados %}
-                                    <div class="material-row p-4" data-material-id="{{ material_data.material.id }}">
-                                        <div class="row">
-                                            <!-- Información del Material -->
-                                            <div class="col-12 mb-3">
-                                                <h5 class="mb-1">
-                                                    <i class="fas fa-box text-primary me-2"></i>
-                                                    {{ material_data.material.nombre }}
-                                                </h5>
-                                                <p class="text-muted mb-0">
-                                                    <i class="fas fa-tag me-1"></i>
-                                                    <small>{{ material_data.material.codigo }} - {{ material_data.material.categoria|default:"Sin categoría" }}</small>
-                                                </p>
-                                            </div>
-                                            
-                                            <!-- Cantidades -->
-                                            <div class="col-md-6">
-                                                <span class="badge bg-primary cantidad-badge w-100 text-start">
-                                                    <i class="fas fa-cubes me-2"></i>
-                                                    <strong>Necesario:</strong> {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                </span>
-                                                <span class="badge bg-success cantidad-badge w-100 text-start">
-                                                    <i class="fas fa-check-circle me-2"></i>
-                                                    <strong>Disponible:</strong> {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                </span>
-                                                {% if material_data.cantidad_faltante > 0 %}
-                                                    <span class="badge bg-warning text-dark cantidad-badge w-100 text-start">
-                                                        <i class="fas fa-exclamation-triangle me-2"></i>
-                                                        <strong>Faltante:</strong> {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-info cantidad-badge w-100 text-start">
-                                                        <i class="fas fa-thumbs-up me-2"></i>
-                                                        <strong>¡Stock Suficiente!</strong>
-                                                    </span>
-                                                {% endif %}
-                                            </div>
-                                            
-                                            <!-- Formulario de Compra Directa -->
-                                            <div class="col-md-6">
-                                                {% if material_data.cantidad_faltante > 0 %}
-                                                    <div class="card border-warning">
-                                                        <div class="card-header bg-warning text-dark py-2">
-                                                            <small><i class="fas fa-shopping-cart me-1"></i> <strong>Registrar Compra</strong></small>
+                            <!-- Formulario Único de Compra -->
+                            <form method="post" id="formCompraConsolidada" onsubmit="return validarCompraTotal()">
+                                {% csrf_token %}
+                                {% for lista in listas_seleccionadas %}
+                                    <input type="hidden" name="listas_seleccionadas" value="{{ lista.id }}">
+                                {% endfor %}
+
+                                <!-- Lista de Materiales -->
+                                <div class="materiales-container mb-3">
+                                    {% for material_data in materiales_consolidados %}
+                                        <div class="material-row p-4" data-material-id="{{ material_data.material.id }}">
+                                            <div class="row">
+                                                <!-- Información del Material -->
+                                                <div class="col-12 mb-3">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div>
+                                                            <h5 class="mb-1">
+                                                                <i class="fas fa-box text-primary me-2"></i>
+                                                                {{ material_data.material.nombre }}
+                                                            </h5>
+                                                            <p class="text-muted mb-0">
+                                                                <i class="fas fa-tag me-1"></i>
+                                                                <small>{{ material_data.material.codigo }} - {{ material_data.material.categoria|default:"Sin categoría" }}</small>
+                                                            </p>
                                                         </div>
-                                                        <div class="card-body p-3">
-                                                            <form method="post" class="compra-form" onsubmit="return validarCompra(this)">
-                                                                {% csrf_token %}
-                                                                <input type="hidden" name="material_id" value="{{ material_data.material.id }}">
-                                                                {% for lista in listas_seleccionadas %}
-                                                                    <input type="hidden" name="listas_seleccionadas" value="{{ lista.id }}">
-                                                                {% endfor %}
+                                                        {% if material_data.cantidad_faltante > 0 %}
+                                                            <span class="badge bg-danger">Requiere Compra</span>
+                                                        {% else %}
+                                                            <span class="badge bg-success">Stock OK</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Cantidades -->
+                                                <div class="col-md-5">
+                                                    <span class="badge bg-primary cantidad-badge w-100 text-start">
+                                                        <i class="fas fa-cubes me-2"></i>
+                                                        <strong>Necesario:</strong> {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                    </span>
+                                                    <span class="badge bg-success cantidad-badge w-100 text-start">
+                                                        <i class="fas fa-check-circle me-2"></i>
+                                                        <strong>Disponible:</strong> {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                    </span>
+                                                    {% if material_data.cantidad_faltante > 0 %}
+                                                        <span class="badge bg-warning text-dark cantidad-badge w-100 text-start">
+                                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                                            <strong>Faltante:</strong> {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-info cantidad-badge w-100 text-start">
+                                                            <i class="fas fa-thumbs-up me-2"></i>
+                                                            <strong>¡Stock Suficiente!</strong>
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                                
+                                                <!-- Formulario de Compra por Material -->
+                                                <div class="col-md-7">
+                                                    {% if material_data.cantidad_faltante > 0 %}
+                                                        <div class="card border-warning">
+                                                            <div class="card-header bg-warning text-dark py-2">
+                                                                <small><i class="fas fa-cart-plus me-1"></i> <strong>Cantidad a Comprar</strong></small>
+                                                            </div>
+                                                            <div class="card-body p-3">
+                                                                <input type="hidden" name="material_ids" value="{{ material_data.material.id }}">
                                                                 
-                                                                <div class="mb-2">
-                                                                    <label class="form-label small mb-1">
-                                                                        Comprar (sugerido: {{ material_data.paquetes_rollos_necesarios }})
-                                                                    </label>
-                                                                    <div class="input-group input-group-sm">
+                                                                <div class="row g-2">
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small mb-1">
+                                                                            <strong>{{ material_data.unidad_compra_display }}s</strong>
+                                                                            <small class="text-muted">(sugerido: {{ material_data.paquetes_rollos_necesarios }})</small>
+                                                                        </label>
                                                                         <input type="number" 
-                                                                               name="paquetes" 
-                                                                               class="form-control paquetes-input" 
+                                                                               name="paquetes_{{ material_data.material.id }}" 
+                                                                               class="form-control form-control-sm paquetes-input" 
                                                                                min="0" 
                                                                                step="1"
                                                                                value="{{ material_data.paquetes_rollos_necesarios }}"
                                                                                data-unidad-compra="{{ material_data.material.cantidad_por_paquete }}"
                                                                                data-material-id="{{ material_data.material.id }}"
                                                                                onchange="actualizarCantidadTotal(this)"
-                                                                               required>
-                                                                        <span class="input-group-text">{{ material_data.unidad_compra_display }}(s)</span>
+                                                                               placeholder="0">
+                                                                        <small class="text-muted d-block mt-1">
+                                                                            = <span class="cantidad-calculada fw-bold" id="cantidad-{{ material_data.material.id }}">{{ material_data.cantidad_total_compra|floatformat:2 }}</span> {{ material_data.material.unidad_base }}
+                                                                        </small>
                                                                     </div>
-                                                                    <div class="cantidad-total-display">
-                                                                        = <span class="cantidad-calculada" id="cantidad-{{ material_data.material.id }}">{{ material_data.cantidad_total_compra|floatformat:2 }}</span> {{ material_data.material.unidad_base }}
+                                                                    
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small mb-1">
+                                                                            <strong>Precio por {{ material_data.unidad_compra_display }}</strong>
+                                                                        </label>
+                                                                        <div class="input-group input-group-sm">
+                                                                            <span class="input-group-text">$</span>
+                                                                            <input type="number" 
+                                                                                   name="precio_{{ material_data.material.id }}" 
+                                                                                   class="form-control precio-input" 
+                                                                                   min="0" 
+                                                                                   step="0.01"
+                                                                                   value="{{ material_data.material.precio_compra|default:'0' }}"
+                                                                                   data-material-id="{{ material_data.material.id }}"
+                                                                                   onchange="actualizarCostoEstimado(this)"
+                                                                                   placeholder="0.00">
+                                                                        </div>
+                                                                        <small class="text-muted d-block mt-1">
+                                                                            Costo: <span class="costo-estimado-material fw-bold text-success" id="costo-{{ material_data.material.id }}">${{ material_data.costo_estimado_compra|floatformat:2 }}</span>
+                                                                        </small>
                                                                     </div>
                                                                 </div>
                                                                 
-                                                                <div class="mb-2">
-                                                                    <label class="form-label small mb-1">
-                                                                        Precio por {{ material_data.unidad_compra_display }}
-                                                                    </label>
-                                                                    <div class="input-group input-group-sm">
-                                                                        <span class="input-group-text">$</span>
-                                                                        <input type="number" 
-                                                                               name="precio" 
-                                                                               class="form-control precio-input" 
-                                                                               min="0" 
-                                                                               step="0.01"
-                                                                               value="{{ material_data.material.precio_compra|default:'0' }}"
-                                                                               data-material-id="{{ material_data.material.id }}"
-                                                                               onchange="actualizarCostoEstimado(this)"
-                                                                               required>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div class="mb-3">
+                                                                <div class="mt-2">
                                                                     <label class="form-label small mb-1">Proveedor (opcional)</label>
                                                                     <input type="text" 
-                                                                           name="proveedor" 
+                                                                           name="proveedor_{{ material_data.material.id }}" 
                                                                            class="form-control form-control-sm"
                                                                            placeholder="Nombre del proveedor"
                                                                            maxlength="200">
                                                                 </div>
-                                                                
-                                                                <button type="submit" name="registrar_compra" class="btn btn-success btn-sm w-100">
-                                                                    <i class="fas fa-check me-1"></i> Registrar Compra
-                                                                </button>
-                                                            </form>
-                                                            
-                                                            <div class="mt-2 p-2 bg-light rounded text-center">
-                                                                <small class="text-muted d-block mb-1">Costo Estimado</small>
-                                                                <div class="fw-bold text-success costo-estimado-material" id="costo-{{ material_data.material.id }}">
-                                                                    ${{ material_data.costo_estimado_compra|floatformat:2 }}
-                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                {% else %}
-                                                    <div class="alert alert-success mb-0 py-4 text-center">
-                                                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-                                                        <h5 class="mb-1">Stock Suficiente</h5>
-                                                        <small class="text-muted">No requiere compra</small>
-                                                    </div>
-                                                {% endif %}
+                                                    {% else %}
+                                                        <div class="alert alert-success mb-0 py-3 text-center">
+                                                            <i class="fas fa-check-circle fa-2x text-success mb-2 d-block"></i>
+                                                            <h6 class="mb-0">Stock Suficiente</h6>
+                                                            <small class="text-muted">No requiere compra</small>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Resumen Total -->
+                                <div class="card bg-light border-0 mb-3">
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <div class="col-6">
+                                                <h5 class="mb-0">
+                                                    <i class="fas fa-calculator me-2 text-primary"></i>
+                                                    Costo Total:
+                                                </h5>
+                                            </div>
+                                            <div class="col-6 text-end">
+                                                <h3 class="mb-0 costo-total" id="costoTotalGeneral">
+                                                    ${{ costo_total|floatformat:2 }}
+                                                </h3>
                                             </div>
                                         </div>
                                     </div>
-                                {% endfor %}
-                            </div>
+                                </div>
 
-                            <!-- Resumen Total -->
-                            <div class="border-top pt-3 mt-3">
-                                <div class="row align-items-center">
-                                    <div class="col-md-6">
-                                        <h6 class="text-muted mb-1">
-                                            <i class="fas fa-calculator me-2"></i>
-                                            Costo Total de Compras:
-                                        </h6>
+                                <!-- Botones de Acción Consolidados -->
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-secondary w-100" onclick="limpiarCantidades()">
+                                            <i class="fas fa-eraser me-1"></i>
+                                            Limpiar
+                                        </button>
                                     </div>
-                                    <div class="col-md-6 text-end">
-                                        <h4 class="costo-total mb-0" id="costoTotalGeneral">
-                                            ${{ costo_total|floatformat:2 }}
-                                        </h4>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-outline-primary w-100" onclick="imprimirLista()">
+                                            <i class="fas fa-print me-1"></i>
+                                            Imprimir
+                                        </button>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="submit" name="registrar_compra_consolidada" class="btn btn-success w-100">
+                                            <i class="fas fa-shopping-cart me-1"></i>
+                                            Comprar Todo
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Botones de Acción -->
-                            <div class="row mt-3 g-2">
-                                <div class="col-md-6">
-                                    <button type="button" class="btn btn-outline-primary w-100" onclick="imprimirLista()">
-                                        <i class="fas fa-print me-2"></i>
-                                        Imprimir Lista
-                                    </button>
-                                </div>
-                                <div class="col-md-6">
-                                    <button type="submit" name="confirmar_compra" class="btn btn-success w-100" onclick="return confirmarCompraTotal()">
-                                        <i class="fas fa-check me-2"></i>
-                                        Marcar como Comprado
-                                    </button>
-                                </div>
-                            </div>
+                            </form>
                         {% else %}
                             <div class="sin-materiales">
                                 <i class="fas fa-shopping-cart fa-3x mb-3 d-block text-secondary"></i>
@@ -488,8 +499,8 @@ function actualizarCantidadTotal(input) {
     }
     
     // Actualizar costo estimado también
-    const form = input.closest('form');
-    const precioInput = form.querySelector('.precio-input');
+    const materialRow = input.closest('.material-row');
+    const precioInput = materialRow.querySelector('.precio-input');
     if (precioInput) {
         actualizarCostoEstimado(precioInput);
     }
@@ -497,10 +508,10 @@ function actualizarCantidadTotal(input) {
 
 // Actualizar costo estimado al cambiar precio o cantidad
 function actualizarCostoEstimado(input) {
-    const form = input.closest('form');
+    const materialRow = input.closest('.material-row');
     const materialId = input.dataset.materialId;
-    const paquetesInput = form.querySelector('.paquetes-input');
-    const precioInput = form.querySelector('.precio-input');
+    const paquetesInput = materialRow.querySelector('.paquetes-input');
+    const precioInput = materialRow.querySelector('.precio-input');
     
     const paquetes = parseFloat(paquetesInput.value) || 0;
     const precio = parseFloat(precioInput.value) || 0;
@@ -529,33 +540,54 @@ function calcularCostoTotal() {
     if (costoTotalElement) {
         costoTotalElement.textContent = '$' + costoTotal.toFixed(2);
     }
+    
+    return costoTotal;
 }
 
-// Validar formulario de compra
-function validarCompra(form) {
-    const paquetes = parseFloat(form.querySelector('.paquetes-input').value);
-    const precio = parseFloat(form.querySelector('.precio-input').value);
+// Validar formulario de compra consolidada
+function validarCompraTotal() {
+    const paquetesInputs = document.querySelectorAll('.paquetes-input');
+    let algunaCompra = false;
+    let hayErrores = false;
     
-    if (paquetes <= 0) {
-        alert('La cantidad debe ser mayor a 0');
+    paquetesInputs.forEach(function(input) {
+        const valor = parseFloat(input.value) || 0;
+        if (valor > 0) {
+            algunaCompra = true;
+            const materialRow = input.closest('.material-row');
+            const precioInput = materialRow.querySelector('.precio-input');
+            const precio = parseFloat(precioInput.value) || 0;
+            
+            if (precio <= 0) {
+                alert('Por favor ingresa un precio válido para todos los materiales a comprar');
+                hayErrores = true;
+                return false;
+            }
+        }
+    });
+    
+    if (hayErrores) {
         return false;
     }
     
-    if (precio < 0) {
-        alert('El precio no puede ser negativo');
+    if (!algunaCompra) {
+        alert('Debes especificar al menos una cantidad a comprar');
         return false;
     }
     
-    return confirm('¿Confirmar registro de compra?');
+    const costoTotal = calcularCostoTotal();
+    return confirm(`¿Confirmar compra por un total de $${costoTotal.toFixed(2)}?\n\nEsto actualizará el inventario de todos los materiales seleccionados.`);
 }
 
-// Confirmar compra total
-function confirmarCompraTotal() {
-    const materialesFaltantes = document.querySelectorAll('.badge.bg-warning');
-    if (materialesFaltantes.length > 0) {
-        return confirm('Aún hay materiales faltantes. ¿Deseas marcar como comprado de todas formas?');
+// Limpiar todas las cantidades
+function limpiarCantidades() {
+    if (confirm('¿Limpiar todas las cantidades ingresadas?')) {
+        const paquetesInputs = document.querySelectorAll('.paquetes-input');
+        paquetesInputs.forEach(function(input) {
+            input.value = '';
+            actualizarCantidadTotal(input);
+        });
     }
-    return confirm('¿Confirmar que todos los materiales han sido comprados?');
 }
 
 // Imprimir lista

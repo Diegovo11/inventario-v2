@@ -1280,8 +1280,9 @@ def listado_listas_produccion(request):
 def lista_de_compras(request):
     """Vista para generar lista consolidada de compras y registrar compras directamente"""
     from decimal import Decimal
+    from django.db import transaction
     
-    # Obtener listas de producción disponibles para compra (pendiente_compra o comprado)
+    # Obtener listas de producción disponibles para compra
     listas_disponibles = ListaProduccion.objects.filter(
         usuario_creador=request.user,
         estado__in=['borrador', 'pendiente_compra', 'comprado']
@@ -1290,114 +1291,183 @@ def lista_de_compras(request):
     # Procesar selección de listas si es POST
     materiales_consolidados = []
     listas_seleccionadas = []
+    costo_total = Decimal('0')
     
     if request.method == 'POST':
-        # Si se está registrando una compra directa
-        if 'registrar_compra' in request.POST:
-            material_id = request.POST.get('material_id')
-            paquetes_rollos = request.POST.get('paquetes_rollos')  # CAMBIO: ahora es paquetes/rollos
-            precio_por_paquete = request.POST.get('precio_por_paquete')  # CAMBIO: precio por paquete/rollo
-            proveedor = request.POST.get('proveedor', '')
+        # Si se está registrando la compra consolidada
+        if 'registrar_compra_consolidada' in request.POST:
+            listas_ids = request.POST.getlist('listas_seleccionadas')
+            material_ids = request.POST.getlist('material_ids')
+            
+            if not listas_ids:
+                messages.error(request, '❌ Debe seleccionar al menos una lista de producción.')
+                return redirect('inventario:lista_de_compras')
+            
+            if not material_ids:
+                messages.error(request, '❌ No hay materiales para comprar.')
+                return redirect('inventario:lista_de_compras')
             
             try:
-                material = Material.objects.get(id=material_id)
-                paquetes = Decimal(str(paquetes_rollos))
-                precio_unitario = Decimal(str(precio_por_paquete))
-                
-                if paquetes > 0 and precio_unitario > 0:
-                    # Calcular cantidad total en unidad base
-                    cantidad_total = paquetes * material.factor_conversion
-                    precio_total = paquetes * precio_unitario
+                with transaction.atomic():
+                    materiales_comprados = 0
+                    total_invertido = Decimal('0')
+                    errores = []
                     
-                    # Guardar cantidad anterior
-                    cantidad_anterior = material.cantidad_disponible
+                    print(f"\n{'='*60}")
+                    print(f"🛒 PROCESANDO COMPRA CONSOLIDADA")
+                    print(f"{'='*60}")
+                    print(f"Listas seleccionadas: {listas_ids}")
+                    print(f"Materiales a procesar: {material_ids}")
                     
-                    # Actualizar inventario
-                    material.cantidad_disponible += cantidad_total
-                    material.precio_compra = precio_unitario  # Guardar precio por paquete/rollo
-                    material.save()
+                    for material_id in material_ids:
+                        paquetes_key = f'paquetes_{material_id}'
+                        precio_key = f'precio_{material_id}'
+                        proveedor_key = f'proveedor_{material_id}'
+                        
+                        paquetes = request.POST.get(paquetes_key)
+                        precio = request.POST.get(precio_key)
+                        proveedor = request.POST.get(proveedor_key, '')
+                        
+                        print(f"\n📦 Material ID: {material_id}")
+                        print(f"   Paquetes: {paquetes}")
+                        print(f"   Precio: {precio}")
+                        print(f"   Proveedor: {proveedor}")
+                        
+                        if paquetes and precio:
+                            try:
+                                material = Material.objects.get(id=material_id)
+                                paquetes_decimal = Decimal(str(paquetes))
+                                precio_decimal = Decimal(str(precio))
+                                
+                                if paquetes_decimal <= 0:
+                                    continue  # Saltar si no hay cantidad
+                                
+                                if precio_decimal <= 0:
+                                    errores.append(f"{material.nombre}: El precio debe ser mayor a 0")
+                                    continue
+                                
+                                # Calcular cantidad total en unidad base
+                                cantidad_total = paquetes_decimal * material.factor_conversion
+                                costo_compra = paquetes_decimal * precio_decimal
+                                
+                                # Guardar cantidad anterior
+                                cantidad_anterior = material.cantidad_disponible
+                                
+                                # Actualizar inventario
+                                material.cantidad_disponible += cantidad_total
+                                material.precio_compra = precio_decimal  # Actualizar precio de compra
+                                material.save()
+                                
+                                # Recargar para confirmar
+                                material.refresh_from_db()
+                                
+                                print(f"   ✅ Compra registrada")
+                                print(f"   Inventario: {cantidad_anterior} → {material.cantidad_disponible} (+{cantidad_total})")
+                                print(f"   Costo: ${costo_compra}")
+                                
+                                # Crear movimiento de entrada
+                                movimiento = Movimiento.objects.create(
+                                    material=material,
+                                    tipo_movimiento='entrada',
+                                    cantidad=cantidad_total,
+                                    cantidad_anterior=cantidad_anterior,
+                                    cantidad_nueva=material.cantidad_disponible,
+                                    precio_unitario=precio_decimal,
+                                    costo_total_movimiento=costo_compra,
+                                    detalle=f'Compra Consolidada - {paquetes_decimal} {material.tipo_material}(s){" - Proveedor: " + proveedor if proveedor else ""}',
+                                    usuario=request.user
+                                )
+                                
+                                # Registrar movimiento de efectivo
+                                MovimientoEfectivo.registrar_movimiento(
+                                    concepto=f'Compra de material: {material.nombre} ({paquetes_decimal} {material.tipo_material}s)',
+                                    tipo_movimiento='egreso',
+                                    categoria='inventario',
+                                    monto=costo_compra,
+                                    usuario=request.user,
+                                    movimiento_inventario=movimiento
+                                )
+                                
+                                # Actualizar resúmenes de las listas seleccionadas
+                                listas_afectadas = ListaProduccion.objects.filter(
+                                    id__in=listas_ids,
+                                    usuario_creador=request.user
+                                )
+                                
+                                for lista in listas_afectadas:
+                                    try:
+                                        resumen = lista.resumen_materiales.get(material=material)
+                                        resumen.cantidad_comprada += cantidad_total
+                                        resumen.precio_compra_real = precio_decimal
+                                        resumen.proveedor = proveedor
+                                        resumen.fecha_compra = timezone.now()
+                                        resumen.cantidad_disponible = material.cantidad_disponible
+                                        resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - material.cantidad_disponible)
+                                        resumen.save()
+                                        print(f"   📋 Actualizado resumen en lista: {lista.nombre}")
+                                    except ResumenMateriales.DoesNotExist:
+                                        print(f"   ⚠️  Material no encontrado en lista: {lista.nombre}")
+                                        pass
+                                
+                                materiales_comprados += 1
+                                total_invertido += costo_compra
+                                
+                            except Material.DoesNotExist:
+                                errores.append(f"Material ID {material_id}: No encontrado")
+                                print(f"   ❌ Material no encontrado")
+                            except (ValueError, TypeError) as e:
+                                errores.append(f"Material ID {material_id}: Error en datos - {str(e)}")
+                                print(f"   ❌ Error: {str(e)}")
                     
-                    # Recargar para confirmar
-                    material.refresh_from_db()
+                    print(f"\n{'='*60}")
+                    print(f"✅ COMPRA CONSOLIDADA COMPLETADA")
+                    print(f"   Materiales comprados: {materiales_comprados}")
+                    print(f"   Total invertido: ${total_invertido}")
+                    if errores:
+                        print(f"⚠️  ERRORES: {len(errores)}")
+                        for error in errores:
+                            print(f"   - {error}")
+                    print(f"{'='*60}\n")
                     
-                    # Actualizar resúmenes de listas que necesitan este material
-                    listas_ids = request.POST.getlist('listas_seleccionadas')
-                    if listas_ids:
+                    if materiales_comprados > 0:
+                        # Verificar si alguna lista ahora está completa
+                        listas_reabastecidas = []
                         listas_afectadas = ListaProduccion.objects.filter(
                             id__in=listas_ids,
-                            usuario_creador=request.user,
-                            estado__in=['pendiente_compra', 'comprado']
+                            usuario_creador=request.user
                         )
                         
                         for lista in listas_afectadas:
-                            try:
-                                resumen = lista.resumen_materiales.get(material=material)
-                                resumen.cantidad_comprada += cantidad_total
-                                resumen.precio_compra_real = precio_unitario
-                                resumen.proveedor = proveedor
-                                resumen.fecha_compra = timezone.now()
-                                resumen.save()
-                            except:
-                                pass
-                    
-                    # Crear movimiento de entrada
-                    Movimiento.objects.create(
-                        material=material,
-                        tipo_movimiento='entrada',
-                        cantidad=cantidad_total,
-                        cantidad_anterior=cantidad_anterior,
-                        cantidad_nueva=material.cantidad_disponible,
-                        precio_unitario=precio_unitario,
-                        costo_total_movimiento=precio_total,
-                        detalle=f'Compra desde Lista Consolidada - {paquetes} {material.tipo_material}(s) - Proveedor: {proveedor or "N/A"}',
-                        usuario=request.user
-                    )
-                    
-                    messages.success(
-                        request, 
-                        f'✅ Compra registrada: {paquetes} {material.tipo_material}(s) de {material.nombre} '
-                        f'(+{cantidad_total} {material.unidad_base}) por ${precio_total:.2f}'
-                    )
-                    
-                    # Verificar si alguna lista ahora está completa
-                    if listas_ids:
-                        for lista in listas_afectadas:
-                            todas_completas = True
-                            for resumen in lista.resumen_materiales.all():
-                                if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
-                                    todas_completas = False
-                                    break
+                            materiales_faltantes = lista.resumen_materiales.filter(
+                                cantidad_faltante__gt=0
+                            ).count()
                             
-                            if todas_completas and lista.estado in ['pendiente_compra', 'comprado']:
+                            if materiales_faltantes == 0 and lista.estado in ['pendiente_compra', 'comprado']:
                                 lista.estado = 'reabastecido'
                                 lista.save()
-                                messages.success(request, f'🎉 Lista "{lista.nombre}" ahora está REABASTECIDA y lista para producción!')
-                else:
-                    messages.error(request, 'Cantidad de paquetes/rollos y precio deben ser mayores a 0')
-            except Exception as e:
-                messages.error(request, f'Error al registrar compra: {str(e)}')
-            
-            return redirect('inventario:lista_de_compras')
-        
-        # Si se está seleccionando listas para ver
-        listas_ids = request.POST.getlist('listas_seleccionadas')
-        if listas_ids:
-            listas_seleccionadas = ListaProduccion.objects.filter(
-                id__in=listas_ids,
-                usuario_creador=request.user
-            )
-            
-            # Consolidar materiales de las listas seleccionadas
-            materiales_consolidados = consolidar_materiales_listas(listas_seleccionadas)
-            
-            # Calcular costo total
-            costo_total = sum(material['costo_total'] for material in materiales_consolidados)
+                                listas_reabastecidas.append(lista.nombre)
+                        
+                        mensaje_base = f'✅ Compra consolidada registrada: {materiales_comprados} material(es) por ${total_invertido:.2f}'
+                        if listas_reabastecidas:
+                            mensaje_base += f' | 🎉 Lista(s) REABASTECIDA(S): {", ".join(listas_reabastecidas)}'
+                        
+                        messages.success(request, mensaje_base)
+                        
+                        # Mostrar errores si los hubo
+                        if errores:
+                            for error in errores:
+                                messages.warning(request, f"⚠️ {error}")
+                    else:
+                        messages.warning(request, '⚠️ No se registró ninguna compra. Verifique los datos ingresados.')
+                        if errores:
+                            for error in errores:
+                                messages.error(request, f"❌ {error}")
     
     context = {
         'listas_disponibles': listas_disponibles,
         'listas_seleccionadas': listas_seleccionadas,
         'materiales_consolidados': materiales_consolidados,
-        'costo_total': costo_total if 'costo_total' in locals() else 0,
+        'costo_total': costo_total,
         'titulo': 'Lista de Compras Consolidada'
     }
     
@@ -1415,32 +1485,50 @@ def consolidar_materiales_listas(listas_produccion):
             
             if material_id in materiales_consolidados:
                 materiales_consolidados[material_id]['cantidad_necesaria'] += resumen.cantidad_necesaria
-                materiales_consolidados[material_id]['cantidad_faltante'] += resumen.cantidad_faltante
+                materiales_consolidados[material_id]['cantidad_faltante'] += max(0, resumen.cantidad_faltante)
             else:
                 materiales_consolidados[material_id] = {
                     'material': resumen.material,
                     'cantidad_necesaria': resumen.cantidad_necesaria,
-                    'cantidad_disponible': resumen.cantidad_disponible,
-                    'cantidad_faltante': resumen.cantidad_faltante,
-                    'precio_unitario': resumen.material.precio_compra / resumen.material.factor_conversion if resumen.material.precio_compra > 0 else 0,
+                    'cantidad_disponible': resumen.material.cantidad_disponible,
+                    'cantidad_faltante': max(0, resumen.cantidad_faltante),
                 }
     
-    # Recalcular cantidad faltante con stock actual
+    # Recalcular con stock actual y calcular paquetes/rollos necesarios
+    resultado = []
     for material_data in materiales_consolidados.values():
         material = material_data['material']
         cantidad_necesaria = material_data['cantidad_necesaria']
         cantidad_disponible = material.cantidad_disponible
+        cantidad_faltante = max(0, cantidad_necesaria - cantidad_disponible)
         
-        material_data['cantidad_disponible'] = cantidad_disponible
-        material_data['cantidad_faltante'] = max(0, cantidad_necesaria - cantidad_disponible)
-        material_data['costo_total'] = material_data['precio_unitario'] * material_data['cantidad_faltante']
+        # Calcular paquetes/rollos necesarios
+        if cantidad_faltante > 0 and material.factor_conversion > 0:
+            import math
+            paquetes_rollos_necesarios = math.ceil(float(cantidad_faltante / material.factor_conversion))
+            cantidad_total_compra = paquetes_rollos_necesarios * material.factor_conversion
+        else:
+            paquetes_rollos_necesarios = 0
+            cantidad_total_compra = 0
+        
+        # Determinar unidad de compra
+        unidad_compra_display = material.get_tipo_material_display()
+        
+        resultado.append({
+            'material': material,
+            'cantidad_necesaria': cantidad_necesaria,
+            'cantidad_disponible': cantidad_disponible,
+            'cantidad_faltante': cantidad_faltante,
+            'paquetes_rollos_necesarios': paquetes_rollos_necesarios,
+            'cantidad_total_compra': cantidad_total_compra,
+            'unidad_compra_display': unidad_compra_display,
+            'costo_estimado_compra': paquetes_rollos_necesarios * material.precio_compra if material.precio_compra > 0 else 0
+        })
     
-    # Convertir a lista ordenada por nombre de material
-    return sorted(
-        materiales_consolidados.values(), 
-        key=lambda x: x['material'].nombre
-    )
+    # Ordenar por nombre de material
+    return sorted(resultado, key=lambda x: x['material'].nombre)
 
+# ...existing code...
 
 @login_required
 def detalle_lista_produccion(request, lista_id):
@@ -1496,54 +1584,34 @@ def compra_productos(request):
     
     # Procesar formulario de compra
     if request.method == 'POST':
-        # Verificar que no sea un reenvío duplicado
-        if not request.POST.get('csrfmiddlewaretoken'):
-            messages.error(request, 'Error de seguridad. Intente nuevamente.')
-            return redirect('inventario:compra_productos')
-            
         materiales_actualizados = 0
-        total_invertido = 0
+        total_invertido = Decimal('0')
         errores = []
         
         print(f"\n{'='*60}")
         print(f"🛒 PROCESANDO COMPRAS DE MATERIALES")
         print(f"{'='*60}")
-        print(f"Materiales pendientes: {len(materiales_pendientes)}")
-        print(f"POST data keys: {list(request.POST.keys())}")
         
         for material_info in materiales_pendientes:
             resumen = material_info['resumen']
             
             # Obtener datos del formulario para cada material
             paquetes_key = f'paquetes_{resumen.id}'
-            cantidad_key = f'cantidad_{resumen.id}'
             precio_key = f'precio_{resumen.id}'
             proveedor_key = f'proveedor_{resumen.id}'
             
             paquetes_comprados = request.POST.get(paquetes_key)
-            cantidad_comprada = request.POST.get(cantidad_key)
             precio_real = request.POST.get(precio_key)
             proveedor = request.POST.get(proveedor_key, '')
-            
-            print(f"\n📦 Material: {resumen.material.nombre} (ID resumen: {resumen.id})")
-            print(f"   Paquetes key: {paquetes_key} = {paquetes_comprados}")
-            print(f"   Cantidad key: {cantidad_key} = {cantidad_comprada}")
-            print(f"   Precio key: {precio_key} = {precio_real}")
-            print(f"   Proveedor key: {proveedor_key} = {proveedor}")
             
             if paquetes_comprados and precio_real:
                 try:
                     paquetes = Decimal(str(paquetes_comprados))
-                    cantidad = Decimal(str(cantidad_comprada)) if cantidad_comprada else paquetes * resumen.material.factor_conversion
                     precio = Decimal(str(precio_real))
-                    
-                    print(f"   Valores convertidos:")
-                    print(f"   - Paquetes: {paquetes}")
-                    print(f"   - Cantidad: {cantidad}")
-                    print(f"   - Precio: {precio}")
+                    cantidad = paquetes * resumen.material.factor_conversion
                     
                     if paquetes > 0 and precio > 0:
-                        # Actualizar resumen de material (sumar a lo ya comprado)
+                        # Actualizar resumen de material
                         cantidad_anterior = resumen.material.cantidad_disponible
                         
                         resumen.cantidad_comprada += cantidad
@@ -1557,75 +1625,44 @@ def compra_productos(request):
                         material.cantidad_disponible += cantidad
                         material.save()
                         
-                        print(f"   ✅ Compra registrada")
-                        print(f"   Inventario: {cantidad_anterior} → {material.cantidad_disponible} (+{cantidad})")
-                        
                         materiales_actualizados += 1
                         total_invertido += paquetes * precio
-                    else:
-                        error_msg = f"Valores inválidos: paquetes={paquetes}, precio={precio}"
-                        print(f"   ⚠️  {error_msg}")
-                        errores.append(f"{resumen.material.nombre}: {error_msg}")
                         
                 except (ValueError, TypeError) as e:
-                    error_msg = f"Error de conversión: {str(e)}"
-                    print(f"   ❌ {error_msg}")
-                    errores.append(f"{resumen.material.nombre}: {error_msg}")
+                    errores.append(f"{resumen.material.nombre}: Error - {str(e)}")
                     continue
-            else:
-                print(f"   ⏭️  Saltado (sin datos o precio 0)")
-        
-        print(f"\n{'='*60}")
-        print(f"✅ COMPRAS PROCESADAS: {materiales_actualizados}")
-        if errores:
-            print(f"⚠️  ERRORES: {len(errores)}")
-            for error in errores:
-                print(f"   - {error}")
-        print(f"{'='*60}\n")
         
         if materiales_actualizados > 0:
-            # Verificar si todas las compras de todas las listas están completas
+            # Verificar si todas las compras están completas
             listas_reabastecidas = []
             for lista in listas_comprado:
                 compras_completas = True
                 for resumen in lista.resumen_materiales.all():
-                    # Verificar si el material actual tiene suficiente inventario
                     if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
                         compras_completas = False
                         break
                 
-                # Si todas las compras están completas, cambiar estado automáticamente a reabastecido
                 if compras_completas and lista.estado == 'comprado':
                     lista.estado = 'reabastecido'
                     lista.save()
                     listas_reabastecidas.append(lista.nombre)
             
-            # Mensaje de éxito con información de listas reabastecidas
-            mensaje_base = f'✅ Se registraron {materiales_actualizados} compra(s) por un total de ${total_invertido:.2f}.'
+            mensaje_base = f'✅ Se registraron {materiales_actualizados} compra(s) por ${total_invertido:.2f}.'
             if listas_reabastecidas:
-                mensaje_base += f' 🎉 Lista(s) LISTA(S) PARA PRODUCIR: {", ".join(listas_reabastecidas)}'
+                mensaje_base += f' 🎉 Lista(s) REABASTECIDA(S): {", ".join(listas_reabastecidas)}'
             
             messages.success(request, mensaje_base)
             
-            # Mostrar errores si los hubo
             if errores:
                 for error in errores:
                     messages.warning(request, f"⚠️ {error}")
             
-            # Redirect a la lista específica o a listas generales para evitar loops
-            if listas_comprado:
-                return redirect('inventario:lista_de_compras')
-            else:
-                return redirect('inventario:compra_productos')
+            return redirect('inventario:lista_de_compras')
         else:
-            messages.warning(request, 'No se registró ninguna compra. Verifique los datos ingresados.')
-            
-            # Mostrar qué campos faltan
+            messages.warning(request, 'No se registró ninguna compra.')
             if errores:
                 for error in errores:
                     messages.error(request, f"❌ {error}")
-            else:
-                messages.info(request, 'Asegúrese de completar los campos de "Paquetes Comprados" y "Precio Real" para cada material.')
     
     context = {
         'listas_comprado': listas_comprado,
@@ -2301,7 +2338,7 @@ def procesar_simulacion_completa(request, simulacion_id):
                     material.cantidad_disponible -= cantidad_necesaria
                     material.save()
                     
-                    # Crear movimiento de salida por producción
+                    # Registrar movimiento de salida por producción
                     movimiento = Movimiento.objects.create(
                         material=material,
                         tipo_movimiento='produccion',
@@ -2310,7 +2347,7 @@ def procesar_simulacion_completa(request, simulacion_id):
                         cantidad_nueva=material.cantidad_disponible,
                         precio_unitario=material.costo_unitario,
                         costo_total_movimiento=cantidad_necesaria * material.costo_unitario,
-                        detalle=f"Salida por producción - Simulación #{simulacion.id}",
+                        detalle=f"Producción - Lista #{simulacion.id}: {monos.codigo} ({cantidad_total_planificada} moños)",
                         usuario=request.user,
                         simulacion_relacionada=simulacion
                     )
@@ -2345,8 +2382,7 @@ def procesar_simulacion_completa(request, simulacion_id):
                     tipo_movimiento='ingreso',
                     categoria='venta',
                     monto=simulacion.ingreso_total_venta,
-                    usuario=request.user,
-                    simulacion_relacionada=simulacion
+                    usuario=request.user
                 )
                 
                 messages.success(request, f'Simulación procesada exitosamente. {len(materiales_utilizados)} materiales utilizados. Venta registrada por ${simulacion.ingreso_total_venta:.2f}.')
@@ -2362,14 +2398,12 @@ def procesar_simulacion_completa(request, simulacion_id):
         return render(request, 'inventario/confirmar_simulacion.html', context)
         
     except Simulacion.DoesNotExist:
-        messages.error(request, 'Simulación no encontrada.')
-        return redirect('inventario:historial_simulaciones')
+        return JsonResponse({'error': 'Simulación no encontrada'}, status=404)
     except Exception as e:
-        messages.error(request, f'Error al procesar simulación: {str(e)}')
-        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
+        return JsonResponse({'error': f'Error interno: {str(e)}'}, status=500)
 
 
-@login_required 
+@login_required
 def reabastecer_desde_simulacion(request, simulacion_id):
     """
     Reabastece automáticamente los materiales faltantes para una simulación
@@ -2384,53 +2418,57 @@ def reabastecer_desde_simulacion(request, simulacion_id):
             # Obtener materiales faltantes
             for detalle in simulacion.detalles.all():
                 material = detalle.material
-                cantidad_necesaria = detalle.cantidad_necesaria
+                cantidad_faltante = detalle.cantidad_necesaria - material.cantidad_disponible
                 
-                if material.cantidad_disponible < cantidad_necesaria:
-                    cantidad_faltante = cantidad_necesaria - material.cantidad_disponible
-                    
-                    # Calcular cantidad a comprar en unidades completas (paquetes/rollos)
-                    if material.factor_conversion > 0:
-                        paquetes_necesarios = math.ceil(cantidad_faltante / material.factor_conversion)
-                        cantidad_a_comprar = paquetes_necesarios * material.factor_conversion
-                    else:
-                        cantidad_a_comprar = cantidad_faltante
-                    
-                    # Calcular costo (asumiendo mismo precio por unidad)
-                    costo_compra = cantidad_a_comprar * material.costo_unitario
-                    
-                    # Registrar entrada
-                    cantidad_anterior = material.cantidad_disponible
-                    material.cantidad_disponible += cantidad_a_comprar
-                    material.save()
-                    
-                    # Crear movimiento de entrada
-                    movimiento = Movimiento.objects.create(
-                        material=material,
-                        tipo_movimiento='entrada',
-                        cantidad=cantidad_a_comprar,
-                        cantidad_anterior=cantidad_anterior,
-                        cantidad_nueva=material.cantidad_disponible,
-                        precio_unitario=material.costo_unitario,
-                        costo_total_movimiento=costo_compra,
-                        detalle=f"Reabastecimiento automático para Simulación #{simulacion.id}",
-                        usuario=request.user,
-                        simulacion_relacionada=simulacion
-                    )
-                    
-                    materiales_reabastecidos.append({
-                        'material': material.nombre,
-                        'cantidad_comprada': cantidad_a_comprar,
-                        'costo': costo_compra,
-                        'nuevo_stock': material.cantidad_disponible
-                    })
-                    
-                    costo_total_reabastecimiento += costo_compra
+                # Calcular cantidad a comprar en unidades completas (paquetes/rollos)
+                if material.factor_conversion > 0:
+                    paquetes_necesarios = math.ceil(cantidad_faltante / material.factor_conversion)
+                    cantidad_a_comprar = paquetes_necesarios * material.factor_conversion
+                else:
+                    cantidad_a_comprar = cantidad_faltante
+                
+                # Calcular costo (asumiendo mismo precio por unidad)
+                costo_unitario = material.costo_unitario or Decimal('0')
+                precio_compra_total = cantidad_a_comprar * costo_unitario
+                
+                # Actualizar inventario
+                cantidad_anterior = material.cantidad_disponible
+                material.cantidad_disponible += cantidad_a_comprar
+                
+                # Actualizar precio de compra y costo unitario si es necesario
+                if costo_unitario > 0:
+                    material.precio_compra = precio_compra_total
+                
+                material.save()
+                
+                # Registrar movimiento de entrada
+                movimiento = Movimiento.objects.create(
+                    material=material,
+                    tipo_movimiento='entrada',
+                    cantidad=cantidad_a_comprar,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=material.cantidad_disponible,
+                    precio_unitario=costo_unitario,
+                    costo_total_movimiento=precio_compra_total,
+                    detalle=f"Reabastecimiento automático para Simulación #{simulacion.id} - {unidades_a_comprar} {material.tipo_material}(s)",
+                    usuario=request.user
+                )
+                
+                materiales_reabastecidos.append({
+                    'material': material.nombre,
+                    'unidades_compradas': unidades_a_comprar,
+                    'tipo_unidad': material.tipo_material,
+                    'cantidad_agregada': float(cantidad_a_comprar),
+                    'unidad_base': material.unidad_base,
+                    'costo': float(precio_compra_total)
+                })
+                
+                costo_total_reabastecimiento += precio_compra_total
             
             if materiales_reabastecidos:
                 messages.success(
                     request,
-                    f'Reabastecimiento completado: {len(materiales_reabastecidos)} materiales. '
+                    f'Reabastecimiento automático completado: {len(materiales_reabastecidos)} materiales. '
                     f'Costo total: ${costo_total_reabastecimiento:.2f}'
                 )
                 # Ahora intentar procesar la simulación automáticamente
@@ -2964,17 +3002,27 @@ def confirmar_produccion(request, simulacion_id):
     try:
         simulacion = Simulacion.objects.get(id=simulacion_id)
         
-        # Verificar que hay suficientes materiales
-        detalles = simulacion.detalles.all()
+        # Verificar que la simulación no haya sido procesada antes
+        if simulacion.movimiento_set.filter(tipo_movimiento='produccion').exists():
+            return JsonResponse({'success': False, 'mensaje': 'Esta simulación ya fue procesada anteriormente.'})
+        
         materiales_insuficientes = []
         
-        for detalle in detalles:
-            if detalle.material.cantidad_disponible < detalle.cantidad_necesaria:
+        # Procesar cada detalle de la simulación
+        for detalle in simulacion.detalles.all():
+            material = detalle.material
+            cantidad_necesaria = detalle.cantidad_necesaria
+            
+            if material.cantidad_disponible >= cantidad_necesaria:
+                # Hay stock suficiente - registrar salida
+                registrar_movimiento_produccion(material, cantidad_necesaria, simulacion, request.user)
+            else:
+                # Stock insuficiente
                 materiales_insuficientes.append({
-                    'material': detalle.material.nombre,
-                    'disponible': float(detalle.material.cantidad_disponible),
-                    'necesaria': float(detalle.cantidad_necesaria),
-                    'faltante': float(detalle.cantidad_necesaria - detalle.material.cantidad_disponible)
+                    'material': material.nombre,
+                    'disponible': material.cantidad_disponible,
+                    'necesario': cantidad_necesaria,
+                    'faltante': cantidad_necesaria - material.cantidad_disponible
                 })
         
         if materiales_insuficientes:
@@ -2983,47 +3031,20 @@ def confirmar_produccion(request, simulacion_id):
                 'error': 'Materiales insuficientes',
                 'materiales_insuficientes': materiales_insuficientes
             })
-        
-        # Ejecutar producción: registrar movimientos de salida
-        movimientos_creados = []
-        
-        for detalle in detalles:
-            material = detalle.material
-            cantidad_anterior = material.cantidad_disponible
-            
-            # Actualizar inventario
-            material.cantidad_disponible -= detalle.cantidad_necesaria
-            material.save()
-            
-            # Registrar movimiento
-            movimiento = Movimiento.objects.create(
-                material=material,
-                tipo_movimiento='produccion',
-                cantidad=detalle.cantidad_necesaria,
-                cantidad_anterior=cantidad_anterior,
-                cantidad_nueva=material.cantidad_disponible,
-                precio_unitario=material.costo_unitario,
-                costo_total_movimiento=detalle.cantidad_necesaria * material.costo_unitario if material.costo_unitario else None,
-                detalle=f"Producción de {simulacion.cantidad_total_monos} moños ({simulacion.monos.nombre}) - Simulación #{simulacion.id}",
-                usuario=request.user,
-                simulacion_relacionada=simulacion
+        else:
+            # Todo procesado correctamente - registrar la venta de la producción
+            MovimientoEfectivo.registrar_movimiento(
+                concepto=f'Venta de producción - {simulacion.monos.nombre} - Simulación #{simulacion.id}',
+                tipo_movimiento='ingreso',
+                categoria='venta',
+                monto=simulacion.ingreso_total_venta,
+                usuario=request.user
             )
             
-            movimientos_creados.append({
-                'material': material.nombre,
-                'cantidad_usada': float(detalle.cantidad_necesaria),
-                'unidad': material.unidad_base
+            return JsonResponse({
+                'success': True,
+                'mensaje': f'Simulación procesada exitosamente. {len(simulacion.detalles.all())} materiales utilizados. Venta registrada por ${simulacion.ingreso_total_venta:.2f}.'
             })
-        
-        mensaje_detalle = f"Producción de {simulacion.cantidad_total_monos} moños completada.\n\nMateriales utilizados:\n"
-        for mov in movimientos_creados:
-            mensaje_detalle += f"• {mov['material']}: {mov['cantidad_usada']} {mov['unidad']}\n"
-        
-        return JsonResponse({
-            'success': True,
-            'mensaje': mensaje_detalle,
-            'movimientos_creados': len(movimientos_creados)
-        })
         
     except Simulacion.DoesNotExist:
         return JsonResponse({'error': 'Simulación no encontrada'}, status=404)
@@ -3084,7 +3105,7 @@ def reabastecer_automatico(request, simulacion_id):
                     cantidad_nueva=material.cantidad_disponible,
                     precio_unitario=costo_unitario,
                     costo_total_movimiento=precio_compra_total,
-                    detalle=f"Reabastecimiento automático para simulación #{simulacion.id} - {unidades_a_comprar} {material.tipo_material}(s)",
+                    detalle=f"Reabastecimiento automático para Simulación #{simulacion.id} - {unidades_a_comprar} {material.tipo_material}(s)",
                     usuario=request.user
                 )
                 
@@ -3092,31 +3113,559 @@ def reabastecer_automatico(request, simulacion_id):
                     'material': material.nombre,
                     'unidades_compradas': unidades_a_comprar,
                     'tipo_unidad': material.tipo_material,
-                    'cantidad_agregada': float(cantidad_en_unidad_base),
+                    'cantidad_agregada': float(cantidad_a_comprar),
                     'unidad_base': material.unidad_base,
                     'costo': float(precio_compra_total)
                 })
                 
                 costo_total_reabastecimiento += precio_compra_total
         
-        if not reabastecimientos:
-            return JsonResponse({
-                'success': False,
-                'error': 'No hay materiales que requieran reabastecimiento'
-            })
+        if materiales_reabastecidos:
+            messages.success(
+                request,
+                f'Reabastecimiento automático completado: {len(materiales_reabastecidos)} materiales. '
+                f'Costo total: ${costo_total_reabastecimiento:.2f}'
+            )
+            # Ahora intentar procesar la simulación automáticamente
+            return redirect('inventario:procesar_simulacion_completa', simulacion_id=simulacion.id)
+        else:
+            messages.info(request, 'No se necesita reabastecimiento para esta simulación.')
+            return redirect('inventario:procesar_simulacion_completa', simulacion_id=simulacion.id)
         
-        mensaje_detalle = f"Reabastecimiento automático completado.\n\nMateriales reabastecidos:\n"
-        for reab in reabastecimientos:
-            mensaje_detalle += f"• {reab['material']}: {reab['unidades_compradas']} {reab['tipo_unidad']}(s) = {reab['cantidad_agregada']} {reab['unidad_base']} (${reab['costo']:.2f})\n"
+    except Simulacion.DoesNotExist:
+        messages.error(request, 'Simulación no encontrada.')
+        return redirect('inventario:historial_simulaciones')
+    except Exception as e:
+        messages.error(request, f'Error en reabastecimiento: {str(e)}')
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
+
+
+@login_required
+def entrada_rapida_simulacion(request, simulacion_id):
+    """
+    Vista para entrada rápida de materiales específicos para una simulación
+    """
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
         
-        mensaje_detalle += f"\nCosto total: ${costo_total_reabastecimiento:.2f}"
+        if request.method == 'POST':
+            materiales_ingresados = []
+            costo_total = 0
+            
+            # Procesar cada material del POST
+            for key, value in request.POST.items():
+                if key.startswith('cantidad_') and value:
+                    material_id = key.split('_')[1]
+                    try:
+                        material = Material.objects.get(id=material_id)
+                        cantidad = float(value)
+                        
+                        # Obtener precio si se proporcionó
+                        precio_key = f'precio_{material_id}'
+                        if precio_key in request.POST and request.POST[precio_key]:
+                            precio_total = float(request.POST[precio_key])
+                        else:
+                            precio_total = cantidad * material.costo_unitario
+                        
+                        if cantidad > 0:
+                            # Registrar entrada
+                            cantidad_anterior = material.cantidad_disponible
+                            material.cantidad_disponible += cantidad
+                            material.save()
+                            
+                            # Crear movimiento
+                            movimiento = Movimiento.objects.create(
+                                material=material,
+                                tipo_movimiento='entrada',
+                                cantidad=cantidad,
+                                cantidad_anterior=cantidad_anterior,
+                                cantidad_nueva=material.cantidad_disponible,
+                                precio_unitario=precio_total / cantidad if cantidad > 0 else material.costo_unitario,
+                                costo_total_movimiento=precio_total,
+                                detalle=f'Entrada rápida para Simulación #{simulacion.id} - {simulacion.monos.nombre}',
+                                usuario=request.user,
+                                simulacion_relacionada=simulacion
+                            )
+                            
+                            materiales_ingresados.append({
+                                'material': material.nombre,
+                                'cantidad': cantidad,
+                                'costo': precio_total,
+                                'nuevo_stock': material.cantidad_disponible
+                            })
+                            
+                            costo_total += precio_total
+                            
+                    except (Material.DoesNotExist, ValueError) as e:
+                        messages.warning(request, f'Error con material ID {material_id}: {str(e)}')
+            
+            if materiales_ingresados:
+                messages.success(
+                    request,
+                    f'Entrada completada: {len(materiales_ingresados)} materiales ingresados. '
+                    f'Costo total: ${costo_total:.2f}'
+                )
+            else:
+                messages.warning(request, 'No se registraron entradas.')
+                
+            return redirect('inventario:detalle_simulacion', simulacion_id=simulacion.id)
+        
+        # GET - mostrar formulario
+        from .forms import EntradaDesdeSimulacionForm
+        form = EntradaDesdeSimulacionForm(simulacion=simulacion)
+        
+        context = {
+            'simulacion': simulacion,
+            'form': form,
+            'title': f'Entrada Rápida - Simulación #{simulacion.id}'
+        }
+        return render(request, 'inventario/entrada_rapida_simulacion.html', context)
+        
+    except Simulacion.DoesNotExist:
+        messages.error(request, 'Simulación no encontrada.')
+        return redirect('inventario:historial_simulaciones')
+    except Exception as e:
+        messages.error(request, f'Error en entrada rápida: {str(e)}')
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
+
+
+@login_required
+def generar_salida_directa(request, simulacion_id):
+    """
+    Genera salidas directas para todos los materiales de una simulación
+    Solo funciona si todos los materiales están disponibles
+    """
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
+        
+        # Verificar que todos los materiales estén disponibles
+        materiales_faltantes = []
+        materiales_procesados = []
+        
+        for detalle in simulacion.detalles.all():
+            material = detalle.material
+            cantidad_necesaria = detalle.cantidad_necesaria
+            
+            if material.cantidad_disponible < cantidad_necesaria:
+                materiales_faltantes.append({
+                    'material': material.nombre,
+                    'disponible': material.cantidad_disponible,
+                    'necesario': cantidad_necesaria,
+                    'faltante': cantidad_necesaria - material.cantidad_disponible
+                })
+            else:
+                # Registrar salida
+                cantidad_anterior = material.cantidad_disponible
+                material.cantidad_disponible -= cantidad_necesaria
+                material.save()
+                
+                # Crear movimiento de salida
+                movimiento = Movimiento.objects.create(
+                    material=material,
+                    tipo_movimiento='salida',
+                    cantidad=-cantidad_necesaria,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=material.cantidad_disponible,
+                    precio_unitario=material.costo_unitario,
+                    costo_total_movimiento=cantidad_necesaria * material.costo_unitario,
+                    detalle=f'Salida directa - Simulación #{simulacion.id} ({simulacion.monos.nombre})',
+                    usuario=request.user,
+                    simulacion_relacionada=simulacion
+                )
+                
+                # Registrar movimiento de efectivo automático
+                MovimientoEfectivo.registrar_movimiento(
+                    concepto=f'Costo de producción - {material.nombre} - Simulación #{simulacion.id}',
+                    tipo_movimiento='egreso',
+                    categoria='produccion',
+                    monto=cantidad_necesaria * material.costo_unitario,
+                    usuario=request.user,
+                    simulacion_relacionada=simulacion,
+                    movimiento_inventario=movimiento
+                )
+                
+                materiales_procesados.append({
+                    'material': material.nombre,
+                    'cantidad': cantidad_necesaria,
+                    'costo': cantidad_necesaria * material.costo_unitario,
+                    'nuevo_stock': material.cantidad_disponible
+                })
+        
+        if materiales_faltantes:
+            messages.error(
+                request,
+                f'No se puede generar salida directa. Faltan {len(materiales_faltantes)} materiales. '
+                f'Usa la opción "Generar Entrada" primero.'
+            )
+        else:
+            # Registrar la venta de la producción (ingreso por la simulación completada)
+            MovimientoEfectivo.registrar_movimiento(
+                concepto=f'Venta de producción - {simulacion.monos.nombre} - Simulación #{simulacion.id}',
+                tipo_movimiento='ingreso',
+                categoria='venta',
+                monto=simulacion.ingreso_total_venta,
+                usuario=request.user,
+                simulacion_relacionada=simulacion
+            )
+            
+            messages.success(
+                request,
+                f'Salida directa generada exitosamente. '
+                f'{len(materiales_procesados)} materiales procesados. '
+                f'Venta registrada por ${simulacion.ingreso_total_venta:.2f}.'
+            )
+        
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion.id)
+        
+    except Simulacion.DoesNotExist:
+        messages.error(request, 'Simulación no encontrada.')
+        return redirect('inventario:historial_simulaciones')
+    except Exception as e:
+        messages.error(request, f'Error al generar salida directa: {str(e)}')
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
+
+
+@login_required
+def generar_entrada_faltante(request, simulacion_id):
+    """
+    Genera entradas automáticas solo para los materiales faltantes de una simulación
+    """
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
+        
+        materiales_ingresados = []
+        costo_total_entradas = 0
+        
+        for detalle in simulacion.detalles.all():
+            material = detalle.material
+            cantidad_necesaria = detalle.cantidad_necesaria
+            
+            if material.cantidad_disponible < cantidad_necesaria:
+                cantidad_faltante = cantidad_necesaria - material.cantidad_disponible
+                
+                # Calcular cantidad a comprar considerando factor de conversión
+                if material.factor_conversion > 0:
+                    paquetes_necesarios = math.ceil(cantidad_faltante / material.factor_conversion)
+                    cantidad_a_comprar = paquetes_necesarios * material.factor_conversion
+                else:
+                    cantidad_a_comprar = cantidad_faltante
+                
+                # Registrar entrada
+                cantidad_anterior = material.cantidad_disponible
+                material.cantidad_disponible += cantidad_a_comprar
+                material.save()
+                
+                costo_entrada = cantidad_a_comprar * material.costo_unitario
+                
+                # Crear movimiento de entrada
+                movimiento = Movimiento.objects.create(
+                    material=material,
+                    tipo_movimiento='entrada',
+                    cantidad=cantidad_a_comprar,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=material.cantidad_disponible,
+                    precio_unitario=material.costo_unitario,
+                    costo_total_movimiento=costo_entrada,
+                    detalle=f'Entrada automática de faltante - Simulación #{simulacion.id} ({simulacion.monos.nombre})',
+                    usuario=request.user,
+                    simulacion_relacionada=simulacion
+                )
+                
+                # Registrar movimiento de efectivo automático
+                MovimientoEfectivo.registrar_movimiento(
+                    concepto=f'Compra automática - {material.nombre} - Simulación #{simulacion.id}',
+                    tipo_movimiento='egreso',
+                    categoria='inventario',
+                    monto=costo_entrada,
+                    usuario=request.user,
+                    simulacion_relacionada=simulacion,
+                    movimiento_inventario=movimiento
+                )
+                
+                materiales_ingresados.append({
+                    'material': material.nombre,
+                    'faltante': cantidad_faltante,
+                    'comprado': cantidad_a_comprar,
+                    'costo': costo_entrada,
+                    'nuevo_stock': material.cantidad_disponible
+                })
+                
+                costo_total_entradas += costo_entrada
+        
+        if materiales_ingresados:
+            messages.success(
+                request,
+                f'Entradas generadas exitosamente: {len(materiales_ingresados)} materiales. '
+                f'Costo total: ${costo_total_entradas:.2f}'
+            )
+        else:
+            messages.info(request, 'No hay materiales faltantes para esta simulación.')
+        
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion.id)
+        
+    except Simulacion.DoesNotExist:
+        messages.error(request, 'Simulación no encontrada.')
+        return redirect('inventario:historial_simulaciones')
+    except Exception as e:
+        messages.error(request, f'Error al generar entradas faltantes: {str(e)}')
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
+
+
+@login_required
+def historial_movimientos(request):
+    """Vista para mostrar historial completo de movimientos de inventario"""
+    filtro_form = MovimientoFiltroForm(request.GET or None)
+    
+    movimientos = Movimiento.objects.select_related('material', 'usuario', 'simulacion_relacionada').all()
+    
+    if filtro_form.is_valid():
+        if filtro_form.cleaned_data.get('material'):
+            movimientos = movimientos.filter(material=filtro_form.cleaned_data['material'])
+        
+        if filtro_form.cleaned_data.get('tipo_movimiento'):
+            movimientos = movimientos.filter(tipo_movimiento=filtro_form.cleaned_data['tipo_movimiento'])
+        
+        if filtro_form.cleaned_data.get('fecha_inicio'):
+            movimientos = movimientos.filter(fecha__date__gte=filtro_form.cleaned_data['fecha_inicio'])
+        
+        if filtro_form.cleaned_data.get('fecha_fin'):
+            movimientos = movimientos.filter(fecha__date__lte=filtro_form.cleaned_data['fecha_fin'])
+        
+        if filtro_form.cleaned_data.get('usuario'):
+            movimientos = movimientos.filter(usuario=filtro_form.cleaned_data['usuario'])
+    
+    movimientos = movimientos.order_by('-fecha')
+    
+    # Calcular estadísticas
+    from django.db.models import Count, Sum, Q
+    stats = {
+        'total_entradas': movimientos.filter(tipo_movimiento='entrada').count(),
+        'total_salidas': movimientos.filter(tipo_movimiento='salida').count(),
+        'valor_total_entradas': movimientos.filter(
+            tipo_movimiento='entrada', 
+            precio_unitario__isnull=False
+        ).aggregate(
+            total=Sum('precio_unitario')
+        )['total'] or 0,
+        'valor_total_salidas': movimientos.filter(
+            tipo_movimiento='salida',
+            precio_unitario__isnull=False
+        ).aggregate(
+            total=Sum('precio_unitario')
+        )['total'] or 0,
+    }
+    
+    # Paginación
+    paginator = Paginator(movimientos, 50)
+    page_number = request.GET.get('page')
+    movimientos_paginados = paginator.get_page(page_number)
+    
+    context = {
+        'filtro_form': filtro_form,
+        'movimientos': movimientos_paginados,
+        'stats': stats,
+        'title': 'Historial de Movimientos',
+    }
+    
+    return render(request, 'inventario/historial_movimientos.html', context)
+
+
+@login_required
+def get_material_info_entrada(request, material_id):
+    """Vista AJAX para obtener información del material para entrada"""
+    try:
+        material = Material.objects.get(id=material_id, activo=True)
+        data = {
+            'nombre': material.nombre,
+            'codigo': material.codigo,
+            'tipo_material': material.get_tipo_material_display(),
+            'unidad_base': material.get_unidad_base_display(),
+            'factor_conversion': material.factor_conversion,
+            'cantidad_disponible': float(material.cantidad_disponible),
+            'precio_compra_anterior': float(material.precio_compra),
+            'costo_unitario_actual': float(material.costo_unitario),
+        }
+        return JsonResponse(data)
+    except Material.DoesNotExist:
+        return JsonResponse({'error': 'Material no encontrado'}, status=404)
+
+
+def registrar_movimiento_produccion(material, cantidad_usada, simulacion, usuario=None, detalle_extra=""):
+    """
+    Función auxiliar para registrar movimientos por producción
+    Usado por el sistema de simulaciones cuando se confirma una producción
+    """
+    if cantidad_usada <= 0:
+        return None
+    
+    if material.cantidad_disponible < cantidad_usada:
+        raise ValueError(f"No hay suficiente stock de {material.nombre}")
+    
+    # Actualizar stock
+    cantidad_anterior = material.cantidad_disponible
+    material.cantidad_disponible -= cantidad_usada
+    material.save()
+    
+    # Registrar movimiento
+    detalle = f"Producción: {simulacion.monos.nombre} (x{simulacion.cantidad_producir})"
+    if detalle_extra:
+        detalle += f" - {detalle_extra}"
+    
+    movimiento = Movimiento.objects.create(
+        material=material,
+        tipo_movimiento='produccion',
+        cantidad=-cantidad_usada,  # Negativo para salida
+        cantidad_anterior=cantidad_anterior,
+        cantidad_nueva=material.cantidad_disponible,
+        precio_unitario=material.costo_unitario,
+        costo_total_movimiento=cantidad_usada * material.costo_unitario,
+        detalle=detalle,
+        usuario=usuario,
+        simulacion_relacionada=simulacion
+    )
+    
+    return movimiento
+
+
+# Vistas AJAX para entrada/salida
+@login_required
+def material_info_entrada(request, material_id):
+    """Información del material para entrada"""
+    try:
+        material = Material.objects.get(id=material_id, activo=True)
+        return JsonResponse({
+            'codigo': material.codigo,
+            'nombre': material.nombre,
+            'tipo_material': material.tipo_material,
+            'unidad_base': material.unidad_base,
+            'cantidad_disponible': float(material.cantidad_disponible),
+            'factor_conversion': float(material.factor_conversion),
+            'costo_unitario': float(material.costo_unitario or 0)
+        })
+    except Material.DoesNotExist:
+        return JsonResponse({'error': 'Material no encontrado'}, status=404)
+
+
+@login_required
+def material_info_salida(request, material_id):
+    """Información del material para salida"""
+    try:
+        material = Material.objects.get(id=material_id, activo=True)
+        
+        # Calcular costo promedio de movimientos recientes
+        movimientos_entrada = Movimiento.objects.filter(
+            material=material,
+            tipo_movimiento='entrada'
+        ).exclude(precio_unitario__isnull=True).order_by('-fecha_movimiento')[:10]
+        
+        costo_promedio = None
+        if movimientos_entrada:
+            total_costo = sum(m.precio_unitario for m in movimientos_entrada)
+            costo_promedio = total_costo / len(movimientos_entrada)
         
         return JsonResponse({
-            'success': True,
-            'mensaje': mensaje_detalle,
-            'reabastecimientos': len(reabastecimientos),
-            'costo_total': float(costo_total_reabastecimiento)
+            'codigo': material.codigo,
+            'nombre': material.nombre,
+            'tipo_material': material.tipo_material,
+            'unidad_base': material.unidad_base,
+            'cantidad_disponible': float(material.cantidad_disponible),
+            'costo_promedio': float(costo_promedio) if costo_promedio else None,
+            'costo_unitario': float(material.costo_unitario or 0)
         })
+    except Material.DoesNotExist:
+        return JsonResponse({'error': 'Material no encontrado'}, status=404)
+
+
+@login_required
+def detalle_movimiento_ajax(request, movimiento_id):
+    """Detalle completo de un movimiento"""
+    try:
+        movimiento = Movimiento.objects.select_related(
+            'material', 'usuario', 'simulacion_relacionada'
+        ).get(id=movimiento_id)
+        
+        data = {
+            'id': movimiento.id,
+            'fecha_movimiento': movimiento.fecha.strftime('%d/%m/%Y %H:%M'),
+            'tipo_movimiento': movimiento.tipo_movimiento,
+            'tipo_movimiento_display': movimiento.get_tipo_movimiento_display(),
+            'cantidad': float(movimiento.cantidad),
+            'precio_unitario': float(movimiento.precio_unitario) if movimiento.precio_unitario else None,
+            'detalle': movimiento.detalle,
+            'usuario': f"{movimiento.usuario.first_name} {movimiento.usuario.last_name}" if movimiento.usuario and movimiento.usuario.first_name else movimiento.usuario.username if movimiento.usuario else 'Sistema',
+            'material': {
+                'codigo': movimiento.material.codigo,
+                'nombre': movimiento.material.nombre,
+                'tipo_material': movimiento.material.tipo_material,
+                'unidad_base': movimiento.material.unidad_base,
+            }
+        }
+        
+        if movimiento.simulacion_relacionada:
+            data['simulacion'] = {
+                'id': movimiento.simulacion_relacionada.id,
+                'fecha_simulacion': movimiento.simulacion_relacionada.fecha_simulacion.strftime('%d/%m/%Y %H:%M'),
+            }
+        
+        return JsonResponse(data)
+        
+    except Movimiento.DoesNotExist:
+        return JsonResponse({'error': 'Movimiento no encontrado'}, status=404)
+
+
+# Vistas de integración Simulación-Inventario
+@login_required
+def confirmar_produccion(request, simulacion_id):
+    """Confirma la producción y registra salidas de materiales"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
+        
+        # Verificar que la simulación no haya sido procesada antes
+        if simulacion.movimiento_set.filter(tipo_movimiento='produccion').exists():
+            return JsonResponse({'success': False, 'mensaje': 'Esta simulación ya fue procesada anteriormente.'})
+        
+        materiales_insuficientes = []
+        
+        # Procesar cada detalle de la simulación
+        for detalle in simulacion.detalles.all():
+            material = detalle.material
+            cantidad_necesaria = detalle.cantidad_necesaria
+            
+            if material.cantidad_disponible >= cantidad_necesaria:
+                # Hay stock suficiente - registrar salida
+                registrar_movimiento_produccion(material, cantidad_necesaria, simulacion, request.user)
+            else:
+                # Stock insuficiente
+                materiales_insuficientes.append({
+                    'material': material.nombre,
+                    'disponible': material.cantidad_disponible,
+                    'necesario': cantidad_necesaria,
+                    'faltante': cantidad_necesaria - material.cantidad_disponible
+                })
+        
+        if materiales_insuficientes:
+            return JsonResponse({
+                'success': False,
+                'error': 'Materiales insuficientes',
+                'materiales_insuficientes': materiales_insuficientes
+            })
+        else:
+            # Todo procesado correctamente - registrar la venta de la producción
+            MovimientoEfectivo.registrar_movimiento(
+                concepto=f'Venta de producción - {simulacion.monos.nombre} - Simulación #{simulacion.id}',
+                tipo_movimiento='ingreso',
+                categoria='venta',
+                monto=simulacion.ingreso_total_venta,
+                usuario=request.user
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'mensaje': f'Simulación procesada exitosamente. {len(simulacion.detalles.all())} materiales utilizados. Venta registrada por ${simulacion.ingreso_total_venta:.2f}.'
+            })
         
     except Simulacion.DoesNotExist:
         return JsonResponse({'error': 'Simulación no encontrada'}, status=404)
@@ -3124,301 +3673,154 @@ def reabastecer_automatico(request, simulacion_id):
         return JsonResponse({'error': f'Error interno: {str(e)}'}, status=500)
 
 
-
 @login_required
-@login_required
-def iniciar_produccion(request, lista_id):
-    """Iniciar producción: cambiar estado a 'en_produccion' y descontar materiales automáticamente"""
+def reabastecer_automatico(request, simulacion_id):
+    """Reabastece automáticamente los materiales faltantes para una simulación"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
     
-    if request.method == 'POST':
-        try:
-            lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
-            
-            # Verificar que esté en estado correcto
-            if lista.estado != 'reabastecido':
-                messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Reabastecido" para iniciar producción.')
-                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-            
-            # Verificar que haya materiales suficientes
-            materiales_faltantes = []
-            for resumen in lista.resumen_materiales.all():
-                if resumen.material.cantidad_disponible < resumen.cantidad_necesaria:
-                    materiales_faltantes.append(resumen.material.nombre)
-            
-            if materiales_faltantes:
-                messages.error(
-                    request, 
-                    f'⚠️ No se puede iniciar producción. Faltan materiales: {", ".join(materiales_faltantes)}'
-                )
-                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-            
-            # Descontar materiales automáticamente
-            try:
-                from django.db import transaction
-                with transaction.atomic():
-                    # Llamar a la función de descuento de materiales
-                    exito, mensaje = descontar_materiales_produccion(lista)
-                    
-                    if not exito:
-                        messages.error(request, f'❌ Error al descontar materiales: {mensaje}')
-                        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-                    
-                    # Cambiar estado a en_produccion
-                    lista.estado = 'en_produccion'
-                    lista.save()
-                    
-                    messages.success(
-                        request, 
-                        f'🎉 ¡Producción iniciada! Lista "{lista.nombre}" ahora está EN PRODUCCIÓN. '
-                        f'Los materiales han sido descontados automáticamente del inventario.'
-                    )
-                    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-                    
-            except Exception as e:
-                messages.error(request, f'❌ Error al iniciar producción: {str(e)}')
-                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error al iniciar producción: {str(e)}')
-            return redirect('inventario:lista_de_compras')
-    
-    return redirect('inventario:lista_de_compras')
-
-
-@login_required
-@login_required
-def enviar_a_salida(request, lista_id):
-    """Confirmar que la producción está completada y enviar a fase de salida"""
-    
-    if request.method == 'POST':
-        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
+        detalles = simulacion.detalles.all()
         
-        if lista.estado != "en_produccion":
-            messages.error(request, f"La lista \"{lista.nombre}\" debe estar en producción para enviarla a salida.")
-            return redirect("inventario:detalle_lista_produccion", lista_id=lista.id)
+        # Identificar materiales que necesitan reabastecimiento
+        reabastecimientos = []
+        costo_total_reabastecimiento = 0
         
-        # Cambiar estado a en_salida
-        lista.estado = "en_salida"
-        lista.save()
-        
-        messages.success(
-            request, 
-            f"✅ ¡Producción confirmada! Lista \"{lista.nombre}\" enviada a SALIDA. "
-            f"Ahora puedes registrar las ventas."
-        )
-        return redirect("inventario:detalle_lista_produccion", lista_id=lista.id)
-    
-    # Si no es POST, redirigir
-    return redirect("inventario:lista_de_compras")
-
-
-@login_required
-def lista_en_salida(request):
-    """Vista para mostrar listas en fase de salida"""
-    
-    # Manejar eliminación de lista
-    if request.method == 'POST':
-        accion = request.POST.get('accion')
-        lista_id = request.POST.get('lista_id')
-        
-        if accion == 'eliminar_lista' and lista_id:
-            try:
-                lista = ListaProduccion.objects.get(id=lista_id, usuario_creador=request.user, estado='en_salida')
-                nombre_lista = lista.nombre
-                lista.delete()
-                messages.success(request, f'Lista "{nombre_lista}" eliminada exitosamente.')
-            except ListaProduccion.DoesNotExist:
-                messages.error(request, 'Lista no encontrada o no tiene permisos para eliminarla.')
-            except Exception as e:
-                messages.error(request, f'Error al eliminar la lista: {str(e)}')
+        for detalle in detalles:
+            material = detalle.material
+            cantidad_faltante = detalle.cantidad_necesaria - material.cantidad_disponible
             
-            return redirect('inventario:lista_en_salida')
-    
-    listas_en_salida = ListaProduccion.objects.filter(
-        estado="en_salida",
-        usuario_creador=request.user
-    ).prefetch_related("detalles_monos__monos", "resumen_materiales__material").order_by("-fecha_creacion")
-    
-    context = {
-        "titulo": "Listas en Salida",
-        "listas_en_salida": listas_en_salida,
-    }
-    
-    return render(request, "inventario/lista_en_salida.html", context)
-
-
-@login_required
-def registrar_salida_materiales(request, lista_id):
-    """Registrar la salida de materiales del inventario para producción"""
-    from .models import MovimientoEfectivo
-    
-    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
-    
-    if lista.estado != "en_salida":
-        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en salida para registrar salidas de materiales.")
-        return redirect("inventario:lista_en_salida")
-    
-    if request.method == "POST":
-        materiales_procesados = []
-        costo_total_materiales = 0
-        
-        # Procesar cada material de la lista
-        for resumen in lista.resumen_materiales.all():
-            cantidad_usar = resumen.cantidad_necesaria
-            material = resumen.material
-            
-            if material.cantidad_disponible >= cantidad_usar:
-                # Registrar movimiento de salida en inventario
+            if cantidad_faltante > 0:
+                # Calcular cantidad a comprar en unidades completas
+                if material.tipo_material == 'paquete':
+                    unidades_a_comprar = math.ceil(cantidad_faltante / material.factor_conversion)
+                elif material.tipo_material == 'rollo':
+                    unidades_a_comprar = math.ceil(cantidad_faltante / material.factor_conversion)
+                else:
+                    unidades_a_comprar = math.ceil(cantidad_faltante)
+                
+                # Cantidad en unidad base que se agregará
+                cantidad_en_unidad_base = unidades_a_comprar * material.factor_conversion
+                
+                # Costo estimado (usando el costo unitario actual)
+                costo_unitario = material.costo_unitario or Decimal('0')
+                precio_compra_total = cantidad_en_unidad_base * costo_unitario
+                
+                # Actualizar inventario
                 cantidad_anterior = material.cantidad_disponible
-                material.cantidad_disponible -= cantidad_usar
+                material.cantidad_disponible += cantidad_en_unidad_base
+                
+                # Actualizar precio de compra y costo unitario si es necesario
+                if costo_unitario > 0:
+                    material.precio_compra = precio_compra_total
+                
                 material.save()
                 
-                # Crear movimiento de inventario
-                Movimiento.objects.create(
+                # Registrar movimiento de entrada
+                movimiento = Movimiento.objects.create(
                     material=material,
-                    tipo_movimiento="produccion",
-                    cantidad=-cantidad_usar,  # Negativo para salida
+                    tipo_movimiento='entrada',
+                    cantidad=cantidad_en_unidad_base,
                     cantidad_anterior=cantidad_anterior,
                     cantidad_nueva=material.cantidad_disponible,
-                    precio_unitario=material.costo_unitario,
-                    costo_total_movimiento=material.costo_unitario * cantidad_usar,
-                    detalle=f"Salida por producción - Lista: {lista.nombre}",
-                    usuario=request.user,
-                    simulacion_relacionada=None
+                    precio_unitario=costo_unitario,
+                    costo_total_movimiento=precio_compra_total,
+                    detalle=f"Reabastecimiento automático para Simulación #{simulacion.id} - {unidades_a_comprar} {material.tipo_material}(s)",
+                    usuario=request.user
                 )
                 
-                # Calcular costo del material utilizado
-                costo_material = material.costo_unitario * cantidad_usar
-                costo_total_materiales += costo_material
-                
-                materiales_procesados.append({
-                    "material": material.nombre,
-                    "cantidad": cantidad_usar,
-                    "unidad": material.unidad_base,
-                    "costo": costo_material
+                reabastecimientos.append({
+                    'material': material.nombre,
+                    'unidades_compradas': unidades_a_comprar,
+                    'tipo_unidad': material.tipo_material,
+                    'cantidad_agregada': float(cantidad_a_comprar),
+                    'unidad_base': material.unidad_base,
+                    'costo': float(precio_compra_total)
                 })
-            else:
-                messages.error(request, f"No hay suficiente {material.nombre} en inventario. Disponible: {material.cantidad_disponible}, Necesario: {cantidad_usar}")
-                return redirect("inventario:lista_en_salida")
-        
-        # Registrar costo de materiales en contaduría
-        if costo_total_materiales > 0:
-            MovimientoEfectivo.registrar_movimiento(
-                concepto=f"Costo de materiales - Lista: {lista.nombre}",
-                tipo_movimiento="egreso",
-                categoria="materiales",
-                monto=costo_total_materiales,
-                usuario=request.user,
-                movimiento_inventario=None,
-                simulacion_relacionada=None
-            )
-        
-        # Actualizar lista: marcar materiales como utilizados
-        for resumen in lista.resumen_materiales.all():
-            resumen.cantidad_utilizada = resumen.cantidad_necesaria
-            resumen.save()
-        
-        messages.success(request, f"Salida de materiales registrada exitosamente. Total: ${costo_total_materiales:.2f}")
-        return redirect("inventario:registrar_ventas_contaduria", lista_id=lista.id)
-    
-    # GET request - mostrar confirmación
-    materiales_necesarios = lista.resumen_materiales.all()
-    
-    # Calcular costo total
-    costo_total_estimado = sum(resumen.costo_material_necesario for resumen in materiales_necesarios)
-    
-    context = {
-        "titulo": f"Registrar Salida de Materiales - {lista.nombre}",
-        "lista": lista,
-        "materiales_necesarios": materiales_necesarios,
-        "costo_total_estimado": costo_total_estimado,
-    }
-    
-    return render(request, "inventario/registrar_salida_materiales.html", context)
-
-
-@login_required  
-def registrar_ventas_contaduria(request, lista_id):
-    """Registrar las ventas de los moños en contaduría"""
-    from .models import MovimientoEfectivo
-    
-    lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
-    
-    if lista.estado != "en_salida":
-        messages.error(request, f"La lista \"{lista.nombre}\" debe estar en salida para registrar ventas.")
-        return redirect("inventario:lista_en_salida")
-    
-    if request.method == "POST":
-        ventas_procesadas = []
-        total_ventas = 0
-        
-        # Procesar cada tipo de moño
-        for detalle in lista.detalles_monos.all():
-            cantidad_vendida_input = request.POST.get(f"cantidad_vendida_{detalle.id}", 0)
-            precio_venta_input = request.POST.get(f"precio_venta_{detalle.id}", detalle.monos.precio_venta)
-            
-            try:
-                cantidad_vendida = int(cantidad_vendida_input) if cantidad_vendida_input else 0
-                precio_venta = float(precio_venta_input) if precio_venta_input else 0
-            except (ValueError, TypeError):
-                messages.error(request, f"Error en los datos del moño {detalle.monos.nombre}")
-                return redirect("inventario:registrar_ventas_contaduria", lista_id=lista.id)
-            
-            if cantidad_vendida > 0:
-                # Calcular venta total
-                venta_total = cantidad_vendida * precio_venta
-                total_ventas += venta_total
                 
-                # Actualizar cantidad producida en el detalle
-                detalle.cantidad_producida = cantidad_vendida
-                detalle.save()
-                
-                ventas_procesadas.append({
-                    "mono": detalle.monos.nombre,
-                    "cantidad": cantidad_vendida,
-                    "precio_unitario": precio_venta,
-                    "total": venta_total,
-                    "tipo_venta": detalle.monos.get_tipo_venta_display()
-                })
+                costo_total_reabastecimiento += precio_compra_total
         
-        if total_ventas > 0:
-            # Registrar ingreso por ventas en contaduría
-            MovimientoEfectivo.registrar_movimiento(
-                concepto=f"Venta de moños - Lista: {lista.nombre}",
-                tipo_movimiento="ingreso",
-                categoria="ventas",
-                monto=total_ventas,
-                usuario=request.user,
-                movimiento_inventario=None,
-                simulacion_relacionada=None
+        if materiales_reabastecidos:
+            messages.success(
+                request,
+                f'Reabastecimiento automático completado: {len(materiales_reabastecidos)} materiales. '
+                f'Costo total: ${costo_total_reabastecimiento:.2f}'
             )
-            
-            # Finalizar la lista
-            lista.estado = "finalizado"
-            
-            # Actualizar totales de la lista
-            lista.total_moños_producidos = sum(detalle.cantidad_producida for detalle in lista.detalles_monos.all())
-            lista.save()
-            
-            mensaje_detalle = f"Ventas registradas exitosamente.\n\nVentas procesadas:\n"
-            for venta in ventas_procesadas:
-                mensaje_detalle += f"• {venta['mono']}: {venta['cantidad']} {venta['tipo_venta']} × ${venta['precio_unitario']:.2f} = ${venta['total']:.2f}\n"
-            
-            mensaje_detalle += f"\nTotal de ventas: ${total_ventas:.2f}"
-            
-            messages.success(request, mensaje_detalle)
-            return redirect("inventario:home")
+            # Ahora intentar procesar la simulación automáticamente
+            return redirect('inventario:procesar_simulacion_completa', simulacion_id=simulacion.id)
         else:
-            messages.warning(request, "No se registraron ventas. Verifica las cantidades.")
-    
-    # GET request - mostrar formulario
-    detalles_monos = lista.detalles_monos.all()
-    
-    context = {
-        "titulo": f"Registrar Ventas - {lista.nombre}",
-        "lista": lista,
-        "detalles_monos": detalles_monos,
-    }
-    
-    return render(request, "inventario/registrar_ventas_contaduria.html", context)
+            messages.info(request, 'No se necesita reabastecimiento para esta simulación.')
+            return redirect('inventario:procesar_simulacion_completa', simulacion_id=simulacion.id)
+        
+    except Simulacion.DoesNotExist:
+        messages.error(request, 'Simulación no encontrada.')
+        return redirect('inventario:historial_simulaciones')
+    except Exception as e:
+        messages.error(request, f'Error en reabastecimiento: {str(e)}')
+        return redirect('inventario:detalle_simulacion', simulacion_id=simulacion_id)
 
+
+@login_required
+def entrada_rapida_simulacion(request, simulacion_id):
+    """
+    Vista para entrada rápida de materiales específicos para una simulación
+    """
+    try:
+        simulacion = Simulacion.objects.get(id=simulacion_id)
+        
+        if request.method == 'POST':
+            materiales_ingresados = []
+            costo_total = 0
+            
+            # Procesar cada material del POST
+            for key, value in request.POST.items():
+                if key.startswith('cantidad_') and value:
+                    material_id = key.split('_')[1]
+                    try:
+                        material = Material.objects.get(id=material_id)
+                        cantidad = float(value)
+                        
+                        # Obtener precio si se proporcionó
+                        precio_key = f'precio_{material_id}'
+                        if precio_key in request.POST and request.POST[precio_key]:
+                            precio_total = float(request.POST[precio_key])
+                        else:
+                            precio_total = cantidad * material.costo_unitario
+                        
+                        if cantidad > 0:
+                            # Registrar entrada
+                            cantidad_anterior = material.cantidad_disponible
+                            material.cantidad_disponible += cantidad
+                            material.save()
+                            
+                            # Crear movimiento
+                            movimiento = Movimiento.objects.create(
+                                material=material,
+                                tipo_movimiento='entrada',
+                                cantidad=cantidad,
+                                cantidad_anterior=cantidad_anterior,
+                                cantidad_nueva=material.cantidad_disponible,
+                                precio_unitario=precio_total / cantidad if cantidad > 0 else material.costo_unitario,
+                                costo_total_movimiento=precio_total,
+                                detalle=f'Entrada rápida para Simulación #{simulacion.id} - {simulacion.monos.nombre}',
+                                usuario=request.user,
+                                simulacion_relacionada=simulacion
+                            )
+                            
+                            materiales_ingresados.append({
+                                'material': material.nombre,
+                                'cantidad': cantidad,
+                                'costo': precio_total,
+                                'nuevo_stock': material.cantidad_disponible
+                            })
+                            
+                            costo_total += precio_total
+                            
+                    except (Material.DoesNotExist, ValueError) as e:
+                        messages.warning(request, f'Error con material ID {material_id}: {str(e)}')
+            
+            if materiales_ingresados:
+                messages.success(
+                    request,
+                    f'Entrada completada: {len(materiales_ingresados)} materiales ingresados.
