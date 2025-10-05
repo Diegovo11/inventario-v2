@@ -35,7 +35,79 @@
         </div>
     {% endif %}
 
-    {% if total_listas > 0 %}
+    {% if ver_finalizadas %}
+        <!-- Mostrar listas finalizadas -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Volver a Listas Activas
+                </a>
+            </div>
+        </div>
+
+        {% if listas_finalizadas %}
+            <div class="row g-3">
+                {% for lista in listas_finalizadas %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 border-success shadow-sm lista-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 flex-grow-1">
+                                        {{ lista.nombre }}
+                                    </h6>
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-trophy me-1"></i>
+                                        Completada
+                                    </span>
+                                </div>
+                                
+                                <p class="card-text text-muted small mb-3">
+                                    {{ lista.descripcion|default:"Sin descripción"|truncatewords:10 }}
+                                </p>
+                                
+                                <div class="row g-2 mb-3 small">
+                                    <div class="col-6">
+                                        <i class="fas fa-ribbon text-muted me-1"></i>
+                                        <strong>{{ lista.total_moños_producidos|default:lista.total_moños_planificados }}</strong> moños
+                                    </div>
+                                    <div class="col-6">
+                                        <i class="fas fa-calendar-check text-muted me-1"></i>
+                                        {{ lista.fecha_modificacion|date:"d/m/y" }}
+                                    </div>
+                                    {% if lista.ganancia_real %}
+                                        <div class="col-12">
+                                            <i class="fas fa-chart-line text-success me-1"></i>
+                                            <strong class="text-success">Ganancia: ${{ lista.ganancia_real|floatformat:2 }}</strong>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
+                                       class="btn btn-success btn-sm">
+                                        <i class="fas fa-eye me-1"></i>
+                                        Ver Detalles
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-trophy fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted mb-3">No hay listas completadas</h4>
+                    <p class="text-muted mb-0">
+                        Las listas finalizadas aparecerán aquí cuando completes el ciclo de producción.
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+
+    {% elif total_listas > 0 %}
         <!-- Resumen de listas por paso -->
         <div class="row mb-4">
             <div class="col-12">

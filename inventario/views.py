@@ -1257,6 +1257,25 @@ def registrar_entrada_reabastecimiento(request, lista_id):
 def listado_listas_produccion(request):
     """Vista para mostrar todas las listas de producción agrupadas por paso"""
     
+    # Verificar si se solicitan listas finalizadas
+    ver_finalizadas = request.GET.get('ver') == 'finalizadas'
+    
+    if ver_finalizadas:
+        # Mostrar solo listas finalizadas
+        todas_listas = ListaProduccion.objects.filter(
+            usuario_creador=request.user,
+            estado='finalizado'
+        ).prefetch_related('detalles_monos__monos').order_by('-fecha_modificacion')
+        
+        context = {
+            'listas_finalizadas': todas_listas,
+            'total_listas': todas_listas.count(),
+            'titulo': 'Listas Completadas',
+            'ver_finalizadas': True
+        }
+        
+        return render(request, 'inventario/listado_listas_produccion.html', context)
+    
     # Obtener todas las listas (excluyendo finalizadas)
     todas_listas = ListaProduccion.objects.filter(
         usuario_creador=request.user
