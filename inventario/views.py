@@ -1333,6 +1333,13 @@ def compra_productos(request):
             
         materiales_actualizados = 0
         total_invertido = 0
+        errores = []
+        
+        print(f"\n{'='*60}")
+        print(f"🛒 PROCESANDO COMPRAS DE MATERIALES")
+        print(f"{'='*60}")
+        print(f"Materiales pendientes: {len(materiales_pendientes)}")
+        print(f"POST data keys: {list(request.POST.keys())}")
         
         for material_info in materiales_pendientes:
             resumen = material_info['resumen']
@@ -1348,6 +1355,11 @@ def compra_productos(request):
             precio_real = request.POST.get(precio_key)
             proveedor = request.POST.get(proveedor_key, '')
             
+            print(f"\n📦 Material: {resumen.material.nombre} (ID resumen: {resumen.id})")
+            print(f"   Paquetes key: {paquetes_key} = {paquetes_comprados}")
+            print(f"   Cantidad key: {cantidad_key} = {cantidad_comprada}")
+            print(f"   Precio key: {precio_key} = {precio_real}")
+            print(f"   Proveedor key: {proveedor_key} = {proveedor}")
             
             if paquetes_comprados and precio_real:
                 try:
@@ -1355,8 +1367,15 @@ def compra_productos(request):
                     cantidad = float(cantidad_comprada) if cantidad_comprada else paquetes * resumen.material.factor_conversion
                     precio = float(precio_real)
                     
+                    print(f"   Valores convertidos:")
+                    print(f"   - Paquetes: {paquetes}")
+                    print(f"   - Cantidad: {cantidad}")
+                    print(f"   - Precio: {precio}")
+                    
                     if paquetes > 0 and precio > 0:
                         # Actualizar resumen de material (sumar a lo ya comprado)
+                        cantidad_anterior = resumen.material.cantidad_disponible
+                        
                         resumen.cantidad_comprada += cantidad
                         resumen.precio_compra_real = precio
                         resumen.proveedor = proveedor
@@ -1368,11 +1387,31 @@ def compra_productos(request):
                         material.cantidad_disponible += cantidad
                         material.save()
                         
+                        print(f"   ✅ Compra registrada")
+                        print(f"   Inventario: {cantidad_anterior} → {material.cantidad_disponible} (+{cantidad})")
+                        
                         materiales_actualizados += 1
                         total_invertido += paquetes * precio
+                    else:
+                        error_msg = f"Valores inválidos: paquetes={paquetes}, precio={precio}"
+                        print(f"   ⚠️  {error_msg}")
+                        errores.append(f"{resumen.material.nombre}: {error_msg}")
                         
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    error_msg = f"Error de conversión: {str(e)}"
+                    print(f"   ❌ {error_msg}")
+                    errores.append(f"{resumen.material.nombre}: {error_msg}")
                     continue
+            else:
+                print(f"   ⏭️  Saltado (sin datos o precio 0)")
+        
+        print(f"\n{'='*60}")
+        print(f"✅ COMPRAS PROCESADAS: {materiales_actualizados}")
+        if errores:
+            print(f"⚠️  ERRORES: {len(errores)}")
+            for error in errores:
+                print(f"   - {error}")
+        print(f"{'='*60}\n")
         
         if materiales_actualizados > 0:
             # Verificar si todas las compras de todas las listas están completas
@@ -1390,16 +1429,29 @@ def compra_productos(request):
             
             messages.success(
                 request, 
-                f'Se registraron {materiales_actualizados} compras por un total de ${total_invertido:.2f}. '
+                f'✅ Se registraron {materiales_actualizados} compra(s) por un total de ${total_invertido:.2f}. '
                 f'El inventario ha sido actualizado.'
             )
+            
+            # Mostrar errores si los hubo
+            if errores:
+                for error in errores:
+                    messages.warning(request, f"⚠️ {error}")
+            
             # Redirect a la lista específica o a listas generales para evitar loops
             if listas_comprado:
-                return redirect('inventario:ver_listas')
+                return redirect('inventario:lista_de_compras')
             else:
                 return redirect('inventario:compra_productos')
         else:
             messages.warning(request, 'No se registró ninguna compra. Verifique los datos ingresados.')
+            
+            # Mostrar qué campos faltan
+            if errores:
+                for error in errores:
+                    messages.error(request, f"❌ {error}")
+            else:
+                messages.info(request, 'Asegúrese de completar los campos de "Paquetes Comprados" y "Precio Real" para cada material.')
     
     context = {
         'listas_comprado': listas_comprado,
