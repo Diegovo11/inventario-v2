@@ -21,21 +21,33 @@
     }
     
     .material-row {
-        border-bottom: 1px solid #f0f0f0;
+        border: 2px solid #f0f0f0;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        background: #fff;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .material-row:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
     }
     
     .material-row:last-child {
-        border-bottom: none;
+        margin-bottom: 0;
     }
     
     .cantidad-badge {
-        font-size: 0.875rem;
-        padding: 0.375rem 0.75rem;
+        font-size: 0.95rem;
+        padding: 0.5rem 1rem;
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
     }
     
     .costo-total {
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.5rem;
+        font-weight: 700;
         color: #198754;
     }
     
@@ -198,60 +210,84 @@
                             </div>
 
                             <!-- Lista de Materiales -->
-                            <div class="materiales-container" style="max-height: 400px; overflow-y: auto;">
+                            <div class="materiales-container" style="max-height: 500px; overflow-y: auto;">
                                 {% for material_data in materiales_consolidados %}
-                                    <div class="material-row p-3">
-                                        <div class="row align-items-center">
-                                            <div class="col-md-6">
-                                                <h6 class="mb-1">{{ material_data.material.nombre }}</h6>
-                                                <small class="text-muted">{{ material_data.material.categoria.nombre|default:"Sin categoría" }}</small>
+                                    <div class="material-row p-4">
+                                        <div class="row">
+                                            <!-- Información del Material -->
+                                            <div class="col-12 mb-3">
+                                                <h5 class="mb-1">
+                                                    <i class="fas fa-box text-primary me-2"></i>
+                                                    {{ material_data.material.nombre }}
+                                                </h5>
+                                                <p class="text-muted mb-0">
+                                                    <i class="fas fa-tag me-1"></i>
+                                                    <small>{{ material_data.material.codigo }} - {{ material_data.material.categoria|default:"Sin categoría" }}</small>
+                                                </p>
                                             </div>
-                                            <div class="col-md-3 text-center">
-                                                <div class="mb-1">
-                                                    <span class="badge bg-primary cantidad-badge">
-                                                        Necesario: {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                    </span>
-                                                </div>
-                                                <div class="mb-1">
-                                                    <span class="badge bg-success cantidad-badge">
-                                                        Disponible: {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                    </span>
-                                                </div>
+                                            
+                                            <!-- Cantidades -->
+                                            <div class="col-md-6">
+                                                <span class="badge bg-primary cantidad-badge w-100 text-start">
+                                                    <i class="fas fa-cubes me-2"></i>
+                                                    <strong>Necesario:</strong> {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                </span>
+                                                <span class="badge bg-success cantidad-badge w-100 text-start">
+                                                    <i class="fas fa-check-circle me-2"></i>
+                                                    <strong>Disponible:</strong> {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                </span>
                                                 {% if material_data.cantidad_faltante > 0 %}
-                                                    <div class="mb-1">
-                                                        <span class="badge bg-warning cantidad-badge">
-                                                            Faltan: {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span class="badge bg-danger cantidad-badge fw-bold">
-                                                            <i class="fas fa-shopping-cart me-1"></i>
-                                                            Comprar: {{ material_data.paquetes_rollos_necesarios }} {{ material_data.unidad_compra_display }}{{ material_data.paquetes_rollos_necesarios|pluralize }}
-                                                        </span>
-                                                    </div>
-                                                    {% if material_data.cantidad_total_compra != material_data.cantidad_faltante %}
-                                                        <small class="text-info d-block mt-1">
-                                                            (= {{ material_data.cantidad_total_compra|floatformat:2 }} {{ material_data.material.unidad_base }})
-                                                        </small>
-                                                    {% endif %}
+                                                    <span class="badge bg-warning text-dark cantidad-badge w-100 text-start">
+                                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                                        <strong>Faltante:</strong> {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-info cantidad-badge w-100 text-start">
+                                                        <i class="fas fa-thumbs-up me-2"></i>
+                                                        <strong>¡Stock suficiente!</strong>
+                                                    </span>
                                                 {% endif %}
                                             </div>
-                                            <div class="col-md-3 text-end">
+                                            
+                                            <!-- Compra y Costos -->
+                                            <div class="col-md-6">
                                                 {% if material_data.cantidad_faltante > 0 %}
-                                                    <div class="costo-total mb-1">
-                                                        <strong>${{ material_data.costo_estimado_compra|floatformat:2 }}</strong>
+                                                    <div class="alert alert-danger mb-2 py-2">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <i class="fas fa-shopping-cart me-2"></i>
+                                                                <strong>Comprar:</strong>
+                                                            </div>
+                                                            <div class="text-end">
+                                                                <span class="fs-5 fw-bold">
+                                                                    {{ material_data.paquetes_rollos_necesarios }} {{ material_data.unidad_compra_display }}{{ material_data.paquetes_rollos_necesarios|pluralize }}
+                                                                </span>
+                                                                <br>
+                                                                <small class="text-muted">
+                                                                    = {{ material_data.cantidad_total_compra|floatformat:2 }} {{ material_data.material.unidad_base }}
+                                                                </small>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <small class="text-muted d-block">
-                                                        ${{ material_data.material.precio_compra|floatformat:2 }}/{{ material_data.unidad_compra_display }}
-                                                    </small>
-                                                    <small class="text-info">
-                                                        {{ material_data.paquetes_rollos_necesarios }} × ${{ material_data.material.precio_compra|floatformat:2 }}
-                                                    </small>
+                                                    
+                                                    <div class="alert alert-success mb-0 py-3">
+                                                        <div class="text-center">
+                                                            <small class="text-muted d-block mb-1">Costo Total Estimado</small>
+                                                            <div class="costo-total">
+                                                                ${{ material_data.costo_estimado_compra|floatformat:2 }}
+                                                            </div>
+                                                            <small class="text-muted">
+                                                                <i class="fas fa-calculator me-1"></i>
+                                                                {{ material_data.paquetes_rollos_necesarios }} × ${{ material_data.material.precio_compra|floatformat:2 }}/{{ material_data.unidad_compra_display }}
+                                                            </small>
+                                                        </div>
+                                                    </div>
                                                 {% else %}
-                                                    <span class="text-success fw-bold">
-                                                        <i class="fas fa-check-circle me-1"></i>
-                                                        Suficiente
-                                                    </span>
+                                                    <div class="alert alert-success mb-0 py-4 text-center">
+                                                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                                        <h5 class="mb-0">Stock Suficiente</h5>
+                                                        <small class="text-muted">No requiere compra</small>
+                                                    </div>
                                                 {% endif %}
                                             </div>
                                         </div>
