@@ -5,98 +5,37 @@
 {% block extra_css %}
 <style>
     .lista-card {
-        border: 1px solid #e9ecef;
-        border-radius: 0.375rem;
-        transition: all 0.2s ease-in-out;
-        cursor: pointer;
+        border: 2px solid #e9ecef;
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+        background: white;
     }
     
     .lista-card:hover {
-        border-color: #0d6efd;
-        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
-        transform: translateY(-2px);
+        border-color: #ffc107;
+        box-shadow: 0 0.5rem 1rem rgba(255, 193, 7, 0.15);
+        transform: translateY(-3px);
     }
     
-    .lista-card.selected {
-        border-color: #0d6efd;
-        background-color: #f8f9ff;
-        box-shadow: 0 0.25rem 0.5rem rgba(13,110,253,0.15);
+    .material-chip {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        margin: 0.25rem;
+        border-radius: 1rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        font-size: 0.875rem;
     }
     
-    .material-row {
-        border: 2px solid #f0f0f0;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        background: #fff;
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .material-row:hover {
-        border-color: #0d6efd;
-        box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
-        transform: translateX(3px);
-    }
-    
-    .material-row:last-child {
-        margin-bottom: 0;
-    }
-    
-    .cantidad-badge {
-        font-size: 0.95rem;
-        padding: 0.5rem 1rem;
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-    }
-    
-    .costo-total {
-        font-size: 1.5rem;
+    .material-chip .cantidad-faltante {
         font-weight: 700;
-        color: #198754;
+        color: #dc3545;
     }
     
-    .sin-materiales {
-        color: #6c757d;
-        font-style: italic;
+    .sin-listas {
         text-align: center;
-        padding: 2rem;
-    }
-    
-    .lista-container {
-        max-height: 400px;
-        overflow-y: auto;
-        padding-right: 0.5rem;
-    }
-    
-    .lista-container::-webkit-scrollbar,
-    .materiales-container::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    .lista-container::-webkit-scrollbar-thumb {
-        background: #0d6efd;
-        border-radius: 4px;
-    }
-    
-    .materiales-container {
-        max-height: 600px;
-        overflow-y: auto;
-        padding-right: 0.5rem;
-    }
-    
-    .materiales-container::-webkit-scrollbar-thumb {
-        background: #198754;
-        border-radius: 4px;
-    }
-    
-    .compra-form {
-        position: relative;
-    }
-    
-    .cantidad-total-display {
-        font-size: 0.85rem;
+        padding: 3rem;
         color: #6c757d;
-        margin-top: 0.25rem;
     }
 </style>
 {% endblock %}
@@ -107,12 +46,13 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
+                    <span class="badge rounded-pill bg-warning text-dark me-2" style="font-size: 1rem;">2</span>
                     <i class="fas fa-shopping-list me-2"></i>
                     {{ titulo }}
                 </h1>
                 <div class="text-muted">
                     <i class="fas fa-info-circle me-1"></i>
-                    Consolida materiales de múltiples listas
+                    Descarga el archivo TXT para ir de compras
                 </div>
             </div>
         </div>
@@ -131,485 +71,102 @@
         </div>
     {% endif %}
 
-    <form method="post" id="formPrincipal">
-        {% csrf_token %}
-        
-        <!-- Sección de Listas Disponibles -->
-        <div class="row">
-            <div class="col-lg-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-list me-2"></i>
-                            Listas de Producción Disponibles
-                        </h5>
-                        <span class="badge bg-primary">{{ listas_disponibles.count }}</span>
-                    </div>
-                    <div class="card-body">
-                        {% if listas_disponibles %}
-                            <div class="mb-3">
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="seleccionarTodas()">
-                                    <i class="fas fa-check-square me-1"></i>
-                                    Seleccionar Todas
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="limpiarSeleccion()">
-                                    <i class="fas fa-times me-1"></i>
-                                    Limpiar
-                                </button>
-                            </div>
-                            
-                            <div class="lista-container">
-                                {% for lista in listas_disponibles %}
-                                    <div class="lista-card p-3 mb-2">
-                                        <div class="form-check">
-                                            <input class="form-check-input lista-checkbox" type="checkbox" 
-                                                   name="listas_seleccionadas" value="{{ lista.id }}" 
-                                                   id="lista_{{ lista.id }}"
-                                                   {% if lista.id|stringformat:"s" in request.POST.listas_seleccionadas %}checked{% endif %}>
-                                            <label class="form-check-label w-100" for="lista_{{ lista.id }}">
-                                                <div class="d-flex justify-content-between align-items-start">
-                                                    <div>
-                                                        <h6 class="mb-1">{{ lista.nombre }}</h6>
-                                                        <small class="text-muted">{{ lista.descripcion|default:"Sin descripción" }}</small>
-                                                        <div class="mt-2">
-                                                            <span class="badge bg-{% if lista.estado == 'borrador' %}secondary{% else %}warning{% endif %}">
-                                                                {{ lista.get_estado_display }}
-                                                            </span>
-                                                            <small class="text-muted ms-2">
-                                                                {{ lista.detalles_monos.count }} tipo{{ lista.detalles_monos.count|pluralize }}
-                                                            </small>
-                                                        </div>
-                                                    </div>
-                                                    <div class="text-end">
-                                                        <small class="text-muted d-block">{{ lista.fecha_creacion|date:"d/m/Y" }}</small>
-                                                        {% if lista.ganancia_estimada %}
-                                                            <small class="text-success fw-bold">${{ lista.ganancia_estimada|floatformat:2 }}</small>
-                                                        {% endif %}
-                                                        <div class="mt-2">
-                                                            <a href="{% url 'inventario:detalle_lista_produccion' lista.id %}" 
-                                                               class="btn btn-outline-info btn-sm me-1" title="Ver Detalle">
-                                                                <i class="fas fa-eye"></i>
-                                                            </a>
-                                                            <a href="{% url 'inventario:editar_lista_produccion' lista.id %}" 
-                                                               class="btn btn-outline-primary btn-sm me-1" title="Editar Lista">
-                                                                <i class="fas fa-edit"></i>
-                                                            </a>
-                                                            <a href="{% url 'inventario:eliminar_lista_produccion' lista.id %}" 
-                                                               class="btn btn-outline-danger btn-sm" title="Eliminar Lista">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                            
-                            <div class="mt-3 d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-calculator me-2"></i>
-                                    Generar Lista de Compras
-                                </button>
-                            </div>
-                        {% else %}
-                            <div class="sin-materiales">
-                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
-                                <h5>No hay listas disponibles</h5>
-                                <p class="mb-0">Crea una nueva lista de producción para generar una lista de compras.</p>
-                                <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary mt-3">
-                                    <i class="fas fa-plus me-1"></i>
-                                    Crear Lista de Producción
-                                </a>
-                            </div>
-                        {% endif %}
-                    </div>
+    <div class="row">
+        <div class="col-12">
+            {% if listas_pendientes %}
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Instrucciones:</strong> Selecciona una lista y descarga su archivo TXT para saber qué materiales comprar.
+                    Una vez que descargues el archivo, la lista pasará automáticamente al Paso 3.
                 </div>
-            </div>
 
-            <!-- Sección de Lista de Compras Consolidada -->
-            <div class="col-lg-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-shopping-cart me-2"></i>
-                            Lista de Compras Consolidada
-                        </h5>
-                        {% if materiales_consolidados %}
-                            <span class="badge bg-light text-success">{{ materiales_consolidados|length }} material{{ materiales_consolidados|length|pluralize:"es" }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="card-body">
-                        {% if materiales_consolidados %}
-                            <!-- Resumen de Listas Seleccionadas -->
-                            <div class="alert alert-info mb-4">
-                                <h6 class="alert-heading mb-2">
-                                    <i class="fas fa-clipboard-list me-2"></i>
-                                    Listas Incluidas:
-                                </h6>
-                                <div>
-                                    {% for lista in listas_seleccionadas %}
-                                        <span class="badge bg-primary me-1 mb-1">{{ lista.nombre }}</span>
-                                    {% endfor %}
+                <div class="row">
+                    {% for lista in listas_pendientes %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="lista-card p-4 h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-clipboard-list text-warning me-2"></i>
+                                        {{ lista.nombre }}
+                                    </h5>
+                                    <span class="badge bg-warning text-dark">Paso 2</span>
                                 </div>
-                            </div>
 
-                            <!-- Formulario Único de Compra -->
-                            <form method="post" id="formCompraConsolidada" onsubmit="return validarCompraTotal()">
-                                {% csrf_token %}
-                                {% for lista in listas_seleccionadas %}
-                                    <input type="hidden" name="listas_seleccionadas" value="{{ lista.id }}">
-                                {% endfor %}
+                                {% if lista.descripcion %}
+                                    <p class="text-muted small mb-3">{{ lista.descripcion }}</p>
+                                {% endif %}
 
-                                <!-- Lista de Materiales -->
-                                <div class="materiales-container mb-3">
-                                    {% for material_data in materiales_consolidados %}
-                                        <div class="material-row p-4" data-material-id="{{ material_data.material.id }}">
-                                            <div class="row">
-                                                <!-- Información del Material -->
-                                                <div class="col-12 mb-3">
-                                                    <div class="d-flex justify-content-between align-items-start">
-                                                        <div>
-                                                            <h5 class="mb-1">
-                                                                <i class="fas fa-box text-primary me-2"></i>
-                                                                {{ material_data.material.nombre }}
-                                                            </h5>
-                                                            <p class="text-muted mb-0">
-                                                                <i class="fas fa-tag me-1"></i>
-                                                                <small>{{ material_data.material.codigo }} - {{ material_data.material.categoria|default:"Sin categoría" }}</small>
-                                                            </p>
-                                                        </div>
-                                                        {% if material_data.cantidad_faltante > 0 %}
-                                                            <span class="badge bg-danger">Requiere Compra</span>
-                                                        {% else %}
-                                                            <span class="badge bg-success">Stock OK</span>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                                
-                                                <!-- Cantidades -->
-                                                <div class="col-md-5">
-                                                    <span class="badge bg-primary cantidad-badge w-100 text-start">
-                                                        <i class="fas fa-cubes me-2"></i>
-                                                        <strong>Necesario:</strong> {{ material_data.cantidad_necesaria|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                    </span>
-                                                    <span class="badge bg-success cantidad-badge w-100 text-start">
-                                                        <i class="fas fa-check-circle me-2"></i>
-                                                        <strong>Disponible:</strong> {{ material_data.cantidad_disponible|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                    </span>
-                                                    {% if material_data.cantidad_faltante > 0 %}
-                                                        <span class="badge bg-warning text-dark cantidad-badge w-100 text-start">
-                                                            <i class="fas fa-exclamation-triangle me-2"></i>
-                                                            <strong>Faltante:</strong> {{ material_data.cantidad_faltante|floatformat:2 }} {{ material_data.material.unidad_base }}
-                                                        </span>
-                                                    {% else %}
-                                                        <span class="badge bg-info cantidad-badge w-100 text-start">
-                                                            <i class="fas fa-thumbs-up me-2"></i>
-                                                            <strong>¡Stock Suficiente!</strong>
-                                                        </span>
-                                                    {% endif %}
-                                                </div>
-                                                
-                                                <!-- Formulario de Compra por Material -->
-                                                <div class="col-md-7">
-                                                    {% if material_data.cantidad_faltante > 0 %}
-                                                        <div class="card border-warning">
-                                                            <div class="card-header bg-warning text-dark py-2">
-                                                                <small><i class="fas fa-cart-plus me-1"></i> <strong>Cantidad a Comprar</strong></small>
-                                                            </div>
-                                                            <div class="card-body p-3">
-                                                                <input type="hidden" name="material_ids" value="{{ material_data.material.id }}">
-                                                                
-                                                                <div class="row g-2">
-                                                                    <div class="col-md-6">
-                                                                        <label class="form-label small mb-1">
-                                                                            <strong>{{ material_data.unidad_compra_display }}{% if material_data.paquetes_rollos_necesarios > 1 %}s{% endif %}</strong>
-                                                                            <small class="text-muted">(sugerido: {{ material_data.paquetes_rollos_necesarios }})</small>
-                                                                        </label>
-                                                                        <input type="number" 
-                                                                               name="paquetes_{{ material_data.material.id }}" 
-                                                                               class="form-control form-control-sm paquetes-input" 
-                                                                               min="0" 
-                                                                               step="1"
-                                                                               value="{{ material_data.paquetes_rollos_necesarios }}"
-                                                                               data-factor-conversion="{{ material_data.material.factor_conversion }}"
-                                                                               data-material-id="{{ material_data.material.id }}"
-                                                                               onchange="actualizarCantidadTotal(this)"
-                                                                               placeholder="0">
-                                                                        <small class="text-muted d-block mt-1">
-                                                                            = <span class="cantidad-calculada fw-bold" id="cantidad-{{ material_data.material.id }}">{{ material_data.cantidad_total_compra|floatformat:2 }}</span> {{ material_data.material.unidad_base }}
-                                                                        </small>
-                                                                    </div>
-                                                                    
-                                                                    <div class="col-md-6">
-                                                                        <label class="form-label small mb-1">
-                                                                            <strong>Precio por {{ material_data.unidad_compra_display }}</strong>
-                                                                        </label>
-                                                                        <div class="input-group input-group-sm">
-                                                                            <span class="input-group-text">$</span>
-                                                                            <input type="number" 
-                                                                                   name="precio_{{ material_data.material.id }}" 
-                                                                                   class="form-control precio-input" 
-                                                                                   min="0" 
-                                                                                   step="0.01"
-                                                                                   value="{{ material_data.material.precio_compra|default:'0' }}"
-                                                                                   data-material-id="{{ material_data.material.id }}"
-                                                                                   onchange="actualizarCostoEstimado(this)"
-                                                                                   placeholder="0.00">
-                                                                        </div>
-                                                                        <small class="text-muted d-block mt-1">
-                                                                            Costo: <span class="costo-estimado-material fw-bold text-success" id="costo-{{ material_data.material.id }}">${{ material_data.costo_estimado_compra|floatformat:2 }}</span>
-                                                                        </small>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div class="mt-2">
-                                                                    <label class="form-label small mb-1">Proveedor (opcional)</label>
-                                                                    <input type="text" 
-                                                                           name="proveedor_{{ material_data.material.id }}" 
-                                                                           class="form-control form-control-sm"
-                                                                           placeholder="Nombre del proveedor"
-                                                                           maxlength="200">
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="alert alert-success mb-0 py-3 text-center">
-                                                            <i class="fas fa-check-circle fa-2x text-success mb-2 d-block"></i>
-                                                            <h6 class="mb-0">Stock Suficiente</h6>
-                                                            <small class="text-muted">No requiere compra</small>
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div class="mb-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Creada: {{ lista.fecha_creacion|date:"d/m/Y H:i" }}
+                                    </small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">
+                                        <i class="fas fa-gift me-1"></i>
+                                        Moños en esta lista:
+                                    </h6>
+                                    {% for detalle in lista.detalles_monos.all %}
+                                        <span class="badge bg-secondary me-1 mb-1">
+                                            {{ detalle.monos.nombre }} ({{ detalle.cantidad }})
+                                        </span>
                                     {% endfor %}
                                 </div>
 
-                                <!-- Resumen Total -->
-                                <div class="card bg-light border-0 mb-3">
-                                    <div class="card-body">
-                                        <div class="row align-items-center">
-                                            <div class="col-6">
-                                                <h5 class="mb-0">
-                                                    <i class="fas fa-calculator me-2 text-primary"></i>
-                                                    Costo Total:
-                                                </h5>
+                                <div class="mb-4">
+                                    <h6 class="small text-muted mb-2">
+                                        <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                                        Materiales a comprar ({{ lista.total_materiales_faltantes }}):
+                                    </h6>
+                                    <div style="max-height: 150px; overflow-y: auto;">
+                                        {% for resumen in lista.materiales_faltantes_lista %}
+                                            <div class="material-chip">
+                                                {{ resumen.material.nombre }}:
+                                                <span class="cantidad-faltante">
+                                                    {% widthratio resumen.cantidad_faltante resumen.material.factor_conversion 1 %}
+                                                    {{ resumen.material.get_tipo_material_display }}{% if resumen.cantidad_faltante|divisibleby:resumen.material.factor_conversion %}{% else %}s{% endif %}
+                                                </span>
                                             </div>
-                                            <div class="col-6 text-end">
-                                                <h3 class="mb-0 costo-total" id="costoTotalGeneral">
-                                                    ${{ costo_total|floatformat:2 }}
-                                                </h3>
-                                            </div>
-                                        </div>
+                                        {% endfor %}
                                     </div>
                                 </div>
 
-                                <!-- Botones de Acción Consolidados -->
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-secondary w-100" onclick="limpiarCantidades()">
-                                            <i class="fas fa-eraser me-1"></i>
-                                            Limpiar
-                                        </button>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-outline-primary w-100" onclick="imprimirLista()">
-                                            <i class="fas fa-print me-1"></i>
-                                            Imprimir
-                                        </button>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="submit" name="registrar_compra_consolidada" class="btn btn-success w-100">
-                                            <i class="fas fa-shopping-cart me-1"></i>
-                                            Comprar Todo
-                                        </button>
-                                    </div>
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'inventario:generar_archivo_compras' lista.id %}" 
+                                       class="btn btn-warning">
+                                        <i class="fas fa-download me-2"></i>
+                                        Descargar TXT para Comprar
+                                    </a>
+                                    <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
+                                       class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-eye me-1"></i>
+                                        Ver Panel Completo
+                                    </a>
                                 </div>
-                            </form>
-                        {% else %}
-                            <div class="sin-materiales">
-                                <i class="fas fa-shopping-cart fa-3x mb-3 d-block text-secondary"></i>
-                                <h5>Selecciona listas para generar</h5>
-                                <p class="mb-0">Marca las casillas de las listas de producción para consolidar sus materiales.</p>
                             </div>
-                        {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="sin-listas">
+                    <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                    <h4>¡No hay listas pendientes de compra!</h4>
+                    <p>Todas tus listas están al día o ya tienen los materiales necesarios.</p>
+                    <div class="mt-4">
+                        <a href="{% url 'inventario:crear_lista_produccion' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-plus me-1"></i>
+                            Crear Nueva Lista
+                        </a>
+                        <a href="{% url 'inventario:listado_listas_produccion' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list me-1"></i>
+                            Ver Todas las Listas
+                        </a>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
-    </form>
+    </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Funcionalidad de selección múltiple
-    const checkboxes = document.querySelectorAll('.lista-checkbox');
-    const cards = document.querySelectorAll('.lista-card');
-    
-    // Actualizar apariencia de cards al cambiar checkbox
-    checkboxes.forEach(function(checkbox) {
-        checkbox.addEventListener('change', function() {
-            const card = this.closest('.lista-card');
-            if (this.checked) {
-                card.classList.add('selected');
-            } else {
-                card.classList.remove('selected');
-            }
-        });
-        
-        // Aplicar estado inicial
-        if (checkbox.checked) {
-            checkbox.closest('.lista-card').classList.add('selected');
-        }
-    });
-    
-    // Funciones globales para los botones
-    window.seleccionarTodas = function() {
-        checkboxes.forEach(function(checkbox) {
-            checkbox.checked = true;
-            checkbox.closest('.lista-card').classList.add('selected');
-        });
-    };
-    
-    window.limpiarSeleccion = function() {
-        checkboxes.forEach(function(checkbox) {
-            checkbox.checked = false;
-            checkbox.closest('.lista-card').classList.remove('selected');
-        });
-    };
-    
-    // Inicializar cálculos
-    calcularCostoTotal();
-});
-
-// Actualizar cantidad total al cambiar paquetes
-function actualizarCantidadTotal(input) {
-    const materialId = input.dataset.materialId;
-    const paquetes = parseFloat(input.value) || 0;
-    const factorConversion = parseFloat(input.dataset.factorConversion) || 1;
-    const cantidadTotal = paquetes * factorConversion;
-    
-    const cantidadDisplay = document.getElementById('cantidad-' + materialId);
-    if (cantidadDisplay) {
-        cantidadDisplay.textContent = cantidadTotal.toFixed(2);
-    }
-    
-    // Actualizar costo estimado también
-    const materialRow = input.closest('.material-row');
-    const precioInput = materialRow.querySelector('.precio-input');
-    if (precioInput) {
-        actualizarCostoEstimado(precioInput);
-    }
-}
-
-// Actualizar costo estimado al cambiar precio o cantidad
-function actualizarCostoEstimado(input) {
-    const materialRow = input.closest('.material-row');
-    const materialId = input.dataset.materialId;
-    const paquetesInput = materialRow.querySelector('.paquetes-input');
-    const precioInput = materialRow.querySelector('.precio-input');
-    
-    const paquetes = parseFloat(paquetesInput.value) || 0;
-    const precio = parseFloat(precioInput.value) || 0;
-    const costoEstimado = paquetes * precio;
-    
-    const costoDisplay = document.getElementById('costo-' + materialId);
-    if (costoDisplay) {
-        costoDisplay.textContent = '$' + costoEstimado.toFixed(2);
-    }
-    
-    // Recalcular costo total general
-    calcularCostoTotal();
-}
-
-// Calcular costo total de todos los materiales
-function calcularCostoTotal() {
-    let costoTotal = 0;
-    const costosEstimados = document.querySelectorAll('.costo-estimado-material');
-    
-    costosEstimados.forEach(function(element) {
-        const costo = parseFloat(element.textContent.replace('$', '').replace(',', '')) || 0;
-        costoTotal += costo;
-    });
-    
-    const costoTotalElement = document.getElementById('costoTotalGeneral');
-    if (costoTotalElement) {
-        costoTotalElement.textContent = '$' + costoTotal.toFixed(2);
-    }
-    
-    return costoTotal;
-}
-
-// Validar formulario de compra consolidada
-function validarCompraTotal() {
-    const paquetesInputs = document.querySelectorAll('.paquetes-input');
-    let algunaCompra = false;
-    let hayErrores = false;
-    
-    paquetesInputs.forEach(function(input) {
-        const valor = parseFloat(input.value) || 0;
-        if (valor > 0) {
-            algunaCompra = true;
-            const materialRow = input.closest('.material-row');
-            const precioInput = materialRow.querySelector('.precio-input');
-            const precio = parseFloat(precioInput.value) || 0;
-            
-            if (precio <= 0) {
-                alert('Por favor ingresa un precio válido para todos los materiales a comprar');
-                hayErrores = true;
-                return false;
-            }
-        }
-    });
-    
-    if (hayErrores) {
-        return false;
-    }
-    
-    if (!algunaCompra) {
-        alert('Debes especificar al menos una cantidad a comprar');
-        return false;
-    }
-    
-    const costoTotal = calcularCostoTotal();
-    return confirm(`¿Confirmar compra por un total de $${costoTotal.toFixed(2)}?\n\nEsto actualizará el inventario de todos los materiales seleccionados.`);
-}
-
-// Limpiar todas las cantidades
-function limpiarCantidades() {
-    if (confirm('¿Limpiar todas las cantidades ingresadas?')) {
-        const paquetesInputs = document.querySelectorAll('.paquetes-input');
-        paquetesInputs.forEach(function(input) {
-            input.value = '';
-            actualizarCantidadTotal(input);
-        });
-    }
-}
-
-// Imprimir lista
-function imprimirLista() {
-    window.print();
-}
-
-// Funciones para selección de listas
-window.seleccionarTodas = function() {
-    const checkboxes = document.querySelectorAll('.lista-checkbox');
-    checkboxes.forEach(function(checkbox) {
-        checkbox.checked = true;
-        checkbox.closest('.lista-card').classList.add('selected');
-    });
-};
-
-window.limpiarSeleccion = function() {
-    const checkboxes = document.querySelectorAll('.lista-checkbox');
-    checkboxes.forEach(function(checkbox) {
-        checkbox.checked = false;
-        checkbox.closest('.lista-card').classList.remove('selected');
-    });
-};
-</script>
 {% endblock %}

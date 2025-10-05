@@ -676,19 +676,20 @@ def crear_lista_produccion(request):
                     materiales_suficientes, mensaje_verificacion = verificar_materiales_suficientes(lista)
                     
                     if materiales_suficientes:
-                        # Hay suficientes materiales, saltar directamente a reabastecido
+                        # Hay suficientes materiales, saltar directamente a reabastecido (Paso 4)
                         lista.estado = 'reabastecido'
+                        lista.save()
                         mensaje_estado = " La lista está lista para producción (todos los materiales disponibles)."
+                        messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.{mensaje_estado}')
+                        return redirect('inventario:panel_lista_produccion', lista_id=lista.id)
                     else:
-                        # Faltan materiales, estado normal
+                        # Faltan materiales, ir a paso de compras (Paso 2)
                         lista.estado = 'pendiente_compra'
+                        lista.save()
                         materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
                         mensaje_estado = f" Se requiere comprar {materiales_faltantes} material(es)."
-                    
-                    lista.save()
-                    
-                    messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.{mensaje_estado}')
-                    return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                        messages.success(request, f'Lista de producción "{lista.nombre}" creada exitosamente con {moños_agregados} tipo(s) de moños.{mensaje_estado}')
+                        return redirect('inventario:lista_de_compras')
                     
             except Exception as e:
                 messages.error(request, f'Error al crear la lista: {str(e)}')
@@ -966,10 +967,11 @@ def generar_archivo_compras(request, lista_id):
     filename = f"compras_{lista.nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.txt"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    # Cambiar estado a pendiente_compra si está en borrador
-    if lista.estado == 'borrador':
-        lista.estado = 'pendiente_compra'
+    # Cambiar estado a comprado cuando se descarga (Paso 2 → Paso 3)
+    if lista.estado == 'pendiente_compra':
+        lista.estado = 'comprado'
         lista.save()
+        messages.success(request, f'Lista "{lista.nombre}" descargada. Ahora pasa al Paso 3 para registrar tus compras.')
     
     return response
 
@@ -1312,203 +1314,23 @@ def listado_listas_produccion(request):
 
 @login_required
 def lista_de_compras(request):
-    """Vista para generar lista consolidada de compras y registrar compras directamente"""
-    from decimal import Decimal
-    from django.db import transaction
+    """Vista para mostrar listas que necesitan compras (Paso 2)"""
     
-    # Obtener listas de producción disponibles para compra
-    listas_disponibles = ListaProduccion.objects.filter(
+    # Obtener listas en estado pendiente_compra (Paso 2)
+    listas_pendientes = ListaProduccion.objects.filter(
         usuario_creador=request.user,
-        estado__in=['borrador', 'pendiente_compra', 'comprado']
-    ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material')
+        estado='pendiente_compra'
+    ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material').order_by('-fecha_creacion')
     
-    # Procesar selección de listas si es POST
-    materiales_consolidados = []
-    listas_seleccionadas = []
-    costo_total = Decimal('0')
-    
-    if request.method == 'POST':
-        # Si se está registrando la compra consolidada
-        if 'registrar_compra_consolidada' in request.POST:
-            listas_ids = request.POST.getlist('listas_seleccionadas')
-            material_ids = request.POST.getlist('material_ids')
-            
-            if not listas_ids:
-                messages.error(request, '❌ Debe seleccionar al menos una lista de producción.')
-                return redirect('inventario:lista_de_compras')
-            
-            if not material_ids:
-                messages.error(request, '❌ No hay materiales para comprar.')
-                return redirect('inventario:lista_de_compras')
-            
-            try:
-                with transaction.atomic():
-                    materiales_comprados = 0
-                    total_invertido = Decimal('0')
-                    errores = []
-                    
-                    print(f"\n{'='*60}")
-                    print(f"🛒 PROCESANDO COMPRA CONSOLIDADA")
-                    print(f"{'='*60}")
-                    print(f"Listas seleccionadas: {listas_ids}")
-                    print(f"Materiales a procesar: {material_ids}")
-                    
-                    for material_id in material_ids:
-                        paquetes_key = f'paquetes_{material_id}'
-                        precio_key = f'precio_{material_id}'
-                        proveedor_key = f'proveedor_{material_id}'
-                        
-                        paquetes = request.POST.get(paquetes_key)
-                        precio = request.POST.get(precio_key)
-                        proveedor = request.POST.get(proveedor_key, '')
-                        
-                        print(f"\n📦 Material ID: {material_id}")
-                        print(f"   Paquetes: {paquetes}")
-                        print(f"   Precio: {precio}")
-                        print(f"   Proveedor: {proveedor}")
-                        
-                        if paquetes and precio:
-                            try:
-                                material = Material.objects.get(id=material_id)
-                                paquetes_decimal = Decimal(str(paquetes))
-                                precio_decimal = Decimal(str(precio))
-                                
-                                if paquetes_decimal <= 0:
-                                    continue  # Saltar si no hay cantidad
-                                
-                                if precio_decimal <= 0:
-                                    errores.append(f"{material.nombre}: El precio debe ser mayor a 0")
-                                    continue
-                                
-                                # Calcular cantidad total en unidad base
-                                cantidad_total = paquetes_decimal * material.factor_conversion
-                                costo_compra = paquetes_decimal * precio_decimal
-                                
-                                # Guardar cantidad anterior
-                                cantidad_anterior = material.cantidad_disponible
-                                
-                                # Actualizar inventario
-                                material.cantidad_disponible += cantidad_total
-                                material.precio_compra = precio_decimal  # Actualizar precio de compra
-                                material.save()
-                                
-                                # Recargar para confirmar
-                                material.refresh_from_db()
-                                
-                                print(f"   ✅ Compra registrada")
-                                print(f"   Inventario: {cantidad_anterior} → {material.cantidad_disponible} (+{cantidad_total})")
-                                print(f"   Costo: ${costo_compra}")
-                                
-                                # Crear movimiento de entrada
-                                movimiento = Movimiento.objects.create(
-                                    material=material,
-                                    tipo_movimiento='entrada',
-                                    cantidad=cantidad_total,
-                                    cantidad_anterior=cantidad_anterior,
-                                    cantidad_nueva=material.cantidad_disponible,
-                                    precio_unitario=precio_decimal,
-                                    costo_total_movimiento=costo_compra,
-                                    detalle=f'Compra Consolidada - {paquetes_decimal} {material.tipo_material}(s){" - Proveedor: " + proveedor if proveedor else ""}',
-                                    usuario=request.user
-                                )
-                                
-                                # Registrar movimiento de efectivo
-                                MovimientoEfectivo.registrar_movimiento(
-                                    concepto=f'Compra de material: {material.nombre} ({paquetes_decimal} {material.tipo_material}s)',
-                                    tipo_movimiento='egreso',
-                                    categoria='inventario',
-                                    monto=costo_compra,
-                                    usuario=request.user,
-                                    movimiento_inventario=movimiento
-                                )
-                                
-                                # Actualizar resúmenes de las listas seleccionadas
-                                listas_afectadas = ListaProduccion.objects.filter(
-                                    id__in=listas_ids,
-                                    usuario_creador=request.user
-                                )
-                                
-                                for lista in listas_afectadas:
-                                    try:
-                                        resumen = lista.resumen_materiales.get(material=material)
-                                        resumen.cantidad_comprada += cantidad_total
-                                        resumen.precio_compra_real = precio_decimal
-                                        resumen.proveedor = proveedor
-                                        resumen.fecha_compra = timezone.now()
-                                        resumen.cantidad_disponible = material.cantidad_disponible
-                                        resumen.cantidad_faltante = max(0, resumen.cantidad_necesaria - material.cantidad_disponible)
-                                        resumen.save()
-                                        print(f"   📋 Actualizado resumen en lista: {lista.nombre}")
-                                    except ResumenMateriales.DoesNotExist:
-                                        print(f"   ⚠️  Material no encontrado en lista: {lista.nombre}")
-                                        pass
-                                
-                                materiales_comprados += 1
-                                total_invertido += costo_compra
-                                
-                            except Material.DoesNotExist:
-                                errores.append(f"Material ID {material_id}: No encontrado")
-                                print(f"   ❌ Material no encontrado")
-                            except (ValueError, TypeError) as e:
-                                errores.append(f"Material ID {material_id}: Error en datos - {str(e)}")
-                                print(f"   ❌ Error: {str(e)}")
-                    
-                    print(f"\n{'='*60}")
-                    print(f"✅ COMPRA CONSOLIDADA COMPLETADA")
-                    print(f"   Materiales comprados: {materiales_comprados}")
-                    print(f"   Total invertido: ${total_invertido}")
-                    if errores:
-                        print(f"⚠️  ERRORES: {len(errores)}")
-                        for error in errores:
-                            print(f"   - {error}")
-                    print(f"{'='*60}\n")
-                    
-                    if materiales_comprados > 0:
-                        # Verificar si alguna lista ahora está completa
-                        listas_reabastecidas = []
-                        listas_afectadas = ListaProduccion.objects.filter(
-                            id__in=listas_ids,
-                            usuario_creador=request.user
-                        )
-                        
-                        for lista in listas_afectadas:
-                            materiales_faltantes = lista.resumen_materiales.filter(
-                                cantidad_faltante__gt=0
-                            ).count()
-                            
-                            if materiales_faltantes == 0 and lista.estado in ['pendiente_compra', 'comprado']:
-                                lista.estado = 'reabastecido'
-                                lista.save()
-                                listas_reabastecidas.append(lista.nombre)
-                        
-                        mensaje_base = f'✅ Compra consolidada registrada: {materiales_comprados} material(es) por ${total_invertido:.2f}'
-                        if listas_reabastecidas:
-                            mensaje_base += f' | 🎉 Lista(s) REABASTECIDA(S): {", ".join(listas_reabastecidas)}'
-                        
-                        messages.success(request, mensaje_base)
-                        
-                        # Mostrar errores si los hubo
-                        if errores:
-                            for error in errores:
-                                messages.warning(request, f"⚠️ {error}")
-                    else:
-                        messages.warning(request, '⚠️ No se registró ninguna compra. Verifique los datos ingresados.')
-                        if errores:
-                            for error in errores:
-                                messages.error(request, f"❌ {error}")
-            
-            except Exception as e:
-                messages.error(request, f'❌ Error al procesar la compra: {str(e)}')
-                print(f"❌ Error crítico: {str(e)}")
-                import traceback
-                traceback.print_exc()
+    # Calcular información de materiales faltantes para cada lista
+    for lista in listas_pendientes:
+        materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
+        lista.total_materiales_faltantes = materiales_faltantes.count()
+        lista.materiales_faltantes_lista = materiales_faltantes
     
     context = {
-        'listas_disponibles': listas_disponibles,
-        'listas_seleccionadas': listas_seleccionadas,
-        'materiales_consolidados': materiales_consolidados,
-        'costo_total': costo_total,
-        'titulo': 'Lista de Compras Consolidada'
+        'listas_pendientes': listas_pendientes,
+        'titulo': 'Listas Pendientes de Compra - Paso 2'
     }
     
     return render(request, 'inventario/lista_de_compras.html', context)
