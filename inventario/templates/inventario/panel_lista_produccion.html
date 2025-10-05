@@ -217,8 +217,10 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <strong>{{ detalle.monos.nombre }}</strong>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <br>
                                             <small class="text-muted">Precio: ${{ detalle.monos.precio_venta|floatformat:2 }}</small>
+                                            {% endif %}
                                         </div>
                                         <div class="text-end">
                                             <span class="badge bg-success">{{ detalle.cantidad_total_planificada }} disponibles</span>
@@ -293,11 +295,13 @@
                         <strong>Moños Planificados:</strong><br>
                         {{ lista.total_moños_planificados }} unidades
                     </p>
+                    {% if user.userprofile.puede_ver_precios %}
                     {% if lista.ganancia_estimada %}
                         <p class="mb-0">
                             <strong>Ganancia Estimada:</strong><br>
                             <span class="text-success fs-5">${{ lista.ganancia_estimada|floatformat:2 }}</span>
                         </p>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>

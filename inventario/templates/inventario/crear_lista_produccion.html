@@ -187,10 +187,12 @@
                                                 <strong>Tipos de Moños:</strong>
                                                 <div class="h4 text-info" id="tipos-monos">0</div>
                                             </div>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <div class="col-md-3">
                                                 <strong>Ganancia Estimada:</strong>
                                                 <div class="h4 text-success" id="ganancia-estimada">$0.00</div>
                                             </div>
+                                            {% endif %}
                                             <div class="col-md-3">
                                                 <strong>Estado:</strong>
                                                 <div class="h6 text-muted">Borrador</div>

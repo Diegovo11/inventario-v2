@@ -66,8 +66,10 @@
                                         <th>Tipo Venta</th>
                                         <th>Cantidad</th>
                                         <th>Total Moños</th>
+                                        {% if user.userprofile.puede_ver_precios %}
                                         <th>Precio Unit.</th>
                                         <th>Total Estimado</th>
+                                        {% endif %}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -87,10 +89,12 @@
                                                 <strong>{{ detalle.cantidad_total_planificada }}</strong>
                                                 <br><small class="text-muted">{{ detalle.tipo_venta_display }}</small>
                                             </td>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <td>${{ detalle.monos.precio_venta|floatformat:2 }}</td>
                                             <td class="text-success">
                                                 <strong>${{ detalle.total_estimado|floatformat:2 }}</strong>
                                             </td>
+                                            {% endif %}
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -120,10 +124,12 @@
                     <p><strong>Creado:</strong> {{ lista.fecha_creacion|date:"d/m/Y H:i" }}</p>
                     <p><strong>Estado:</strong> {{ lista.get_estado_display }}</p>
                     
+                    {% if user.userprofile.puede_ver_precios %}
                     {% if lista.ganancia_estimada %}
                         <hr>
                         <p><strong>Ganancia Estimada:</strong></p>
                         <h4 class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</h4>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>

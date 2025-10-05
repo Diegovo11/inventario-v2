@@ -38,10 +38,12 @@
                                 <div class="col-md-6">
                                     <p><strong>Moños planificados:</strong> {{ lista.total_moños_planificados }}</p>
                                     <p><strong>Tipos de moños:</strong> {{ lista.detalles_monos.count }}</p>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     {% if lista.ganancia_estimada %}
                                         <p><strong>Ganancia estimada:</strong> 
                                             <span class="text-success">${{ lista.ganancia_estimada|floatformat:2 }}</span>
                                         </p>
+                                    {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
