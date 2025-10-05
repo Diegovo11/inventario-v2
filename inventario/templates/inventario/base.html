@@ -254,7 +254,7 @@
                             </a>
                         </li>
                         
-                        <!-- 6 Pasos del Proceso -->
+                        <!-- 7 Pasos del Proceso -->
                         <li class="nav-item ps-3">
                             <small class="text-muted d-block ps-3 mt-2 mb-1">Pasos del Proceso:</small>
                         </li>
@@ -283,20 +283,27 @@
                         <li class="nav-item">
                             <a class="nav-link py-2 {% if request.resolver_match.url_name == 'reabastecimiento' %}active{% endif %}" href="{% url 'inventario:reabastecimiento' %}">
                                 <span class="badge bg-success me-2">4</span>
-                                <small>Iniciar Producción</small>
+                                <small>Materiales Listos</small>
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link py-2" href="#" title="Disponible en el panel de cada lista">
+                                <span class="badge bg-primary me-2">5</span>
+                                <small>Produciendo</small>
                             </a>
                         </li>
                         
                         <li class="nav-item">
                             <a class="nav-link py-2 {% if request.resolver_match.url_name == 'lista_en_salida' %}active{% endif %}" href="{% url 'inventario:lista_en_salida' %}">
-                                <span class="badge bg-primary me-2">5</span>
+                                <span class="badge bg-dark me-2">6</span>
                                 <small>Salida y Ventas</small>
                             </a>
                         </li>
                         
                         <li class="nav-item">
                             <a class="nav-link py-2" href="{% url 'inventario:listas_produccion' %}?ver=finalizadas" title="Ver listas completadas">
-                                <span class="badge bg-success me-2">6</span>
+                                <span class="badge bg-success me-2">7</span>
                                 <small>Completadas</small>
                             </a>
                         </li>

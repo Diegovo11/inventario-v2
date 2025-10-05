@@ -467,6 +467,7 @@ class ListaProduccion(models.Model):
         ('pendiente_compra', 'Pendiente de Compra'),
         ('comprado', 'Materiales Comprados'),
         ('reabastecido', 'Inventario Reabastecido'),
+        ('en_produccion', 'En Producción'),
         ('en_salida', 'Lista en Salida'),
         ('finalizado', 'Finalizado'),
     ]
