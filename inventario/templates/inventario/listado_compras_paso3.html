@@ -1,0 +1,173 @@
+{% extends 'inventario/base.html' %}
+
+{% block title %}{{ titulo }} - Inventario{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lista-card {
+        border: 2px solid #e9ecef;
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .lista-card:hover {
+        border-color: #17a2b8;
+        box-shadow: 0 0.5rem 1rem rgba(23, 162, 184, 0.15);
+        transform: translateY(-3px);
+    }
+    
+    .material-chip {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        margin: 0.25rem;
+        border-radius: 1rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        font-size: 0.875rem;
+    }
+    
+    .material-chip .cantidad-faltante {
+        font-weight: 700;
+        color: #dc3545;
+    }
+    
+    .sin-listas {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <span class="badge rounded-pill bg-info text-dark me-2" style="font-size: 1rem;">3</span>
+                    <i class="fas fa-clipboard-check me-2"></i>
+                    {{ titulo }}
+                </h1>
+                <div class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Registra las cantidades que compraste
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            {% if listas_compradas %}
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    <strong>Instrucciones:</strong> Selecciona una lista y registra las cantidades que realmente compraste.
+                    El sistema actualizará tu inventario automáticamente. Si completaste todas las compras de una lista, 
+                    pasará automáticamente al Paso 4 (Reabastecido).
+                </div>
+
+                <div class="row">
+                    {% for lista in listas_compradas %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="lista-card p-4 h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-clipboard-list text-info me-2"></i>
+                                        {{ lista.nombre }}
+                                    </h5>
+                                    <span class="badge bg-info text-dark">Paso 3</span>
+                                </div>
+
+                                {% if lista.descripcion %}
+                                    <p class="text-muted small mb-3">{{ lista.descripcion }}</p>
+                                {% endif %}
+
+                                <div class="mb-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Creada: {{ lista.fecha_creacion|date:"d/m/Y H:i" }}
+                                    </small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">
+                                        <i class="fas fa-gift me-1"></i>
+                                        Moños en esta lista:
+                                    </h6>
+                                    {% for detalle in lista.detalles_monos.all %}
+                                        <span class="badge bg-secondary me-1 mb-1">
+                                            {{ detalle.monos.nombre }} ({{ detalle.cantidad }})
+                                        </span>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="mb-4">
+                                    <h6 class="small text-muted mb-2">
+                                        <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                                        Materiales que faltan ({{ lista.total_materiales_faltantes }}):
+                                    </h6>
+                                    <div style="max-height: 150px; overflow-y: auto;">
+                                        {% for resumen in lista.materiales_faltantes_lista %}
+                                            <div class="material-chip">
+                                                {{ resumen.material.nombre }}:
+                                                <span class="cantidad-faltante">
+                                                    {% widthratio resumen.cantidad_faltante resumen.material.factor_conversion 1 %}
+                                                    {{ resumen.material.get_tipo_material_display }}{% if resumen.cantidad_faltante|divisibleby:resumen.material.factor_conversion %}{% else %}s{% endif %}
+                                                </span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'inventario:verificar_compras' lista.id %}" 
+                                       class="btn btn-info">
+                                        <i class="fas fa-clipboard-check me-2"></i>
+                                        Registrar Compras
+                                    </a>
+                                    <a href="{% url 'inventario:panel_lista_produccion' lista.id %}" 
+                                       class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-eye me-1"></i>
+                                        Ver Panel Completo
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="sin-listas">
+                    <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                    <h4>¡No hay listas pendientes de registrar compras!</h4>
+                    <p>Todas tus compras han sido registradas correctamente.</p>
+                    <div class="mt-4">
+                        <a href="{% url 'inventario:lista_de_compras' %}" class="btn btn-warning me-2">
+                            <i class="fas fa-shopping-list me-1"></i>
+                            Ir al Paso 2 (Compras)
+                        </a>
+                        <a href="{% url 'inventario:listado_listas_produccion' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list me-1"></i>
+                            Ver Todas las Listas
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

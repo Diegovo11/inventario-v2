@@ -47,6 +47,7 @@ urlpatterns = [
     path('lista-produccion/<int:lista_id>/registrar-salida-materiales/', views.registrar_salida_materiales, name='registrar_salida_materiales'),
     path('lista-produccion/<int:lista_id>/registrar-ventas/', views.registrar_ventas_contaduria, name='registrar_ventas_contaduria'),
     path('lista-compras/', views.lista_de_compras, name='lista_de_compras'),
+    path('listado-compras-paso3/', views.listado_compras_paso3, name='listado_compras_paso3'),
     path('compra-productos/', views.compra_productos, name='compra_productos'),
     path('reabastecimiento/', views.reabastecimiento, name='reabastecimiento'),
     path('lista-en-salida/', views.lista_en_salida, name='lista_en_salida'),

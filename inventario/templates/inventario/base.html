@@ -274,7 +274,7 @@
                         </li>
                         
                         <li class="nav-item">
-                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'compra_productos' %}active{% endif %}" href="{% url 'inventario:compra_productos' %}">
+                            <a class="nav-link py-2 {% if request.resolver_match.url_name == 'listado_compras_paso3' or request.resolver_match.url_name == 'verificar_compras' %}active{% endif %}" href="{% url 'inventario:listado_compras_paso3' %}">
                                 <span class="badge bg-info me-2">3</span>
                                 <small>Registrar Compras</small>
                             </a>

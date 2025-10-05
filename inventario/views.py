@@ -1010,10 +1010,10 @@ def verificar_compras(request, lista_id):
     
     lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
     
-    # Solo disponible para listas en estado 'pendiente_compra'
-    if lista.estado != 'pendiente_compra':
-        messages.warning(request, f'La lista "{lista.nombre}" ya pasó por verificación de compras.')
-        return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+    # Solo disponible para listas en estado 'comprado' (Paso 3)
+    if lista.estado != 'comprado':
+        messages.warning(request, f'La lista "{lista.nombre}" no está en Paso 3 (Comprado).')
+        return redirect('inventario:listado_compras_paso3')
     
     materiales_necesarios = lista.resumen_materiales.filter(cantidad_faltante__gt=0).select_related('material')
     
@@ -1069,23 +1069,26 @@ def verificar_compras(request, lista_id):
                     continue
             
             if materiales_registrados > 0:
-                # Cambiar estado a 'comprado'
-                lista.estado = 'comprado'
-                lista.save()
-                
-                messages.success(
-                    request,
-                    f'✅ Compras registradas: {materiales_registrados} material(es) agregados al inventario.'
-                )
-                
                 # Verificar si ya se cubrieron todos los materiales
                 materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+                
                 if materiales_aun_faltantes == 0:
+                    # Todos los materiales están listos, mover a Paso 4
                     lista.estado = 'reabastecido'
                     lista.save()
-                    messages.info(request, '🎉 Todos los materiales están listos. Lista movida a "Reabastecido".')
+                    messages.success(
+                        request,
+                        f'✅ Compras de "{lista.nombre}" registradas: {materiales_registrados} material(es). 🎉 Lista enviada al Paso 4 (Reabastecido).'
+                    )
+                else:
+                    # Aún faltan materiales
+                    messages.success(
+                        request,
+                        f'✅ Compras de "{lista.nombre}" registradas: {materiales_registrados} material(es). Aún faltan {materiales_aun_faltantes} material(es).'
+                    )
                 
-                return redirect('inventario:detalle_lista_produccion', lista_id=lista.id)
+                # Redirigir de vuelta al listado del Paso 3 para que pueda registrar otras listas
+                return redirect('inventario:listado_compras_paso3')
             else:
                 messages.warning(request, 'No se registró ninguna compra. Ingresa las cantidades.')
         
@@ -1334,6 +1337,30 @@ def lista_de_compras(request):
     }
     
     return render(request, 'inventario/lista_de_compras.html', context)
+
+
+@login_required
+def listado_compras_paso3(request):
+    """Vista para mostrar listas en Paso 3 (comprado) para registrar compras"""
+    
+    # Obtener listas en estado comprado (Paso 3)
+    listas_compradas = ListaProduccion.objects.filter(
+        usuario_creador=request.user,
+        estado='comprado'
+    ).prefetch_related('detalles_monos__monos', 'resumen_materiales__material').order_by('-fecha_creacion')
+    
+    # Calcular información de materiales faltantes para cada lista
+    for lista in listas_compradas:
+        materiales_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0)
+        lista.total_materiales_faltantes = materiales_faltantes.count()
+        lista.materiales_faltantes_lista = materiales_faltantes
+    
+    context = {
+        'listas_compradas': listas_compradas,
+        'titulo': 'Registrar Compras - Paso 3'
+    }
+    
+    return render(request, 'inventario/listado_compras_paso3.html', context)
 
 
 def consolidar_materiales_listas(listas_produccion):
