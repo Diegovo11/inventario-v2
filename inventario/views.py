@@ -3595,7 +3595,7 @@ def lista_en_salida(request):
     listas_en_salida = ListaProduccion.objects.filter(
         usuario_creador=request.user,
         estado='en_salida'
-    ).prefetch_related('detalles_monos__monos').order_by('-fecha_actualizacion')
+    ).prefetch_related('detalles_monos__monos').order_by('-fecha_modificacion')
     
     context = {
         'listas_en_salida': listas_en_salida,
