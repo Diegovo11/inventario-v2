@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 from .models import Material, Monos, RecetaMonos, ListaProduccion, VentaMonos, MovimientoEfectivo
 from django.db.models import Sum, Count
 
@@ -346,3 +347,127 @@ def diagnostico_ventas_web(request):
     }
     
     return render(request, 'inventario/diagnostico_ventas.html', context)
+
+
+@login_required
+@user_passes_test(es_superuser)
+def migrar_ventas_antiguas_web(request):
+    """Vista web para migrar ventas antiguas de MovimientoEfectivo a VentaMonos"""
+    
+    resultado = {
+        'ejecutado': False,
+        'dry_run': True,
+        'ventas_creadas': 0,
+        'ventas_ya_existen': 0,
+        'errores': 0,
+        'detalles': [],
+        'errores_detalle': []
+    }
+    
+    if request.method == 'POST':
+        dry_run = request.POST.get('dry_run') == 'true'
+        resultado['dry_run'] = dry_run
+        resultado['ejecutado'] = True
+        
+        # Buscar MovimientoEfectivo de ventas
+        movimientos_venta = MovimientoEfectivo.objects.filter(
+            tipo_movimiento='ingreso',
+            categoria='venta'
+        ).order_by('fecha')
+        
+        for mov in movimientos_venta:
+            try:
+                if 'Lista:' in mov.concepto:
+                    nombre_lista = mov.concepto.split('Lista:')[1].strip()
+                    
+                    detalle_mov = {
+                        'concepto': mov.concepto,
+                        'fecha': mov.fecha,
+                        'monto': mov.monto,
+                        'lista': nombre_lista,
+                        'ventas_creadas': []
+                    }
+                    
+                    try:
+                        lista = ListaProduccion.objects.get(nombre=nombre_lista)
+                        
+                        # Verificar si ya existen ventas
+                        ventas_existentes = VentaMonos.objects.filter(lista_produccion=lista)
+                        
+                        if ventas_existentes.exists():
+                            detalle_mov['estado'] = 'ya_existe'
+                            detalle_mov['mensaje'] = f'Ya existen {ventas_existentes.count()} ventas'
+                            resultado['ventas_ya_existen'] += ventas_existentes.count()
+                            resultado['detalles'].append(detalle_mov)
+                            continue
+                        
+                        # Obtener detalles de moños
+                        detalles = lista.detalles_monos.all()
+                        ventas_para_crear = []
+                        
+                        for detalle in detalles:
+                            if detalle.cantidad_producida > 0:
+                                cantidad_vendida = detalle.cantidad_producida
+                                mono = detalle.monos
+                                precio_unitario = mono.precio_venta
+                                ingreso_total = Decimal(cantidad_vendida) * precio_unitario
+                                costo_unitario = mono.costo_produccion
+                                ganancia_total = ingreso_total - (costo_unitario * cantidad_vendida)
+                                
+                                venta_dict = {
+                                    'mono': mono.nombre,
+                                    'cantidad': cantidad_vendida,
+                                    'tipo': mono.tipo_venta,
+                                    'ingreso': float(ingreso_total),
+                                    'ganancia': float(ganancia_total)
+                                }
+                                
+                                if not dry_run:
+                                    venta = VentaMonos.objects.create(
+                                        lista_produccion=lista,
+                                        monos=mono,
+                                        cantidad_vendida=cantidad_vendida,
+                                        tipo_venta=mono.tipo_venta,
+                                        precio_unitario=precio_unitario,
+                                        ingreso_total=ingreso_total,
+                                        costo_unitario=costo_unitario,
+                                        ganancia_total=ganancia_total,
+                                        fecha=mov.fecha,
+                                        usuario=mov.usuario
+                                    )
+                                
+                                ventas_para_crear.append(venta_dict)
+                                resultado['ventas_creadas'] += 1
+                        
+                        if ventas_para_crear:
+                            detalle_mov['estado'] = 'creadas' if not dry_run else 'simuladas'
+                            detalle_mov['ventas_creadas'] = ventas_para_crear
+                            detalle_mov['mensaje'] = f'{"Creadas" if not dry_run else "Se crearían"} {len(ventas_para_crear)} ventas'
+                        else:
+                            detalle_mov['estado'] = 'sin_datos'
+                            detalle_mov['mensaje'] = 'No hay detalles con cantidad_producida > 0'
+                        
+                        resultado['detalles'].append(detalle_mov)
+                        
+                    except ListaProduccion.DoesNotExist:
+                        error = {
+                            'concepto': mov.concepto,
+                            'error': f'Lista "{nombre_lista}" no encontrada'
+                        }
+                        resultado['errores_detalle'].append(error)
+                        resultado['errores'] += 1
+                        
+            except Exception as e:
+                error = {
+                    'concepto': mov.concepto,
+                    'error': str(e)
+                }
+                resultado['errores_detalle'].append(error)
+                resultado['errores'] += 1
+    
+    context = {
+        'resultado': resultado,
+        'titulo': 'Migrar Ventas Antiguas'
+    }
+    
+    return render(request, 'inventario/migrar_ventas_antiguas.html', context)
