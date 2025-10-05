@@ -128,7 +128,7 @@
                         
                         <p>Ve a <strong>"Registrar Compras"</strong> e ingresa cuántos paquetes o rollos compraste de cada material.</p>
                         
-                        {% if lista.resumen_materiales.filter.cantidad_faltante__gt=0.count == 0 %}
+                        {% if materiales_aun_faltantes == 0 %}
                             <div class="alert alert-success">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Todas las compras fueron registradas. Puedes continuar al siguiente paso.

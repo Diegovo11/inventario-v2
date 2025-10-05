@@ -4001,6 +4001,9 @@ def panel_lista_produccion(request, lista_id):
             'icono': 'fas fa-dollar-sign'
         }
     
+    # Verificar si aún quedan materiales faltantes (para paso 3)
+    materiales_aun_faltantes = lista.resumen_materiales.filter(cantidad_faltante__gt=0).count()
+    
     context = {
         'titulo': f'Panel de Gestión - {lista.nombre}',
         'lista': lista,
@@ -4009,6 +4012,7 @@ def panel_lista_produccion(request, lista_id):
         'detalles_monos': detalles_monos,
         'materiales_necesarios': materiales_necesarios,
         'materiales_faltantes': materiales_faltantes,
+        'materiales_aun_faltantes': materiales_aun_faltantes,
         'accion_siguiente': accion_siguiente,
     }
     
