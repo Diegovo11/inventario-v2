@@ -2,7 +2,7 @@ from django.urls import path
 from . import views
 from .views_contaduria import contaduria_home, flujo_efectivo, registrar_movimiento_efectivo, estado_resultados, exportar_excel_efectivo
 from . import views_analytics
-from .views_debug import verificar_unidades_web, simular_descuento_lista
+from .views_debug import verificar_unidades_web, simular_descuento_lista, diagnostico_ventas_web
 
 app_name = 'inventario'
 
@@ -85,6 +85,7 @@ urlpatterns = [
     # DEBUG - Vista temporal para verificar unidades
     path('debug/verificar-unidades/', verificar_unidades_web, name='verificar_unidades_web'),
     path('debug/simular-descuento/<int:lista_id>/', simular_descuento_lista, name='simular_descuento_lista'),
+    path('debug/diagnostico-ventas/', diagnostico_ventas_web, name='diagnostico_ventas_web'),
     
     # AJAX
     path('api/monos/<int:monos_id>/', views.get_monos_info, name='get_monos_info'),

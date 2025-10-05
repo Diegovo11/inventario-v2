@@ -1,6 +1,11 @@
 from django.http import HttpResponse, JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
-from .models import Material, Monos, RecetaMonos, ListaProduccion
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.shortcuts import render
+from django.utils import timezone
+from datetime import timedelta
+from .models import Material, Monos, RecetaMonos, ListaProduccion, VentaMonos, MovimientoEfectivo
+from django.db.models import Sum, Count
 
 @staff_member_required
 def verificar_unidades_web(request):
@@ -166,3 +171,178 @@ def simular_descuento_lista(request, lista_id):
         resultado['detalles'].append(detalle_info)
     
     return JsonResponse(resultado, json_dumps_params={'indent': 2})
+
+
+def es_superuser(user):
+    return user.is_superuser
+
+
+@login_required
+@user_passes_test(es_superuser)
+def diagnostico_ventas_web(request):
+    """Vista web para diagnóstico del sistema de ventas"""
+    
+    diagnostico = {
+        'ventas': {},
+        'listas': {},
+        'movimientos': {},
+        'monos': {},
+        'analytics': {},
+        'migraciones': {},
+        'resumen': {}
+    }
+    
+    # 1. Verificar VentaMonos
+    try:
+        total_ventas = VentaMonos.objects.count()
+        diagnostico['ventas']['total'] = total_ventas
+        diagnostico['ventas']['existe_tabla'] = True
+        
+        if total_ventas > 0:
+            ultimas = VentaMonos.objects.select_related('monos', 'lista_produccion').order_by('-fecha')[:5]
+            diagnostico['ventas']['ultimas'] = [{
+                'mono': v.monos.nombre,
+                'cantidad': v.cantidad_vendida,
+                'tipo': v.tipo_venta,
+                'fecha': v.fecha,
+                'ingreso': v.ingreso_total,
+                'ganancia': v.ganancia_total,
+                'lista': v.lista_produccion.nombre if v.lista_produccion else 'Sin lista'
+            } for v in ultimas]
+        else:
+            diagnostico['ventas']['ultimas'] = []
+            
+    except Exception as e:
+        diagnostico['ventas']['error'] = str(e)
+        diagnostico['ventas']['existe_tabla'] = False
+    
+    # 2. Verificar listas finalizadas
+    try:
+        listas_finalizadas = ListaProduccion.objects.filter(estado='finalizado')
+        diagnostico['listas']['total_finalizadas'] = listas_finalizadas.count()
+        
+        if listas_finalizadas.exists():
+            diagnostico['listas']['detalles'] = []
+            for lista in listas_finalizadas[:10]:
+                ventas_lista = VentaMonos.objects.filter(lista_produccion=lista).count()
+                diagnostico['listas']['detalles'].append({
+                    'nombre': lista.nombre,
+                    'fecha': lista.fecha_modificacion,
+                    'ventas_asociadas': ventas_lista,
+                    'tiene_ventas': ventas_lista > 0
+                })
+    except Exception as e:
+        diagnostico['listas']['error'] = str(e)
+    
+    # 3. Verificar MovimientoEfectivo de ventas
+    try:
+        movimientos_venta = MovimientoEfectivo.objects.filter(
+            tipo_movimiento='ingreso',
+            categoria='venta'
+        ).order_by('-fecha')
+        
+        diagnostico['movimientos']['total'] = movimientos_venta.count()
+        
+        if movimientos_venta.exists():
+            diagnostico['movimientos']['ultimos'] = [{
+                'concepto': m.concepto,
+                'fecha': m.fecha,
+                'monto': m.monto
+            } for m in movimientos_venta[:5]]
+    except Exception as e:
+        diagnostico['movimientos']['error'] = str(e)
+    
+    # 4. Verificar moños disponibles
+    try:
+        monos = Monos.objects.filter(activo=True)
+        diagnostico['monos']['total_activos'] = monos.count()
+        diagnostico['monos']['detalles'] = []
+        
+        for mono in monos:
+            ventas_mono = VentaMonos.objects.filter(monos=mono).count()
+            diagnostico['monos']['detalles'].append({
+                'nombre': mono.nombre,
+                'tipo': mono.tipo_venta,
+                'ventas': ventas_mono
+            })
+    except Exception as e:
+        diagnostico['monos']['error'] = str(e)
+    
+    # 5. Verificar datos para analytics (últimos 12 meses)
+    try:
+        fecha_fin = timezone.now()
+        fecha_inicio = fecha_fin - timedelta(days=365)
+        
+        ventas_en_rango = VentaMonos.objects.filter(
+            fecha__gte=fecha_inicio,
+            fecha__lte=fecha_fin
+        )
+        
+        diagnostico['analytics']['fecha_inicio'] = fecha_inicio
+        diagnostico['analytics']['fecha_fin'] = fecha_fin
+        diagnostico['analytics']['total_ventas'] = ventas_en_rango.count()
+        
+        if ventas_en_rango.exists():
+            stats = ventas_en_rango.values('monos__nombre').annotate(
+                total_cantidad=Sum('cantidad_vendida'),
+                total_ingresos=Sum('ingreso_total'),
+                total_ganancia=Sum('ganancia_total'),
+                num_ventas=Count('id')
+            ).order_by('-total_cantidad')
+            
+            diagnostico['analytics']['estadisticas'] = [{
+                'mono': s['monos__nombre'],
+                'cantidad': s['total_cantidad'],
+                'ingresos': s['total_ingresos'],
+                'ganancia': s['total_ganancia'],
+                'num_ventas': s['num_ventas']
+            } for s in stats]
+        else:
+            diagnostico['analytics']['estadisticas'] = []
+            
+    except Exception as e:
+        diagnostico['analytics']['error'] = str(e)
+    
+    # 6. Verificar migraciones
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT name, applied FROM django_migrations WHERE app='inventario' ORDER BY applied DESC LIMIT 10")
+            migraciones = cursor.fetchall()
+            
+        diagnostico['migraciones']['ultimas'] = [{
+            'nombre': m[0],
+            'fecha': m[1],
+            'es_ventamonos': '0008_ventamonos' in m[0]
+        } for m in migraciones]
+        
+    except Exception as e:
+        diagnostico['migraciones']['error'] = str(e)
+    
+    # 7. Generar resumen
+    total_ventas_obj = diagnostico['ventas'].get('total', 0)
+    
+    if total_ventas_obj == 0:
+        diagnostico['resumen']['estado'] = 'sin_ventas'
+        diagnostico['resumen']['mensaje'] = 'No hay ventas registradas en VentaMonos'
+        diagnostico['resumen']['causas'] = [
+            'Las ventas se registraron ANTES de aplicar la migración 0008_ventamonos',
+            'Las ventas se registraron pero hubo un error al crear VentaMonos',
+            'Aún no se han registrado ventas después del último deploy'
+        ]
+        diagnostico['resumen']['solucion'] = 'Registra una venta de prueba desde el Paso 6'
+    elif diagnostico['analytics'].get('total_ventas', 0) == 0:
+        diagnostico['resumen']['estado'] = 'ventas_fuera_rango'
+        diagnostico['resumen']['mensaje'] = f'Hay {total_ventas_obj} ventas pero fuera del rango de fechas de analytics'
+        diagnostico['resumen']['solucion'] = 'Verifica las fechas de las ventas o selecciona "Todo" en el periodo de analytics'
+    else:
+        diagnostico['resumen']['estado'] = 'correcto'
+        diagnostico['resumen']['mensaje'] = f'✅ Sistema funcionando correctamente con {total_ventas_obj} ventas'
+        diagnostico['resumen']['solucion'] = 'Analytics debería mostrar estos datos correctamente'
+    
+    context = {
+        'diagnostico': diagnostico,
+        'titulo': 'Diagnóstico del Sistema de Ventas'
+    }
+    
+    return render(request, 'inventario/diagnostico_ventas.html', context)

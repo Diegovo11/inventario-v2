@@ -1,0 +1,304 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fas fa-bug"></i> {{ titulo }}</h3>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- RESUMEN -->
+                    <div class="alert {% if diagnostico.resumen.estado == 'correcto' %}alert-success{% elif diagnostico.resumen.estado == 'sin_ventas' %}alert-warning{% else %}alert-info{% endif %}" role="alert">
+                        <h4 class="alert-heading">
+                            {% if diagnostico.resumen.estado == 'correcto' %}
+                                <i class="fas fa-check-circle"></i> Sistema Funcionando
+                            {% elif diagnostico.resumen.estado == 'sin_ventas' %}
+                                <i class="fas fa-exclamation-triangle"></i> Sin Ventas Registradas
+                            {% else %}
+                                <i class="fas fa-info-circle"></i> Ventas Fuera de Rango
+                            {% endif %}
+                        </h4>
+                        <p class="mb-2"><strong>{{ diagnostico.resumen.mensaje }}</strong></p>
+                        
+                        {% if diagnostico.resumen.causas %}
+                        <hr>
+                        <p class="mb-1"><strong>Posibles causas:</strong></p>
+                        <ul class="mb-2">
+                            {% for causa in diagnostico.resumen.causas %}
+                            <li>{{ causa }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        
+                        <p class="mb-0"><strong>💡 Solución:</strong> {{ diagnostico.resumen.solucion }}</p>
+                    </div>
+
+                    <!-- 1. VENTAS EN VENTAMONOS -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">1. Tabla VentaMonos</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.ventas.error %}
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-times-circle"></i> Error: {{ diagnostico.ventas.error }}
+                                </div>
+                            {% else %}
+                                <p><strong>Existe tabla:</strong> 
+                                    {% if diagnostico.ventas.existe_tabla %}
+                                        <span class="badge bg-success">Sí</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">No</span>
+                                    {% endif %}
+                                </p>
+                                <p><strong>Total ventas:</strong> {{ diagnostico.ventas.total }}</p>
+                                
+                                {% if diagnostico.ventas.ultimas %}
+                                <h6 class="mt-3">Últimas 5 ventas:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Moño</th>
+                                                <th>Cantidad</th>
+                                                <th>Tipo</th>
+                                                <th>Fecha</th>
+                                                <th>Ingreso</th>
+                                                <th>Ganancia</th>
+                                                <th>Lista</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for venta in diagnostico.ventas.ultimas %}
+                                            <tr>
+                                                <td>{{ venta.mono }}</td>
+                                                <td>{{ venta.cantidad }}</td>
+                                                <td><span class="badge bg-primary">{{ venta.tipo }}</span></td>
+                                                <td>{{ venta.fecha|date:"Y-m-d H:i" }}</td>
+                                                <td>${{ venta.ingreso|floatformat:2 }}</td>
+                                                <td>${{ venta.ganancia|floatformat:2 }}</td>
+                                                <td>{{ venta.lista }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> No hay ventas registradas</p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 2. LISTAS FINALIZADAS -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">2. Listas Finalizadas</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.listas.error %}
+                                <div class="alert alert-danger">Error: {{ diagnostico.listas.error }}</div>
+                            {% else %}
+                                <p><strong>Total listas finalizadas:</strong> {{ diagnostico.listas.total_finalizadas }}</p>
+                                
+                                {% if diagnostico.listas.detalles %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Lista</th>
+                                                <th>Fecha Modificación</th>
+                                                <th>Ventas Asociadas</th>
+                                                <th>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for lista in diagnostico.listas.detalles %}
+                                            <tr>
+                                                <td>{{ lista.nombre }}</td>
+                                                <td>{{ lista.fecha|date:"Y-m-d H:i" }}</td>
+                                                <td>{{ lista.ventas_asociadas }}</td>
+                                                <td>
+                                                    {% if lista.tiene_ventas %}
+                                                        <span class="badge bg-success">Con ventas</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Sin ventas</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 3. MOVIMIENTOS DE EFECTIVO -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">3. MovimientoEfectivo (Ventas)</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.movimientos.error %}
+                                <div class="alert alert-danger">Error: {{ diagnostico.movimientos.error }}</div>
+                            {% else %}
+                                <p><strong>Total movimientos de venta:</strong> {{ diagnostico.movimientos.total }}</p>
+                                
+                                {% if diagnostico.movimientos.ultimos %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Concepto</th>
+                                                <th>Fecha</th>
+                                                <th>Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for mov in diagnostico.movimientos.ultimos %}
+                                            <tr>
+                                                <td>{{ mov.concepto }}</td>
+                                                <td>{{ mov.fecha|date:"Y-m-d H:i" }}</td>
+                                                <td>${{ mov.monto|floatformat:2 }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 4. MOÑOS -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">4. Moños Disponibles</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.monos.error %}
+                                <div class="alert alert-danger">Error: {{ diagnostico.monos.error }}</div>
+                            {% else %}
+                                <p><strong>Total moños activos:</strong> {{ diagnostico.monos.total_activos }}</p>
+                                
+                                {% if diagnostico.monos.detalles %}
+                                <div class="row">
+                                    {% for mono in diagnostico.monos.detalles %}
+                                    <div class="col-md-4 mb-2">
+                                        <div class="card">
+                                            <div class="card-body p-2">
+                                                <strong>{{ mono.nombre }}</strong><br>
+                                                <small>Tipo: {{ mono.tipo }}</small><br>
+                                                <small>Ventas: <strong>{{ mono.ventas }}</strong></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 5. ANALYTICS -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">5. Datos para Analytics (Últimos 12 meses)</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.analytics.error %}
+                                <div class="alert alert-danger">Error: {{ diagnostico.analytics.error }}</div>
+                            {% else %}
+                                <p><strong>Rango:</strong> {{ diagnostico.analytics.fecha_inicio|date:"Y-m-d" }} a {{ diagnostico.analytics.fecha_fin|date:"Y-m-d" }}</p>
+                                <p><strong>Ventas en rango:</strong> {{ diagnostico.analytics.total_ventas }}</p>
+                                
+                                {% if diagnostico.analytics.estadisticas %}
+                                <h6 class="mt-3">Estadísticas por moño:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Moño</th>
+                                                <th>Cantidad</th>
+                                                <th>Ingresos</th>
+                                                <th>Ganancia</th>
+                                                <th># Ventas</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for stat in diagnostico.analytics.estadisticas %}
+                                            <tr>
+                                                <td><strong>{{ stat.mono }}</strong></td>
+                                                <td>{{ stat.cantidad }}</td>
+                                                <td>${{ stat.ingresos|floatformat:2 }}</td>
+                                                <td>${{ stat.ganancia|floatformat:2 }}</td>
+                                                <td>{{ stat.num_ventas }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="alert alert-success mt-3">
+                                    <i class="fas fa-check-circle"></i> <strong>Estos datos deberían aparecer en Analytics</strong>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> No hay ventas en los últimos 12 meses. Por eso analytics aparece vacío.
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 6. MIGRACIONES -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0">6. Migraciones Aplicadas</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if diagnostico.migraciones.error %}
+                                <div class="alert alert-danger">Error: {{ diagnostico.migraciones.error }}</div>
+                            {% else %}
+                                <p><strong>Últimas 10 migraciones:</strong></p>
+                                <ul class="list-group">
+                                    {% for mig in diagnostico.migraciones.ultimas %}
+                                    <li class="list-group-item {% if mig.es_ventamonos %}list-group-item-success{% endif %}">
+                                        {{ mig.nombre }}
+                                        {% if mig.es_ventamonos %}
+                                            <span class="badge bg-success float-end">✓ Migración VentaMonos</span>
+                                        {% endif %}
+                                        <br><small class="text-muted">{{ mig.fecha|date:"Y-m-d H:i:s" }}</small>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- ACCIONES -->
+                    <div class="mt-4">
+                        <a href="{% url 'inventario:analytics_dashboard' %}" class="btn btn-primary">
+                            <i class="fas fa-chart-line"></i> Ir a Analytics
+                        </a>
+                        <a href="{% url 'inventario:listas_produccion' %}" class="btn btn-success">
+                            <i class="fas fa-list"></i> Ver Listas de Producción
+                        </a>
+                        <a href="javascript:location.reload()" class="btn btn-secondary">
+                            <i class="fas fa-sync"></i> Recargar Diagnóstico
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
