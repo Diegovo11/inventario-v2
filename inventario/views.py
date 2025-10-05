@@ -1041,6 +1041,9 @@ def verificar_compras(request, lista_id):
                         # Calcular cantidad en unidad base
                         cantidad_total = paquetes_comprados * resumen.material.factor_conversion
                         
+                        # Guardar cantidad anterior para el movimiento
+                        cantidad_anterior = resumen.material.cantidad_disponible
+                        
                         # Registrar entrada al inventario
                         resumen.material.cantidad_disponible += cantidad_total
                         resumen.material.save()
@@ -1050,8 +1053,10 @@ def verificar_compras(request, lista_id):
                             material=resumen.material,
                             tipo_movimiento='entrada',
                             cantidad=cantidad_total,
+                            cantidad_anterior=cantidad_anterior,
+                            cantidad_nueva=resumen.material.cantidad_disponible,
                             usuario=request.user,
-                            notas=f'Compra para lista: {lista.nombre} - {paquetes_comprados} {resumen.unidad_compra_display}{"s" if paquetes_comprados > 1 else ""}'
+                            detalle=f'Compra para lista: {lista.nombre} - {paquetes_comprados} {resumen.unidad_compra_display}{"s" if paquetes_comprados > 1 else ""}'
                         )
                         
                         # Actualizar resumen
