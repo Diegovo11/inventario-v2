@@ -1,8 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from decimal import Decimal
 from .models import (Material, Movimiento, ConfiguracionSistema, Monos, RecetaMonos, 
                    Simulacion, DetalleSimulacion, MovimientoEfectivo, ListaProduccion, 
-                   DetalleListaMonos, ResumenMateriales, VentaMonos)
+                   DetalleListaMonos, ResumenMateriales, VentaMonos, UserProfile)
 
 
 @admin.register(Material)
@@ -358,6 +362,103 @@ class MovimientoEfectivoAdmin(admin.ModelAdmin):
             return format_html('<span class="badge badge-info">Automático</span>')
         return format_html('<span class="badge badge-secondary">Manual</span>')
     automatico_badge.short_description = "Origen"
+    
+    actions = ['migrar_ventas_a_ventamonos']
+    
+    @admin.action(description='🔄 Migrar ventas seleccionadas a VentaMonos')
+    def migrar_ventas_a_ventamonos(self, request, queryset):
+        """Acción para migrar ventas antiguas de MovimientoEfectivo a VentaMonos"""
+        # Filtrar solo movimientos de venta
+        movimientos_venta = queryset.filter(tipo_movimiento='ingreso', categoria='venta')
+        
+        if not movimientos_venta.exists():
+            self.message_user(
+                request,
+                "No hay movimientos de venta en la selección.",
+                level=messages.WARNING
+            )
+            return
+        
+        ventas_creadas = 0
+        ventas_ya_existen = 0
+        errores = 0
+        
+        for mov in movimientos_venta:
+            # Extraer nombre de lista del concepto
+            if 'Lista:' not in mov.concepto:
+                errores += 1
+                continue
+            
+            nombre_lista = mov.concepto.split('Lista:')[1].strip()
+            
+            try:
+                # Buscar listas con ese nombre
+                listas_candidatas = ListaProduccion.objects.filter(nombre=nombre_lista, estado='finalizado')
+                
+                if listas_candidatas.count() == 0:
+                    errores += 1
+                    continue
+                elif listas_candidatas.count() == 1:
+                    lista = listas_candidatas.first()
+                else:
+                    # Si hay múltiples, usar la más cercana en fecha
+                    lista = None
+                    menor_diferencia = None
+                    
+                    for l in listas_candidatas:
+                        if l.fecha_finalizacion:
+                            diferencia = abs((l.fecha_finalizacion - mov.fecha).total_seconds())
+                            if menor_diferencia is None or diferencia < menor_diferencia:
+                                menor_diferencia = diferencia
+                                lista = l
+                    
+                    if lista is None:
+                        lista = listas_candidatas.order_by('-fecha_creacion').first()
+                
+                # Verificar si ya existen ventas para esta lista
+                if VentaMonos.objects.filter(lista_produccion=lista).exists():
+                    ventas_ya_existen += 1
+                    continue
+                
+                # Crear VentaMonos por cada detalle
+                detalles = lista.detalles_monos.all()
+                
+                for detalle in detalles:
+                    if detalle.cantidad_producida > 0:
+                        cantidad_vendida = detalle.cantidad_producida
+                        mono = detalle.monos
+                        precio_unitario = mono.precio_venta
+                        ingreso_total = Decimal(cantidad_vendida) * precio_unitario
+                        costo_unitario = mono.costo_produccion
+                        ganancia_total = ingreso_total - (costo_unitario * cantidad_vendida)
+                        
+                        VentaMonos.objects.create(
+                            lista_produccion=lista,
+                            monos=mono,
+                            cantidad_vendida=cantidad_vendida,
+                            tipo_venta=mono.tipo_venta,
+                            precio_unitario=precio_unitario,
+                            ingreso_total=ingreso_total,
+                            costo_unitario=costo_unitario,
+                            ganancia_total=ganancia_total,
+                            fecha=mov.fecha,
+                            usuario=mov.usuario
+                        )
+                        ventas_creadas += 1
+                        
+            except Exception as e:
+                errores += 1
+                continue
+        
+        # Mensaje de resultado
+        mensaje = f"Migración completada: {ventas_creadas} ventas creadas"
+        if ventas_ya_existen > 0:
+            mensaje += f", {ventas_ya_existen} ya existían"
+        if errores > 0:
+            mensaje += f", {errores} errores"
+        
+        nivel = messages.SUCCESS if ventas_creadas > 0 else messages.WARNING
+        self.message_user(request, mensaje, level=nivel)
 
 
 class DetalleListaMonosInline(admin.TabularInline):
@@ -485,6 +586,124 @@ class VentaMonosAdmin(admin.ModelAdmin):
         )
     ganancia_total_formatted.short_description = "Ganancia"
     ganancia_total_formatted.admin_order_field = 'ganancia_total'
+
+
+# ========================================================================================
+# ADMIN DE PERFILES DE USUARIO
+# ========================================================================================
+
+class UserProfileInline(admin.StackedInline):
+    """Inline para mostrar el perfil dentro del admin de User"""
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Perfil y Permisos'
+    fields = ['nivel', 'fecha_creacion', 'fecha_modificacion']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion']
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    """Administración de perfiles de usuario"""
+    list_display = ['user', 'nivel_badge', 'permisos_resumen', 'fecha_creacion']
+    list_filter = ['nivel', 'fecha_creacion']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'permisos_detalle']
+    
+    fieldsets = [
+        ('Usuario', {
+            'fields': ['user']
+        }),
+        ('Nivel de Acceso', {
+            'fields': ['nivel'],
+            'description': 'Define qué puede ver y hacer este usuario en el sistema'
+        }),
+        ('Permisos Otorgados', {
+            'fields': ['permisos_detalle'],
+            'classes': ['collapse']
+        }),
+        ('Fechas', {
+            'fields': ['fecha_creacion', 'fecha_modificacion'],
+            'classes': ['collapse']
+        })
+    ]
+    
+    def nivel_badge(self, obj):
+        colores = {
+            'superuser': 'danger',
+            'admin': 'warning',
+            'invitado': 'info'
+        }
+        return format_html(
+            '<span class="badge badge-{}">{}</span>',
+            colores.get(obj.nivel, 'secondary'),
+            obj.get_nivel_display()
+        )
+    nivel_badge.short_description = "Nivel"
+    
+    def permisos_resumen(self, obj):
+        permisos = []
+        if obj.puede_ver_precios():
+            permisos.append('💰 Precios')
+        if obj.puede_ver_flujo_efectivo():
+            permisos.append('💵 Efectivo')
+        if obj.puede_gestionar_ventas():
+            permisos.append('🛒 Ventas')
+        if obj.puede_ver_analytics():
+            permisos.append('📊 Analytics')
+        if obj.puede_modificar_configuracion():
+            permisos.append('⚙️ Config')
+        if obj.puede_gestionar_usuarios():
+            permisos.append('👥 Usuarios')
+        
+        return ' | '.join(permisos) if permisos else 'Sin permisos especiales'
+    permisos_resumen.short_description = "Permisos"
+    
+    def permisos_detalle(self, obj):
+        html = '<ul style="margin: 0; padding-left: 20px;">'
+        permisos = [
+            ('Ver precios de venta y costos', obj.puede_ver_precios()),
+            ('Ver flujo de efectivo (ingresos/egresos)', obj.puede_ver_flujo_efectivo()),
+            ('Gestionar ventas', obj.puede_gestionar_ventas()),
+            ('Ver dashboard de analytics', obj.puede_ver_analytics()),
+            ('Modificar configuración del sistema', obj.puede_modificar_configuracion()),
+            ('Gestionar usuarios', obj.puede_gestionar_usuarios()),
+        ]
+        
+        for permiso, tiene in permisos:
+            icono = '✅' if tiene else '❌'
+            html += f'<li>{icono} {permiso}</li>'
+        
+        html += '</ul>'
+        return format_html(html)
+    permisos_detalle.short_description = "Detalle de Permisos"
+
+
+# Extender el UserAdmin para incluir el perfil
+class CustomUserAdmin(BaseUserAdmin):
+    """UserAdmin personalizado que incluye el perfil"""
+    inlines = [UserProfileInline]
+    
+    list_display = ['username', 'email', 'first_name', 'last_name', 'nivel_usuario', 'is_staff']
+    
+    def nivel_usuario(self, obj):
+        if hasattr(obj, 'userprofile'):
+            colores = {
+                'superuser': 'danger',
+                'admin': 'warning',
+                'invitado': 'info'
+            }
+            return format_html(
+                '<span class="badge badge-{}">{}</span>',
+                colores.get(obj.userprofile.nivel, 'secondary'),
+                obj.userprofile.get_nivel_display()
+            )
+        return format_html('<span class="badge badge-secondary">Sin perfil</span>')
+    nivel_usuario.short_description = "Nivel"
+
+
+# Re-registrar User con el admin personalizado
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
 
 
 # Personalización del admin site

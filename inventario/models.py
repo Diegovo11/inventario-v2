@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Material(models.Model):
@@ -769,3 +771,73 @@ class ResumenMateriales(models.Model):
     
     def __str__(self):
         return f"{self.material.nombre} - Lista: {self.lista_produccion.nombre}"
+
+
+# ========================================================================================
+# SISTEMA DE PERMISOS Y PERFILES DE USUARIO
+# ========================================================================================
+
+class UserProfile(models.Model):
+    """Perfil de usuario con niveles de permisos personalizados"""
+    
+    NIVEL_CHOICES = [
+        ('superuser', 'Super Usuario'),
+        ('admin', 'Administrador'),
+        ('invitado', 'Invitado'),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userprofile')
+    nivel = models.CharField(max_length=20, choices=NIVEL_CHOICES, default='invitado')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    
+    # Permisos específicos (se calculan automáticamente según el nivel)
+    def puede_ver_precios(self):
+        """Puede ver precios de venta y costos de producción"""
+        return self.nivel in ['superuser', 'admin']
+    
+    def puede_ver_flujo_efectivo(self):
+        """Puede ver ingresos, egresos, movimientos de efectivo"""
+        return self.nivel in ['superuser', 'admin']
+    
+    def puede_gestionar_ventas(self):
+        """Puede registrar ventas y ver historial de ventas"""
+        return self.nivel in ['superuser', 'admin']
+    
+    def puede_ver_analytics(self):
+        """Puede ver dashboard de analytics con ganancias"""
+        return self.nivel in ['superuser', 'admin']
+    
+    def puede_modificar_configuracion(self):
+        """Puede modificar configuración del sistema"""
+        return self.nivel == 'superuser'
+    
+    def puede_gestionar_usuarios(self):
+        """Puede crear/editar/eliminar usuarios"""
+        return self.nivel == 'superuser'
+    
+    class Meta:
+        verbose_name = "Perfil de Usuario"
+        verbose_name_plural = "Perfiles de Usuario"
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.get_nivel_display()}"
+
+
+# Signal para crear perfil automáticamente cuando se crea un usuario
+@receiver(post_save, sender=User)
+def crear_perfil_usuario(sender, instance, created, **kwargs):
+    """Crea un perfil automáticamente cuando se crea un usuario"""
+    if created:
+        # Si es superuser, crear con nivel superuser
+        if instance.is_superuser:
+            UserProfile.objects.create(user=instance, nivel='superuser')
+        else:
+            UserProfile.objects.create(user=instance, nivel='invitado')
+
+
+@receiver(post_save, sender=User)
+def guardar_perfil_usuario(sender, instance, **kwargs):
+    """Guarda el perfil cuando se guarda el usuario"""
+    if hasattr(instance, 'userprofile'):
+        instance.userprofile.save()

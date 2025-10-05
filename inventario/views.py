@@ -12,6 +12,7 @@ from .forms import (MaterialForm, MonosForm, RecetaMonosFormSet, SimulacionForm,
                    SimulacionBusquedaForm, EntradaMaterialForm, SalidaMaterialForm, MovimientoFiltroForm,
                    EntradaDesdeSimulacionForm, SalidaDesdeSimulacionForm, MovimientoEfectivoForm, 
                    FiltroMovimientosEfectivoForm, ListaProduccionForm, DetalleListaMonosFormSet)
+from .permissions import requiere_nivel
 from django.core.paginator import Paginator
 from decimal import Decimal
 import math
@@ -3652,6 +3653,7 @@ def registrar_salida_materiales(request, lista_id):
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def registrar_ventas_contaduria(request, lista_id):
     """Registra las ventas de una lista de producción en contaduría"""
     lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)

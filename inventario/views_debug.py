@@ -389,7 +389,36 @@ def migrar_ventas_antiguas_web(request):
                     }
                     
                     try:
-                        lista = ListaProduccion.objects.get(nombre=nombre_lista)
+                        # Si hay múltiples listas con el mismo nombre, buscar la más cercana a la fecha del movimiento
+                        listas_candidatas = ListaProduccion.objects.filter(nombre=nombre_lista, estado='finalizado')
+                        
+                        if listas_candidatas.count() == 0:
+                            detalle_mov['estado'] = 'error'
+                            detalle_mov['mensaje'] = f'No se encontró lista finalizada con nombre "{nombre_lista}"'
+                            resultado['errores'] += 1
+                            resultado['errores_detalle'].append(f"{mov.concepto}: {detalle_mov['mensaje']}")
+                            resultado['detalles'].append(detalle_mov)
+                            continue
+                        elif listas_candidatas.count() == 1:
+                            lista = listas_candidatas.first()
+                        else:
+                            # Múltiples listas: buscar la más cercana por fecha
+                            from datetime import timedelta
+                            lista = None
+                            menor_diferencia = None
+                            
+                            for l in listas_candidatas:
+                                if l.fecha_finalizacion:
+                                    diferencia = abs((l.fecha_finalizacion - mov.fecha).total_seconds())
+                                    if menor_diferencia is None or diferencia < menor_diferencia:
+                                        menor_diferencia = diferencia
+                                        lista = l
+                            
+                            if lista is None:
+                                # Si ninguna tiene fecha_finalizacion, tomar la más reciente por fecha_creacion
+                                lista = listas_candidatas.order_by('-fecha_creacion').first()
+                            
+                            detalle_mov['info_adicional'] = f'Se encontraron {listas_candidatas.count()} listas. Usando la más cercana en fecha.'
                         
                         # Verificar si ya existen ventas
                         ventas_existentes = VentaMonos.objects.filter(lista_produccion=lista)

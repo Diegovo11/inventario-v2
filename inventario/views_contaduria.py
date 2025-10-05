@@ -8,10 +8,12 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from .models import MovimientoEfectivo
 from .forms import MovimientoEfectivoForm, FiltroMovimientosEfectivoForm
+from .permissions import requiere_nivel
 from datetime import datetime, timedelta
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def contaduria_home(request):
     """Vista principal del sistema de contaduría"""
     # Obtener saldo actual
@@ -46,6 +48,7 @@ def contaduria_home(request):
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def flujo_efectivo(request):
     """Vista para mostrar el flujo de efectivo con filtros"""
     filtro_form = FiltroMovimientosEfectivoForm(request.GET or None)
@@ -90,6 +93,7 @@ def flujo_efectivo(request):
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def registrar_movimiento_efectivo(request):
     """Vista para registrar movimientos de efectivo manuales"""
     if request.method == 'POST':
@@ -122,6 +126,7 @@ def registrar_movimiento_efectivo(request):
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def estado_resultados(request):
     """Vista para generar estado de resultados"""
     # Obtener fechas del formulario o usar mes actual por defecto
@@ -218,7 +223,8 @@ def estado_resultados(request):
     return render(request, 'inventario/estado_resultados.html', context)
 
 
-@login_required 
+@login_required
+@requiere_nivel('superuser', 'admin')
 def exportar_excel_efectivo(request):
     """Exportar movimientos de efectivo a Excel"""
     import openpyxl

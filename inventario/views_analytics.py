@@ -9,9 +9,11 @@ import json
 from decimal import Decimal
 
 from .models import MovimientoEfectivo, Simulacion, Monos, VentaMonos
+from .permissions import requiere_nivel
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def analytics_dashboard(request):
     """Dashboard de análisis de ventas y rendimiento"""
     
@@ -146,6 +148,7 @@ def analytics_dashboard(request):
 
 
 @login_required
+@requiere_nivel('superuser', 'admin')
 def analytics_detalle_mono(request, mono_id):
     """Vista detallada de análisis para un moño específico"""
     
