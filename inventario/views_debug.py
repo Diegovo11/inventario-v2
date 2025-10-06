@@ -500,3 +500,73 @@ def migrar_ventas_antiguas_web(request):
     }
     
     return render(request, 'inventario/migrar_ventas_antiguas.html', context)
+
+
+@staff_member_required
+def diagnostico_perfiles_web(request):
+    """Diagnostica y repara perfiles de usuario"""
+    from django.contrib.auth.models import User
+    from .models import UserProfile
+    
+    resultado = {
+        'usuarios_total': 0,
+        'con_perfil': 0,
+        'sin_perfil': 0,
+        'reparados': 0,
+        'errores': 0,
+        'detalles': []
+    }
+    
+    # Si viene con acción de reparar
+    reparar = request.GET.get('reparar') == 'true'
+    
+    try:
+        usuarios = User.objects.all()
+        resultado['usuarios_total'] = usuarios.count()
+        
+        for user in usuarios:
+            detalle = {
+                'username': user.username,
+                'email': user.email,
+                'is_superuser': user.is_superuser,
+                'is_staff': user.is_staff,
+                'tiene_perfil': False,
+                'nivel': None,
+                'accion': None
+            }
+            
+            # Verificar si tiene perfil
+            try:
+                perfil = user.userprofile
+                detalle['tiene_perfil'] = True
+                detalle['nivel'] = perfil.get_nivel_display()
+                resultado['con_perfil'] += 1
+            except UserProfile.DoesNotExist:
+                detalle['tiene_perfil'] = False
+                resultado['sin_perfil'] += 1
+                
+                # Si está en modo reparar, crear el perfil
+                if reparar:
+                    try:
+                        nivel = 'superuser' if user.is_superuser else 'invitado'
+                        perfil = UserProfile.objects.create(user=user, nivel=nivel)
+                        detalle['accion'] = f'✅ Perfil creado con nivel {perfil.get_nivel_display()}'
+                        resultado['reparados'] += 1
+                    except Exception as e:
+                        detalle['accion'] = f'❌ Error: {str(e)}'
+                        resultado['errores'] += 1
+                else:
+                    detalle['accion'] = '⚠️ Sin perfil - necesita reparación'
+            
+            resultado['detalles'].append(detalle)
+    
+    except Exception as e:
+        resultado['error_general'] = str(e)
+    
+    context = {
+        'resultado': resultado,
+        'reparar': reparar,
+        'titulo': 'Diagnóstico de Perfiles de Usuario'
+    }
+    
+    return render(request, 'inventario/diagnostico_perfiles.html', context)

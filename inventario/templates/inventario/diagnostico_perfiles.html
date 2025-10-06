@@ -1,0 +1,162 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-shield me-2"></i>{{ titulo }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Resumen -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ resultado.usuarios_total }}</h3>
+                                    <small>Usuarios Totales</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ resultado.con_perfil }}</h3>
+                                    <small>Con Perfil</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ resultado.sin_perfil }}</h3>
+                                    <small>Sin Perfil</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ resultado.reparados }}</h3>
+                                    <small>Reparados</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    {% if not reparar and resultado.sin_perfil > 0 %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>¡Atención!</strong> Hay {{ resultado.sin_perfil }} usuario(s) sin perfil.
+                        <a href="?reparar=true" class="btn btn-warning btn-sm ms-3">
+                            <i class="fas fa-wrench me-1"></i>Reparar Perfiles
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if reparar %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>¡Proceso completado!</strong> Se repararon {{ resultado.reparados }} perfiles.
+                        <a href="{% url 'inventario:diagnostico_perfiles_web' %}" class="btn btn-success btn-sm ms-3">
+                            <i class="fas fa-redo me-1"></i>Ver Estado Actualizado
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if resultado.errores > 0 %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle me-2"></i>
+                        <strong>Errores:</strong> {{ resultado.errores }} perfiles no pudieron repararse.
+                    </div>
+                    {% endif %}
+
+                    <!-- Tabla de detalles -->
+                    <div class="table-responsive mt-4">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Email</th>
+                                    <th>Superusuario</th>
+                                    <th>Staff</th>
+                                    <th>Tiene Perfil</th>
+                                    <th>Nivel</th>
+                                    <th>Estado / Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detalle in resultado.detalles %}
+                                <tr class="{% if not detalle.tiene_perfil %}table-danger{% endif %}">
+                                    <td><strong>{{ detalle.username }}</strong></td>
+                                    <td>{{ detalle.email|default:"-" }}</td>
+                                    <td>
+                                        {% if detalle.is_superuser %}
+                                        <span class="badge bg-danger">Sí</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if detalle.is_staff %}
+                                        <span class="badge bg-warning">Sí</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if detalle.tiene_perfil %}
+                                        <span class="badge bg-success">✓</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">✗</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if detalle.nivel %}
+                                        <span class="badge bg-primary">{{ detalle.nivel }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ detalle.accion|default:"OK" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">No hay usuarios en el sistema</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Información adicional -->
+                    <div class="mt-4">
+                        <h5>Información sobre Niveles de Usuario</h5>
+                        <ul>
+                            <li><span class="badge bg-danger">SUPERUSER</span>: Acceso total al sistema, incluyendo gestión de usuarios</li>
+                            <li><span class="badge bg-warning">ADMIN</span>: Puede ver precios, costos, y gestionar ventas y contaduría</li>
+                            <li><span class="badge bg-info">INVITADO</span>: Solo puede ver inventario y crear listas de producción (sin ver precios)</li>
+                        </ul>
+                    </div>
+
+                    <!-- Botón para volver -->
+                    <div class="mt-4">
+                        <a href="{% url 'inventario:home' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
