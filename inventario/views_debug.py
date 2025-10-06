@@ -502,11 +502,17 @@ def migrar_ventas_antiguas_web(request):
     return render(request, 'inventario/migrar_ventas_antiguas.html', context)
 
 
-@staff_member_required
+@login_required
 def diagnostico_perfiles_web(request):
     """Diagnostica y repara perfiles de usuario"""
     from django.contrib.auth.models import User
     from .models import UserProfile
+    
+    # Verificar que sea superuser o staff
+    if not (request.user.is_superuser or request.user.is_staff):
+        return render(request, 'inventario/sin_permiso.html', {
+            'mensaje': 'Solo administradores pueden acceder a esta herramienta.'
+        }, status=403)
     
     resultado = {
         'usuarios_total': 0,
