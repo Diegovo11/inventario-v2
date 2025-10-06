@@ -804,6 +804,11 @@ document.addEventListener('DOMContentLoaded', function() {
 $(document).ready(function() {
     // Función para inicializar Select2 en un select
     function initializeSelect2(selectElement) {
+        // Verificar si ya tiene Select2
+        if ($(selectElement).hasClass('select2-hidden-accessible')) {
+            return;
+        }
+        
         $(selectElement).select2({
             theme: 'bootstrap-5',
             language: 'es',
@@ -813,6 +818,8 @@ $(document).ready(function() {
             templateResult: formatMonoOption,
             templateSelection: formatMonoSelection
         });
+        
+        console.log('✅ Select2 inicializado en:', selectElement.name);
     }
     
     // Formato personalizado para las opciones del dropdown
@@ -842,24 +849,56 @@ $(document).ready(function() {
     }
     
     // Inicializar Select2 en todos los selects de moños existentes
-    $('select[name$="-monos"]').each(function() {
-        initializeSelect2(this);
+    function initializeAllSelects() {
+        $('select[name$="-monos"]').each(function() {
+            initializeSelect2(this);
+        });
+    }
+    
+    // Inicializar selects existentes
+    initializeAllSelects();
+    
+    // Observar cambios en el DOM para detectar nuevos selects
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.addedNodes.length) {
+                mutation.addedNodes.forEach(function(node) {
+                    // Si el nodo es un elemento HTML
+                    if (node.nodeType === 1) {
+                        // Buscar selects de moños dentro del nodo agregado
+                        $(node).find('select[name$="-monos"]').each(function() {
+                            console.log('🆕 Nuevo select detectado, inicializando Select2...');
+                            initializeSelect2(this);
+                        });
+                        
+                        // Si el nodo mismo es un select
+                        if ($(node).is('select[name$="-monos"]')) {
+                            console.log('🆕 Nuevo select detectado (directo), inicializando Select2...');
+                            initializeSelect2(node);
+                        }
+                    }
+                });
+            }
+        });
     });
     
-    // Cuando se añade un nuevo formulario, inicializar Select2
-    const originalAddForm = window.addForm;
-    if (originalAddForm) {
-        window.addForm = function() {
-            originalAddForm();
-            // Buscar el último select agregado e inicializar Select2
-            setTimeout(function() {
-                const lastSelect = $('select[name$="-monos"]').last();
-                if (lastSelect.length && !lastSelect.hasClass('select2-hidden-accessible')) {
-                    initializeSelect2(lastSelect);
-                }
-            }, 100);
-        };
+    // Configurar el observer para observar el contenedor de formularios
+    const formContainer = document.getElementById('formset-container');
+    if (formContainer) {
+        observer.observe(formContainer, {
+            childList: true,
+            subtree: true
+        });
+        console.log('👁️ Observer configurado para detectar nuevos selects');
     }
+    
+    // Backup: También interceptar el botón de agregar moño
+    $('#add-mono').on('click', function() {
+        console.log('🔘 Botón agregar clickeado');
+        setTimeout(function() {
+            initializeAllSelects();
+        }, 200);
+    });
 });
 </script>
 {% endblock %}
