@@ -43,6 +43,7 @@ urlpatterns = [
     path('lista-produccion/<int:lista_id>/enviar-reabastecimiento/', views.enviar_a_reabastecimiento, name='enviar_a_reabastecimiento'),
     path('lista-produccion/<int:lista_id>/registrar-entrada/', views.registrar_entrada_reabastecimiento, name='registrar_entrada_reabastecimiento'),
     path('lista-produccion/<int:lista_id>/iniciar-produccion/', views.iniciar_produccion, name='iniciar_produccion'),
+    path('lista-produccion/<int:lista_id>/enviar-a-salida/', views.enviar_a_salida, name='enviar_a_salida'),
     path('lista-produccion/<int:lista_id>/registrar-salida-materiales/', views.registrar_salida_materiales, name='registrar_salida_materiales'),
     path('lista-produccion/<int:lista_id>/registrar-ventas/', views.registrar_ventas_contaduria, name='registrar_ventas_contaduria'),
     path('lista-compras/', views.lista_de_compras, name='lista_de_compras'),

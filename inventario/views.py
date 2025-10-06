@@ -1747,11 +1747,18 @@ def reabastecimiento(request):
                         usuario=request.user
                     )
                 
-                messages.success(
-                    request, 
-                    f'¡Salida de "{lista.nombre}" registrada exitosamente! '
-                    f'Venta registrada en contaduría: ${ingreso_total_venta:,.2f}'
-                )
+                # Mensaje según permiso del usuario
+                if hasattr(request.user, 'userprofile') and request.user.userprofile.puede_ver_precios():
+                    messages.success(
+                        request, 
+                        f'¡Salida de "{lista.nombre}" registrada exitosamente! '
+                        f'Venta registrada en contaduría: ${ingreso_total_venta:,.2f}'
+                    )
+                else:
+                    messages.success(
+                        request, 
+                        f'¡Salida de "{lista.nombre}" registrada exitosamente!'
+                    )
                     
         except ListaProduccion.DoesNotExist:
             messages.error(request, 'Lista de producción no encontrada.')
@@ -3589,14 +3596,14 @@ def iniciar_produccion(request, lista_id):
     """Inicia la producción de una lista, descontando materiales del inventario"""
     if request.method != 'POST':
         messages.error(request, 'Método no permitido.')
-        return redirect('inventario:reabastecimiento')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
     
     try:
         lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
         
         if lista.estado != 'reabastecido':
             messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "Reabastecido" para iniciar producción.')
-            return redirect('inventario:reabastecimiento')
+            return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
         
         # Descontar materiales
         materiales_descontados = descontar_materiales_produccion(lista, request.user)
@@ -3606,11 +3613,37 @@ def iniciar_produccion(request, lista_id):
         lista.save()
         
         messages.success(request, f'Producción iniciada para "{lista.nombre}". {materiales_descontados} materiales descontados del inventario.')
-        return redirect('inventario:reabastecimiento')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
         
     except Exception as e:
         messages.error(request, f'Error al iniciar producción: {str(e)}')
-        return redirect('inventario:reabastecimiento')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
+
+
+@login_required
+def enviar_a_salida(request, lista_id):
+    """Envía la lista de producción de 'en_produccion' a 'en_salida'"""
+    if request.method != 'POST':
+        messages.error(request, 'Método no permitido.')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
+    
+    try:
+        lista = get_object_or_404(ListaProduccion, id=lista_id, usuario_creador=request.user)
+        
+        if lista.estado != 'en_produccion':
+            messages.error(request, f'La lista "{lista.nombre}" debe estar en estado "En Producción" para enviarla a salida.')
+            return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
+        
+        # Cambiar estado
+        lista.estado = 'en_salida'
+        lista.save()
+        
+        messages.success(request, f'Lista "{lista.nombre}" enviada a Salida. Ahora puedes registrar las ventas.')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
+        
+    except Exception as e:
+        messages.error(request, f'Error al enviar a salida: {str(e)}')
+        return redirect('inventario:panel_lista_produccion', lista_id=lista_id)
 
 
 @login_required
