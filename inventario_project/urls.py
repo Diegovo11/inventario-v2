@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
-from django.contrib.auth import views as auth_views
+from django.contrib.auth import views as auth_views, logout
 from django.http import JsonResponse
 
 def redirect_to_inventario(request):
@@ -28,6 +28,11 @@ def healthcheck(request):
     """Vista simple para healthcheck de Railway"""
     return JsonResponse({"status": "ok", "service": "inventario-v2"})
 
+def custom_logout(request):
+    """Vista de logout que acepta GET y POST"""
+    logout(request)
+    return redirect('login')
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('inventario/', include('inventario.urls')),
@@ -37,7 +42,7 @@ urlpatterns = [
     
     # Authentication URLs
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('logout/', custom_logout, name='logout'),
     
     path('', redirect_to_inventario),  # Página raíz redirige al inventario
 ]
