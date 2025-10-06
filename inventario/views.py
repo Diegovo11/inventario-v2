@@ -2285,7 +2285,11 @@ def procesar_simulacion_completa(request, simulacion_id):
                     usuario=request.user
                 )
                 
-                messages.success(request, f'Simulación procesada exitosamente. {len(materiales_utilizados)} materiales utilizados. Venta registrada por ${simulacion.ingreso_total_venta:.2f}.')
+                # Mensaje según permiso del usuario
+                if hasattr(request.user, 'userprofile') and request.user.userprofile.puede_ver_precios():
+                    messages.success(request, f'Simulación procesada exitosamente. {len(materiales_utilizados)} materiales utilizados. Venta registrada por ${simulacion.ingreso_total_venta:.2f}.')
+                else:
+                    messages.success(request, f'Simulación procesada exitosamente. {len(materiales_utilizados)} materiales utilizados.')
                 return redirect('inventario:detalle_simulacion', simulacion_id=simulacion.id)
         
         # GET request - mostrar confirmación
