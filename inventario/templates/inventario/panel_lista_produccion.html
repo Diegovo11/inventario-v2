@@ -326,7 +326,9 @@
                                         <br>
                                         <small class="text-muted">{{ detalle.cantidad_total_planificada }} unid.</small>
                                     </div>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     <small class="text-success">${{ detalle.total_estimado|floatformat:2 }}</small>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endfor %}
