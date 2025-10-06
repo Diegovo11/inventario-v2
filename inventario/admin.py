@@ -691,9 +691,11 @@ class UserProfileAdmin(admin.ModelAdmin):
 # Extender el UserAdmin para incluir el perfil
 class CustomUserAdmin(BaseUserAdmin):
     """UserAdmin personalizado que incluye el perfil"""
-    inlines = [UserProfileInline]
+    # NOTA: Inline desactivado para evitar conflictos con el signal
+    # El signal se encarga automáticamente de crear el UserProfile
+    # inlines = [UserProfileInline]
     
-    list_display = ['username', 'email', 'first_name', 'last_name', 'nivel_usuario', 'is_staff']
+    list_display = ['username', 'email', 'first_name', 'last_name', 'nivel_usuario', 'editar_perfil', 'is_staff']
     
     def nivel_usuario(self, obj):
         if hasattr(obj, 'userprofile'):
@@ -709,6 +711,15 @@ class CustomUserAdmin(BaseUserAdmin):
             )
         return format_html('<span class="badge badge-secondary">Sin perfil</span>')
     nivel_usuario.short_description = "Nivel"
+    
+    def editar_perfil(self, obj):
+        if hasattr(obj, 'userprofile'):
+            return format_html(
+                '<a href="/admin/inventario/userprofile/{}/change/" class="button">Editar Perfil</a>',
+                obj.userprofile.id
+            )
+        return format_html('<span class="text-muted">-</span>')
+    editar_perfil.short_description = "Perfil"
 
 
 # Re-registrar User con el admin personalizado
