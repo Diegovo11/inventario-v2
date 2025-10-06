@@ -25,6 +25,7 @@
             {% if materiales_faltantes %}
             <div class="row">
                 <!-- Resumen de Costos -->
+                {% if user.userprofile.puede_ver_precios %}
                 <div class="col-lg-4">
                     <div class="card shadow-sm">
                         <div class="card-header bg-primary text-white">
@@ -50,9 +51,10 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Lista de Materiales a Reabastecer -->
-                <div class="col-lg-8">
+                <div class="{% if user.userprofile.puede_ver_precios %}col-lg-8{% else %}col-12{% endif %}">
                     <div class="card shadow-sm">
                         <div class="card-header bg-warning text-dark">
                             <h5 class="mb-0">
@@ -69,7 +71,9 @@
                                             <th>Stock Actual</th>
                                             <th>Cantidad Faltante</th>
                                             <th>Cantidad a Comprar</th>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <th>Costo Estimado</th>
+                                            {% endif %}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -88,16 +92,20 @@
                                             <td>
                                                 <span class="badge bg-danger">{{ item.faltante }} {{ item.material.unidad_base }}</span>
                                             </td>
-                                            <td>
+                                                                                        <td>
                                                 <span class="badge bg-primary">{{ item.cantidad_a_comprar }} {{ item.material.unidad_base }}</span>
                                                 {% if item.material.factor_conversion > 1 %}
                                                 <br><small class="text-muted">{{ item.cantidad_a_comprar|div:item.material.factor_conversion|floatformat:0 }} {{ item.material.tipo_material }}(s)</small>
                                                 {% endif %}
                                             </td>
+                                            {% if user.userprofile.puede_ver_precios %}
                                             <td>
                                                 <strong class="text-success">${{ item.costo|floatformat:2 }}</strong>
                                                 <br><small class="text-muted">${{ item.material.costo_unitario|floatformat:2 }}/{{ item.material.unidad_base }}</small>
                                             </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -127,16 +135,27 @@
                                 <ul class="mb-0">
                                     <li>Se registrarán automáticamente las <strong>entradas de materiales</strong> necesarias</li>
                                     <li>Se <strong>actualizará el inventario</strong> con las nuevas cantidades</li>
+                                    {% if user.userprofile.puede_ver_precios %}
                                     <li>Se calculará el <strong>costo total de la compra</strong> basado en precios actuales</li>
+                                    {% endif %}
                                     <li>Después del reabastecimiento, se <strong>procesará automáticamente la simulación</strong></li>
                                 </ul>
                             </div>
 
-                            <form method="post" class="d-flex gap-2" onsubmit="return confirmarReabastecimiento()">
+                            <form method="post" class="d-flex gap-2" 
+                                  onsubmit="return confirmarReabastecimiento()"
+                                  data-materiales="{{ materiales_faltantes|length }}"
+                                  {% if user.userprofile.puede_ver_precios %}
+                                  data-costo="{{ costo_total_estimado|floatformat:2 }}"
+                                  data-mostrar-precio="true"
+                                  {% else %}
+                                  data-mostrar-precio="false"
+                                  {% endif %}
+                                  id="formReabastecimiento">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-success btn-lg">
                                     <i class="fas fa-shopping-cart me-1"></i>
-                                    Reabastecer y Procesar (${​{ costo_total_estimado|floatformat:2 }})
+                                    Reabastecer y Procesar{% if user.userprofile.puede_ver_precios %} (${{ costo_total_estimado|floatformat:2 }}){% endif %}
                                 </button>
                                 <a href="{% url 'inventario:procesar_simulacion_completa' simulacion.id %}" class="btn btn-outline-warning btn-lg">
                                     <i class="fas fa-exclamation-triangle me-1"></i>
@@ -177,16 +196,23 @@
 {% block extra_js %}
 <script>
 function confirmarReabastecimiento() {
-    const costo = parseFloat('{{ costo_total_estimado|floatformat:2 }}');
-    const materiales = parseInt('{{ materiales_faltantes|length }}');
+    const form = document.getElementById('formReabastecimiento');
+    const materiales = parseInt(form.dataset.materiales);
+    const mostrarPrecio = form.dataset.mostrarPrecio === 'true';
+    const costo = mostrarPrecio ? parseFloat(form.dataset.costo) : 0;
     
-    return confirm(
-        `¿Confirmas el reabastecimiento automático?\n\n` +
-        `• ${materiales} materiales serán reabastecidos\n` +
-        `• Costo total: $${costo.toFixed(2)}\n` +
-        `• Después se procesará automáticamente la simulación\n\n` +
-        `Esta acción no se puede deshacer.`
-    );
+    let mensaje = `¿Confirmas el reabastecimiento automático?\n\n`;
+    mensaje += `• ${materiales} materiales serán reabastecidos\n`;
+    
+    if (mostrarPrecio) {
+        mensaje += `• Costo total: $${costo.toFixed(2)}\n`;
+    }
+    
+    mensaje += `• Se actualizará el inventario\n`;
+    mensaje += `• Se procesará la simulación automáticamente\n\n`;
+    mensaje += `Esta acción no se puede deshacer.`;
+    
+    return confirm(mensaje);
 }
 
 // Filtro personalizado para división en templates
