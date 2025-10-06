@@ -532,6 +532,7 @@ def diagnostico_perfiles_web(request):
         
         for user in usuarios:
             detalle = {
+                'id': user.id,
                 'username': user.username,
                 'email': user.email,
                 'is_superuser': user.is_superuser,
@@ -568,6 +569,23 @@ def diagnostico_perfiles_web(request):
     
     except Exception as e:
         resultado['error_general'] = str(e)
+    
+    # Verificar si se está promoviendo un usuario
+    promover_user_id = request.GET.get('promover')
+    if promover_user_id:
+        try:
+            user = User.objects.get(id=promover_user_id)
+            user.is_superuser = True
+            user.is_staff = True
+            user.save()
+            
+            if hasattr(user, 'userprofile'):
+                user.userprofile.nivel = 'superuser'
+                user.userprofile.save()
+            
+            resultado['promovido'] = f'✅ Usuario {user.username} promovido a SUPERUSUARIO'
+        except Exception as e:
+            resultado['error_promocion'] = f'❌ Error al promover: {str(e)}'
     
     context = {
         'resultado': resultado,

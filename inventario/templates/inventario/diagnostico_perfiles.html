@@ -62,6 +62,23 @@
                     </div>
                     {% endif %}
 
+                    {% if resultado.promovido %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-crown me-2"></i>
+                        {{ resultado.promovido }}
+                        <a href="{% url 'inventario:diagnostico_perfiles_web' %}" class="btn btn-success btn-sm ms-3">
+                            <i class="fas fa-redo me-1"></i>Actualizar
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if resultado.error_promocion %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle me-2"></i>
+                        {{ resultado.error_promocion }}
+                    </div>
+                    {% endif %}
+
                     {% if reparar %}
                     <div class="alert alert-success">
                         <i class="fas fa-check-circle me-2"></i>
@@ -91,6 +108,7 @@
                                     <th>Tiene Perfil</th>
                                     <th>Nivel</th>
                                     <th>Estado / Acción</th>
+                                    <th>Acciones Rápidas</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -127,10 +145,19 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ detalle.accion|default:"OK" }}</td>
+                                    <td>
+                                        {% if not detalle.is_superuser %}
+                                        <a href="?promover={{ detalle.id }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Promover a {{ detalle.username }} como SUPERUSUARIO?')">
+                                            <i class="fas fa-crown me-1"></i>Hacer Superusuario
+                                        </a>
+                                        {% else %}
+                                        <span class="text-success"><i class="fas fa-check"></i> Ya es superusuario</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted">No hay usuarios en el sistema</td>
+                                    <td colspan="8" class="text-center text-muted">No hay usuarios en el sistema</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
