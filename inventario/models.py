@@ -828,8 +828,8 @@ class UserProfile(models.Model):
 @receiver(post_save, sender=User)
 def crear_perfil_usuario(sender, instance, created, **kwargs):
     """Crea un perfil automáticamente cuando se crea un usuario"""
-    if created:
-        # Si es superuser, crear con nivel superuser
+    # No crear si viene del admin inline (el inline lo maneja)
+    if created and not kwargs.get('raw', False):
         nivel = 'superuser' if instance.is_superuser else 'invitado'
         UserProfile.objects.get_or_create(user=instance, defaults={'nivel': nivel})
 
@@ -837,5 +837,9 @@ def crear_perfil_usuario(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def guardar_perfil_usuario(sender, instance, **kwargs):
     """Guarda el perfil cuando se guarda el usuario"""
-    if hasattr(instance, 'userprofile'):
-        instance.userprofile.save()
+    # Solo guardar si ya existe el perfil
+    if hasattr(instance, 'userprofile') and not kwargs.get('raw', False):
+        try:
+            instance.userprofile.save()
+        except Exception:
+            pass  # Evitar errores si el perfil está siendo creado

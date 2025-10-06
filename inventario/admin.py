@@ -599,6 +599,16 @@ class UserProfileInline(admin.StackedInline):
     verbose_name_plural = 'Perfil y Permisos'
     fields = ['nivel', 'fecha_creacion', 'fecha_modificacion']
     readonly_fields = ['fecha_creacion', 'fecha_modificacion']
+    
+    def get_or_create_instance(self, request, obj=None):
+        """Sobrescribir para usar get_or_create en lugar de create"""
+        if obj:
+            profile, created = UserProfile.objects.get_or_create(
+                user=obj,
+                defaults={'nivel': 'superuser' if obj.is_superuser else 'invitado'}
+            )
+            return profile
+        return super().get_or_create_instance(request, obj)
 
 
 @admin.register(UserProfile)
