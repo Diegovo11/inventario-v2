@@ -830,10 +830,8 @@ def crear_perfil_usuario(sender, instance, created, **kwargs):
     """Crea un perfil automáticamente cuando se crea un usuario"""
     if created:
         # Si es superuser, crear con nivel superuser
-        if instance.is_superuser:
-            UserProfile.objects.create(user=instance, nivel='superuser')
-        else:
-            UserProfile.objects.create(user=instance, nivel='invitado')
+        nivel = 'superuser' if instance.is_superuser else 'invitado'
+        UserProfile.objects.get_or_create(user=instance, defaults={'nivel': nivel})
 
 
 @receiver(post_save, sender=User)
