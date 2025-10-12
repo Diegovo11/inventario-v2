@@ -25,10 +25,10 @@ class VentaMonos(models.Model):
 ```
 
 Características:
-- ✅ Distingue entre ventas individuales y por par
-- ✅ Calcula automáticamente cantidad total de moños (pares = cantidad × 2)
-- ✅ Registra ganancia individual por venta
-- ✅ Índices en base de datos para consultas rápidas
+- Distingue entre ventas individuales y por par
+- Calcula automáticamente cantidad total de moños (pares = cantidad × 2)
+- Registra ganancia individual por venta
+- Índices en base de datos para consultas rápidas
 
 2. Registro Automático de Ventas
 
