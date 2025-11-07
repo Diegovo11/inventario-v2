@@ -26,7 +26,10 @@ def redirect_to_inventario(request):
 
 def healthcheck(request):
     """Vista simple para healthcheck de Railway"""
-    return JsonResponse({"status": "ok", "service": "inventario-v2"})
+    try:
+        return JsonResponse({"status": "ok", "service": "inventario-v2", "timestamp": "2025-11-07"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "error": str(e)}, status=500)
 
 def custom_logout(request):
     """Vista de logout que acepta GET y POST"""
