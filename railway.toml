@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Comando ultra-simplificado - solo iniciar gunicorn (sin migraciones)
-startCommand = "python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
+# Comando con migraciones para SQLite (que sí funciona)
+startCommand = "python manage.py migrate && python manage.py create_admin && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
 # healthcheckPath = "/health/"  # Temporalmente deshabilitado
 # healthcheckTimeout = 100
 restartPolicyType = "on_failure"
