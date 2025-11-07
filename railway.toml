@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Comando simplificado temporalmente - ejecutar migraciones después
-startCommand = "echo 'DEBUG: Iniciando deploy...' && env | grep -E '(DATABASE|RAILWAY|SECRET|DEBUG)' && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
+# Comando ultra-simplificado - solo iniciar gunicorn (sin migraciones)
+startCommand = "python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
 healthcheckPath = "/health/"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
