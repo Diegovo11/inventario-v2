@@ -9,10 +9,5 @@ healthcheckTimeout = 100
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-[deploy]
-# Comando simplificado para evitar problemas de conexión inicial
-startCommand = "python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
-healthcheckPath = "/health/"
-
 [env]
 NIXPACKS_PYTHON_VERSION = "3.12"
