@@ -103,7 +103,7 @@ print(f"🔍 DEBUG: DATABASE_URL value: {database_url[:50] if database_url else 
 print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
 print(f"🔍 DEBUG: All env vars with DATABASE: {[k for k in os.environ.keys() if 'DATABASE' in k]}")
 
-if database_url:
+if database_url and False:  # Temporalmente deshabilitado hasta que PostgreSQL funcione
     # Configuración para Railway (PostgreSQL)
     import dj_database_url
     print(f"🔗 DATABASE_URL detectada: {database_url[:50]}...")
