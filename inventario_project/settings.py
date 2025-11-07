@@ -103,22 +103,34 @@ print(f"🔍 DEBUG: DATABASE_URL value: {database_url[:50] if database_url else 
 print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
 print(f"🔍 DEBUG: All env vars with DATABASE: {[k for k in os.environ.keys() if 'DATABASE' in k]}")
 
-if database_url and False:  # Temporalmente deshabilitado hasta que PostgreSQL funcione
+if database_url:  # Usar PostgreSQL cuando esté disponible
     # Configuración para Railway (PostgreSQL)
     import dj_database_url
     print(f"🔗 DATABASE_URL detectada: {database_url[:50]}...")
     
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=database_url,
-            conn_max_age=0,  # Desactivar connection pooling temporalmente
-            conn_health_checks=False,  # Desactivar health checks
-        )
-    }
-    print(f"✅ USANDO POSTGRESQL CORRECTAMENTE")
-    print(f"🚀 ENGINE: {DATABASES['default'].get('ENGINE', 'No engine')}")
-    print(f"🚀 HOST: {DATABASES['default'].get('HOST', 'No host')}")
-    print(f"🚀 NAME: {DATABASES['default'].get('NAME', 'No name')}")
+    try:
+        # Intentar configurar PostgreSQL
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=database_url,
+                conn_max_age=0,  # Desactivar connection pooling temporalmente
+                conn_health_checks=False,  # Desactivar health checks
+            )
+        }
+        print(f"✅ USANDO POSTGRESQL CORRECTAMENTE")
+        print(f"🚀 ENGINE: {DATABASES['default'].get('ENGINE', 'No engine')}")
+        print(f"🚀 HOST: {DATABASES['default'].get('HOST', 'No host')}")
+        print(f"🚀 NAME: {DATABASES['default'].get('NAME', 'No name')}")
+    except Exception as e:
+        print(f"⚠️ Error configurando PostgreSQL: {e}")
+        print(f"🔄 Fallback a SQLite temporalmente")
+        # Fallback a SQLite si PostgreSQL falla
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 elif railway_env:
     # Estamos en Railway pero no hay DATABASE_URL - PROBLEMA!
     print("❌ ERROR: Estamos en Railway pero no hay DATABASE_URL!")
