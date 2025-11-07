@@ -32,10 +32,10 @@ ALLOWED_HOSTS = ['*'] if config('RAILWAY_ENVIRONMENT', default=None) else ['127.
 
 # CSRF Configuration for Railway
 CSRF_TRUSTED_ORIGINS = [
-    'https://web-production-944d97.up.railway.app',
+    'https://inventario-v2-magicos.up.railway.app',  # Dominio actual
+    'https://web-production-944d97.up.railway.app',   # Dominio anterior
     'https://*.up.railway.app',
     'https://*.railway.app',
-    'https://trustworthy-tranquility-production.up.railway.app',
 ]
 
 # Si estamos en Railway, configurar CSRF correctamente
