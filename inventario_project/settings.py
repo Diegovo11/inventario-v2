@@ -35,6 +35,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://web-production-944d97.up.railway.app',
     'https://*.up.railway.app',
     'https://*.railway.app',
+    'https://trustworthy-tranquility-production.up.railway.app',
 ]
 
 # Si estamos en Railway, configurar CSRF correctamente
