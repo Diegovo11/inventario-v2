@@ -132,10 +132,9 @@ if database_url:  # Usar PostgreSQL cuando esté disponible
             }
         }
 elif railway_env:
-    # Estamos en Railway pero no hay DATABASE_URL - PROBLEMA!
-    print("❌ ERROR: Estamos en Railway pero no hay DATABASE_URL!")
-    print("❌ Esto causará pérdida de datos. Agrega PostgreSQL en Railway.")
-    # Usar SQLite como fallback pero con advertencia
+    # Estamos en Railway pero no hay DATABASE_URL - usar SQLite como fallback
+    print("⚠️ WARNING: En Railway pero usando SQLite (PostgreSQL no disponible)")
+    print("📝 Usando SQLite como fallback temporal")
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
