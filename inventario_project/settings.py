@@ -94,12 +94,14 @@ WSGI_APPLICATION = 'inventario_project.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Configuración de base de datos que funciona tanto en desarrollo como en Railway
-# Usar os.environ directamente para mayor confiabilidad en Railway
-database_url = os.environ.get('DATABASE_URL')
-railway_env = os.environ.get('RAILWAY_ENVIRONMENT')
+# Intentar múltiples métodos para obtener DATABASE_URL
+database_url = os.environ.get('DATABASE_URL') or config('DATABASE_URL', default=None)
+railway_env = os.environ.get('RAILWAY_ENVIRONMENT') or config('RAILWAY_ENVIRONMENT', default=None)
 
 print(f"🔍 DEBUG: DATABASE_URL exists: {database_url is not None}")
+print(f"🔍 DEBUG: DATABASE_URL value: {database_url[:50] if database_url else 'None'}...")
 print(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {railway_env}")
+print(f"🔍 DEBUG: All env vars with DATABASE: {[k for k in os.environ.keys() if 'DATABASE' in k]}")
 
 if database_url:
     # Configuración para Railway (PostgreSQL)
