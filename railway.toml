@@ -2,8 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Comando simplificado para evitar problemas de conexión durante el build
-startCommand = "python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
+# Comando completo con debug mejorado
+startCommand = "echo 'DEBUG: Iniciando deploy...' && env | grep -E '(DATABASE|RAILWAY|SECRET|DEBUG)' && python manage.py migrate && python manage.py create_admin && python manage.py verificar_db && python manage.py collectstatic --noinput && gunicorn inventario_project.wsgi --bind 0.0.0.0:$PORT --timeout 120"
 healthcheckPath = "/health/"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
